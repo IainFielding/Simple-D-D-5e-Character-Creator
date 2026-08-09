@@ -160,9 +160,9 @@ const KNOWN = [
     note: "As `advancementOrigin`; appears when the two builds create a duplicate pair in opposite "
       + "order, so the normaliser numbers them the other way round." },
   { sig: "source.items.*.effects[]",
-    note: "An enchantment effect (\"Spell Changes\") on one build's copy of a duplicated spell — the "
-      + "Grave Domain / Spare the Dying case, where both builds hold both copies but attribute them "
-      + "to different features. Under investigation; not yet raised upstream." },
+    note: "An enchantment effect (\"Spell Changes\") on the copy one build holds and the other does "
+      + "not — part of the upstream cached-spell drop, not a difference of its own. Clean-room "
+      + "confirmed." },
   { sig: "source.actor.system.attributes.hp.value",
     note: "Current hit points, with a per-level maximum-HP bonus in play (Dwarven Toughness, the "
       + "Tough feat). Measured against `hp.max`, ours sits *at* maximum and the native reference "
@@ -187,8 +187,9 @@ const KNOWN = [
     note: "A cached spell sits at `prepared: 0`; this appears wherever one build holds that copy and "
       + "the other does not. Travels with the cached-spell cause." },
   { sig: "source.items.*.system.sourceItem",
-    note: "Which feature a duplicated spell is attributed to — the Grave Domain / Spare the Dying "
-      + "case. Both builds hold both copies; they disagree about which granted which." },
+    note: "Which feature a spell is attributed to. Appears where one build holds a copy the other "
+      + "lost, so the normaliser lines the granted copy up against the cached one — pairing noise "
+      + "downstream of the cached-spell drop, not an attribution disagreement." },
   { sig: "source.items.*.flags.dnd5e.riders.effect",
     note: "The partial form of the empty-riders flag the driver now clears on update. One item, and "
       + "empty on both sides — see the riders note in the README." },

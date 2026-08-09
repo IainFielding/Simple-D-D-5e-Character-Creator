@@ -1012,6 +1012,10 @@ diff paired `#1` against `#2` and reported every field of both as different — 
 fact identical, just crossed. `normalize.mjs` now breaks the tie on a content digest that ignores
 ids, timestamps and flags, so a duplicate always takes the same number as its counterpart.
 
+That fix holds. **Shadow Sorcery's *current* difference is not this bug** — it is the upstream
+cached-spell drop above, clean-room confirmed. Do not read a Summon Beast row as this returning
+without probing first; assuming the familiar cause is what kept it mis-filed for a week.
+
 Only traits are ordered by level, because they are the type here with an intra-type dependency. Note
 the interactive shell has the same latent hazard — it applies picks as the player clicks, so visiting
 the level-6 screen before the level-3 one would reproduce it. The screens are presented in level
@@ -1046,27 +1050,49 @@ with the same signature:
 | **Warlock Undead Patron** (Ravenloft) | Mage Armor | 5 | **1 → 0** | [premium-content#1709](https://github.com/foundryvtt/foundryvtt-premium-content/issues/1709) |
 | Ranger Hollow Warden (Ravenloft) | Hunter's Mark | 5 | 2 → 1 | clean-room confirmed, not raised — same spell and level as #1704 |
 | Artificer Reanimator (Ravenloft) | Raise Dead | 17 | — | signature matches; **not probed** |
-| Sorcerer Shadow Sorcery (Ravenloft) | Summon Beast (×2) | 7 | — | **not covered by the 6.0 fix — see below** |
+| Sorcerer Shadow Sorcery (Ravenloft) | Summon Beast | 7 | **2 → 0** | clean-room confirmed 2026-08-06; not on the 6.0 list |
+| Cleric Grave Domain (Ravenloft) | Spare the Dying | 5 | 2 → 1 | clean-room confirmed 2026-08-06; not on the 6.0 list |
 
 The rows that reach **zero** copies are the ones that bite hardest: the character loses the cast
-button outright rather than losing a spare. Undead Patron and Alchemist are both in that group.
+button outright rather than losing a spare. Alchemist and Shadow Sorcery are both in that group.
 
-**All five of the above are fixed in dnd5e 6.0**, confirmed by the maintainers. Nothing to do here —
-but **re-run the sweep after upgrading** rather than assuming, both to confirm they clear and because
-a change in this area could move other things. `module.json` still declares dnd5e 5.3.3 as its
-verified version, so that needs revisiting for a 6.0 world too.
+**The first five are fixed in dnd5e 6.0**, confirmed by the maintainers. Nothing to do here — but
+**re-run the sweep after upgrading** rather than assuming, both to confirm they clear and because a
+change in this area could move other things. `module.json` declares dnd5e 5.3.3 as its verified
+version, so that needs revisiting for a 6.0 world too.
 
-**Shadow Sorcery is the one to look at.** The maintainers' list covers the other five and not this,
-which is a reason to stop treating it as the same cause. Two things make it suspect on its own terms:
-its rows are *all* creator-only (no matching native-only row, unlike the genuine cached-spell drops),
-and this exact subclass has previous — it is the case that exposed the positional duplicate-pairing
-bug in `normalize.mjs`, fixed there with a content digest. So this may be that resurfacing, in the
-harness rather than in dnd5e. Probe it in the clean room before raising anything:
+**Grave Domain and Shadow Sorcery are not on that list**, and both are now confirmed as the same
+cause — so they are worth raising, or asking whether the 6.0 fix already covers them.
+
+### Two readings that were wrong, and why
+
+Both of these sat in the "probably ours, do not raise" pile for a while on reasoning that does not
+survive contact with `--probe-native`. Recorded because the *shape* of the mistake is easy to repeat.
+
+**"All the rows are creator-only, so it is our duplicate-pairing."** That was the argument for Shadow
+Sorcery, and it is backwards. All-creator-only is exactly what a drop to **zero** looks like; the
+both-sides shape only appears when native keeps one copy. The rule was induced from two examples that
+happened to be 2 → 1, then applied to a 2 → 0 case it never covered.
+
+**"The two builds disagree about which feature granted the spell."** That was Grave Domain, read off
+`system.sourceItem` and `flags.dnd5e.advancementOrigin` rows. Those are *pairing noise*: comparing
+one native copy against two creator copies has to mismatch fields somewhere, and the normaliser had
+lined the granted copy up against the cached one. The disagreement was an artefact of the count
+difference, not a finding of its own.
+
+The probe settles either question in about a minute, and prints the flags that identify each copy:
 
 ```bash
+node run.mjs playwright-clean --probe-native "sweep:cleric/grave-domain/Spare the Dying" --level 6
+#   L3–L4  2 copies — one advOrigin=… (granted), one cachedFor=… (the Cast-activity copy)
+#   L5     1 copy   — the cached one is gone
 node run.mjs playwright-clean --probe-native "sweep:sorcerer/shadow-sorcery/Summon Beast" --level 8
-node run.mjs --compare-item "sweep:sorcerer/shadow-sorcery/Summon Beast" --level 7 --incremental
+#   L6  2 copies … L7  0 copies
 ```
+
+**Reach for the clean room before reasoning from the diff's shape.** The diff says *what* differs; only
+the probe says *which side is wrong*, and this file now has three separate entries — the HP direction,
+these two — where the shape argued convincingly for the wrong answer.
 
 The shape of the diff reads as "the creator has a spare copy", and that reading is wrong. Count the
 copies on each side either side of the boundary and the direction reverses:
