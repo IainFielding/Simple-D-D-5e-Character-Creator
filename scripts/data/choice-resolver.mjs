@@ -44,8 +44,24 @@ const TRAIT_TITLE = {
   skills: "traitChoice.skills", tool: "traitChoice.tool"
 };
 
-/** Memo for compendium scans backing `allowDrops` restrictions, keyed by restriction signature. */
+/**
+ * Memo for compendium scans backing `allowDrops` restrictions, keyed by restriction signature.
+ *
+ * Derived from the *enabled* pack set ({@link findRestrictedItems} skips anything the world's source
+ * configuration switches off), so it is only valid while that set holds — see
+ * {@link resetRestrictedCache}.
+ */
 const restrictedCache = new Map();
+
+/**
+ * Drop the `allowDrops` scan memo. Called from `invalidateSources()` when the world's enabled-source
+ * set changes: this cache is built by scanning the enabled packs, so a GM switching one off must not
+ * keep being offered its content (a disabled 2014 SRD's invocations reaching a 2024 Warlock) for the
+ * rest of the session.
+ */
+export function resetRestrictedCache() {
+  restrictedCache.clear();
+}
 
 /* -------------------------------------------- */
 /*  Entry points                                */

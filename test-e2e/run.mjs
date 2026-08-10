@@ -16,9 +16,9 @@
  *
  * And the subclass sweep — every subclass in the world, built both ways at level 20:
  *
- *   node run.mjs --sweep                  # the whole thing (hours)
+ *   node run.mjs --sweep                  # the whole thing, one level at a time (hours)
  *   node run.mjs --sweep --level 6        # shallower
- *   node run.mjs --sweep --incremental    # one manager per level, comparing after each
+ *   node run.mjs --sweep --jump           # the whole span in one manager, compared once at the end
  *   node run.mjs --sweep --axis species     # vary the species instead of the subclass
  *   node run.mjs --sweep --axis background  # vary the background, taking a feat at every ASI
  *   node run.mjs --sweep --shard 1/20     # one twentieth of it, for a smoke test
@@ -193,7 +193,17 @@ async function load(session) {
 async function runSweep(harness) {
   const { appendFileSync, readFileSync, existsSync } = await import("node:fs");
   const level = Number(value("level") ?? 20);
-  const incremental = flag("incremental");
+  // Incremental by default, because it is what a player actually does: one level at a time, each
+  // with its own commit. The single-jump walk is the special case — it is how the *creator* reaches
+  // a target level in one manager, so it is still worth testing, but it is not the shape a
+  // level-by-level character takes and it should not be what an unqualified `--sweep` measures.
+  //
+  // The two hide different bugs and neither subsumes the other: only the increments test what
+  // survives a commit (a level-5 divergence that a later level papers over), while the jump alone
+  // can misorder a level-20 capstone against level-4 points. Defaulting to the player's shape means
+  // an unflagged run is the one whose result can be read as "would a real character come out right".
+  // `--incremental` is still accepted, and now redundant, so existing scripts keep working.
+  const incremental = !flag("jump");
   // Which axis to sweep. "subclass" is the original and the default; "species" holds the class fixed
   // and varies the species instead, covering the advancements a species gains above level 1.
   const axis = value("axis") ?? "subclass";
@@ -243,7 +253,7 @@ async function runSweep(harness) {
   }
 
   console.log(`\nsweeping ${ids.length} subclass(es) at level ${level}`
-    + `${incremental ? ", one level at a time" : ""} → test-e2e/sweep-results.jsonl\n`);
+    + `${incremental ? ", one level at a time" : ", in a single jump"} → test-e2e/sweep-results.jsonl\n`);
   let passed = 0;
   let failed = 0;
   let errored = 0;

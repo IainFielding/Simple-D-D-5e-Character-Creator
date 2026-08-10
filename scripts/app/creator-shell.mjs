@@ -208,6 +208,10 @@ export class CreatorShell extends CreatorShellBase {
     super._onRender(context, options);
     const root = this.element;
     this.#applySourceArt(root);
+    // Everything below binds to stage DOM. A rail-only render (the point-buy steppers) leaves that
+    // DOM in place, so re-binding would stack a second set of listeners on it — see
+    // {@link CreatorShellBase#_stageRendered}.
+    if ( !this._stageRendered(options) ) return;
     // Selects/inputs don't fire click "actions"; wire their change events to the dispatcher.
     this._wireStepChanges(root);
     this.#wireDragDrop(root);

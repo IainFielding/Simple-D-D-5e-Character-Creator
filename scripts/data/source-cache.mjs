@@ -3,7 +3,9 @@ import { SourceIndex } from "./source-index.mjs";
 import { SpellSource, MAGIC_INITIATE_LISTS } from "./spell-source.mjs";
 import { EquipmentSource } from "./equipment-source.mjs";
 import { StoreSource } from "./store-source.mjs";
-import { warmChoices } from "./choice-resolver.mjs";
+import { warmChoices, resetRestrictedCache } from "./choice-resolver.mjs";
+import { resetToolCache } from "./tool-source.mjs";
+import { resetWeaponIcons } from "./weapon-source.mjs";
 import { getEnabledPacks } from "./compendium-util.mjs";
 
 /**
@@ -121,10 +123,21 @@ export function isStale() {
   return cache != null && signature !== packSignature();
 }
 
-/** Drop the shared cache so the next {@link warmSources} rebuilds from scratch. */
+/**
+ * Drop the shared cache so the next {@link warmSources} rebuilds from scratch.
+ *
+ * The four data sources hang off `cache` and go with it, but three memos live at module scope in
+ * their own files and would otherwise outlive the world they describe. All three are built by
+ * scanning the *enabled* packs — the `allowDrops` restriction scan, the tool-category expansion, and
+ * the PHB weapon-icon map — which is exactly the configuration whose change brought us here, so they
+ * are cleared on the same beat rather than serving pre-change content for the rest of the session.
+ */
 export function invalidateSources() {
   cache = null;
   warming = null;
   signature = null;
   lastPct = 0;
+  resetRestrictedCache();
+  resetToolCache();
+  resetWeaponIcons();
 }

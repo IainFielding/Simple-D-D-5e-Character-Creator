@@ -278,9 +278,9 @@ scenarios above each exist to exercise one mechanism and argue for their answers
 one just covers the content.
 
 ```bash
-node run.mjs --sweep                  # 122 subclasses at level 20 (hours)
+node run.mjs --sweep                  # 122 subclasses at level 20, one level at a time (hours)
 node run.mjs --sweep --level 6        # shallower
-node run.mjs --sweep --incremental    # one manager per level, compared after each
+node run.mjs --sweep --jump           # the whole span in one manager, compared once at the end
 node run.mjs --sweep --shard 1/20     # every 20th, for a smoke test
 node run.mjs --sweep --only artificer # substring match on the id, for chasing one finding
 node run.mjs --sweep --resume         # skip what is already recorded
@@ -395,15 +395,22 @@ only because nobody can select them.
 
 ### One jump, or one level at a time
 
-By default a sweep raises the class from 1 to its target in a **single** manager — what the sheet's
-own level selector does. `--incremental` uses one manager per level instead, each starting from a
-committed actor rather than one long-lived clone.
+By default a sweep uses **one manager per level**, each starting from a committed actor rather than
+one long-lived clone — because that is how a character is actually played. `--jump` raises the class
+from 1 to its target in a single manager instead, which is what the sheet's own level selector does
+and what the creator does when it carries a new character to a target level.
 
 These are genuinely different walks, and each hides what the other exposes. The ordering that
 `deferredAsi` fixes — a level-20 capstone eating points a level-4 improvement is entitled to — can
 only go wrong in the jump, because in the increments level 4 is committed long before level 20
 exists. Conversely anything that has to *survive* a commit is only tested by the increments, because
-the jump does not commit until the end. And the increments are how a character is actually played.
+the jump does not commit until the end.
+
+Neither subsumes the other, so a result is only comparable against a baseline taken the same way —
+the archived `sweep-results-*.jsonl` files differ on this, and a row carries a `levels` key if and
+only if it came from an incremental run. The default is the increments because an unqualified sweep
+should measure the shape a real character takes; reach for `--jump` when the question is
+specifically about the creator's target-level hand-off, and expect ~half the wall time.
 
 An incremental run snapshots after every level and compares each, so a failure reports **the level it
 starts at** rather than the level it was noticed at:
