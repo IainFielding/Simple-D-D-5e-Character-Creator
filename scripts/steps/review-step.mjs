@@ -23,6 +23,19 @@ const ORIGIN_META = [
 ];
 
 /**
+ * The tooltip behind an ability's bonus pill, naming where the increase came from — "+2 from
+ * species". Both origins can in principle contribute (nothing in the data model forbids it, even
+ * though no single edition does it), so a multi-source bonus lists each part.
+ * @param {{total: number, sources: Array<{source: string, bonus: number}>}} delta
+ * @returns {string}
+ */
+function bonusTip(delta) {
+  return delta.sources
+    .map(({ source, bonus }) => t(`step.review.bonusFrom.${source}`, { bonus }))
+    .join(", ");
+}
+
+/**
  * The filled identity/biography rows for the summary — only fields the player
  * actually wrote, so empty fields don't clutter the review. Short fields render as
  * label/value tags; the longer text fields render as their own paragraphs.
@@ -262,7 +275,9 @@ export const reviewStep = {
 
   async context({ state, source, equipment }) {
     const scores = state.resolvedScores();
-    const deltas = state.backgroundDeltas();
+    // Merged across both origins, with the contributing source(s) kept so the pill can name them:
+    // under the 2024 rules the increase comes from the background, under 2014 from the species.
+    const deltas = state.abilityDeltas();
     const equipBySource = await reviewEquipment(state, source, equipment);
     const spells = reviewSpells(state);
     const featSpellsBySource = await reviewFeatSpells(state, source);
@@ -280,7 +295,8 @@ export const reviewStep = {
       portrait: state.portrait || "icons/svg/mystery-man.svg",
       method: t(methodKeys[state.abilityMethod] ?? "step.abilities.label"),
       abilities: ABILITIES.map(key => {
-        const bonus = deltas[key] ?? 0;
+        const delta = deltas[key];
+        const bonus = delta?.total ?? 0;
         const total = scores[key] + bonus;
         return {
           key,
@@ -288,7 +304,7 @@ export const reviewStep = {
           value: total,
           modifier: formatMod(total),
           bonus: bonus ? `+${bonus}` : null,
-          bonusTip: bonus ? t("step.review.bonusFromBackground", { bonus }) : null
+          bonusTip: bonus ? bonusTip(delta) : null
         };
       }),
       details: reviewDetails(state),

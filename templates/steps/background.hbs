@@ -1,10 +1,11 @@
 {{!--
   The Background step: the origin list/description layout plus an ability-increase panel on the
   right (2024 backgrounds grant a small ability-score increase the player allocates here). The
-  right column only appears once a background with an increase is picked (`abilities.selected`).
+  right column only appears once a background that *has* an increase is picked — `abilities` is
+  null otherwise, which covers "nothing picked yet" and every 2014 background.
   Data from background-step.mjs context(): `cards`, `detail`, `groups`, `abilities` (the panel).
 --}}
-<section class="creator-pick {{#unless abilities.selected}}creator-pick--solo{{/unless}}">
+<section class="creator-pick {{#unless abilities}}creator-pick--solo{{/unless}}">
   <!-- Left column: vertical picker -->
   <div class="creator-pick-side">
     <div class="creator-toolbar creator-toolbar--stacked">
@@ -96,50 +97,7 @@
     {{/if}}
   </div>
 
-  {{#with abilities}}
-  {{#if selected}}
-  <aside class="creator-class-aside">
-    <h2 class="creator-aside-title">{{localize "sogrom-dnd5e-character-creator.step.bgAbilities.label"}}</h2>
-    {{#if hasAsi}}
-    <p class="creator-asi-hint">
-      {{localize "sogrom-dnd5e-character-creator.step.bgAbilities.hint" points=points cap=cap}}
-    </p>
-
-    <div class="creator-points">
-      <span class="creator-points-value {{#if allSpent}}is-zero{{/if}}">{{remaining}}</span>
-      <span class="creator-points-label">{{localize "sogrom-dnd5e-character-creator.step.abilities.pointsLeft"}}</span>
-    </div>
-    {{else}}
-    <p class="creator-asi-hint">{{localize "sogrom-dnd5e-character-creator.step.bgAbilities.none"}}</p>
-    {{/if}}
-
-    <ul class="creator-ability-list">
-      {{#each rows}}
-      <li class="creator-ability-row {{#if locked}}is-locked{{/if}} {{#if bonus}}is-assigned{{/if}}">
-        <span class="creator-ability-name">{{label}}</span>
-        <div class="creator-stepper">
-          <button type="button" class="creator-step-btn" data-action="stepAction" data-step-action="bg-ability-dec"
-                  data-ability="{{key}}" {{#unless canDec}}disabled{{/unless}}>&minus;</button>
-          <span class="creator-ability-score">
-            {{total}}
-            {{#if locked}}<i class="creator-ability-lock fa-solid fa-lock" title="{{localize 'sogrom-dnd5e-character-creator.step.bgAbilities.locked'}}"></i>{{/if}}
-          </span>
-          <button type="button" class="creator-step-btn" data-action="stepAction" data-step-action="bg-ability-inc"
-                  data-ability="{{key}}" {{#unless canInc}}disabled{{/unless}}>+</button>
-        </div>
-        <span class="creator-ability-mod">{{bonusLabel}}</span>
-      </li>
-      {{/each}}
-    </ul>
-
-    {{#if hasAsi}}
-    <div class="creator-ability-actions">
-      <button type="button" class="creator-btn creator-btn-ghost" data-action="stepAction" data-step-action="bg-ability-reset">
-        <i class="fa-solid fa-rotate-left"></i> {{localize "sogrom-dnd5e-character-creator.common.reset"}}
-      </button>
-    </div>
-    {{/if}}
-  </aside>
+  {{#if abilities}}
+  {{> "modules/sogrom-dnd5e-character-creator/templates/parts/origin-abilities.hbs" abilities}}
   {{/if}}
-  {{/with}}
 </section>

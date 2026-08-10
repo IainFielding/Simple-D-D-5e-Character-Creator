@@ -2,7 +2,7 @@ import { describe, it, expect, beforeEach } from "vitest";
 import { installFoundryShims } from "./helpers/foundry-shims.mjs";
 import { QUICK_BUILD, MI_SPELL_SUGGESTIONS, FEATURE_PREFERENCES } from "../scripts/data/quick-build-data.mjs";
 import {
-  applyQuickBuild, assignStandardArray, allocateBackgroundAsi, pickBackground, choosePicks, pickSpells
+  applyQuickBuild, assignStandardArray, allocateOriginAsi, pickBackground, choosePicks, pickSpells
 } from "../scripts/data/quick-build.mjs";
 import { ABILITIES, DEFAULT_CANTRIPS, DEFAULT_LEVEL1_SPELLS } from "../scripts/config.mjs";
 import { CreatorState } from "../scripts/state/creator-state.mjs";
@@ -103,24 +103,48 @@ describe("assignStandardArray", () => {
   });
 });
 
-describe("allocateBackgroundAsi", () => {
-  const sageAsi = () => ({ id: "x", points: 3, cap: 2, fixed: {}, locked: ["str", "dex", "cha"] });
+describe("allocateOriginAsi", () => {
+  const sageAsi = () => ({ id: "x", points: 3, canAllocate: true, cap: 2, fixed: {}, locked: ["str", "dex", "cha"] });
 
   it("spends +2/+1 down the unlocked priorities", () => {
     const state = new CreatorState(null);
-    state.backgroundAsi = sageAsi();
-    allocateBackgroundAsi(state, QUICK_BUILD.wizard.abilities);
-    expect(state.backgroundAbilities).toEqual({ str: 0, dex: 0, con: 1, int: 2, wis: 0, cha: 0 });
-    const spent = ABILITIES.reduce((sum, k) => sum + state.backgroundAbilities[k], 0);
+    state.originAsi.background = sageAsi();
+    allocateOriginAsi(state, "background", QUICK_BUILD.wizard.abilities);
+    expect(state.originAbilities.background).toEqual({ str: 0, dex: 0, con: 1, int: 2, wis: 0, cha: 0 });
+    const spent = ABILITIES.reduce((sum, k) => sum + state.originAbilities.background[k], 0);
     expect(spent).toBe(3); // the background step's pointsRemaining === 0
   });
 
-  it("is a no-op for a background with no increase", () => {
+  it("is a no-op for an origin with no increase", () => {
     const state = new CreatorState(null);
-    state.backgroundAsi = null;
-    state.backgroundAbilities.str = 2; // stale allocation from a previous background
-    allocateBackgroundAsi(state, QUICK_BUILD.fighter.abilities);
-    expect(state.backgroundAbilities).toEqual({ str: 0, dex: 0, con: 0, int: 0, wis: 0, cha: 0 });
+    state.originAsi.background = null;
+    state.originAbilities.background.str = 2; // stale allocation from a previous background
+    allocateOriginAsi(state, "background", QUICK_BUILD.fighter.abilities);
+    expect(state.originAbilities.background).toEqual({ str: 0, dex: 0, con: 0, int: 0, wis: 0, cha: 0 });
+  });
+
+  // The 2014 Half-Elf: fixed +2 CHA plus 2 free points at cap 1. The fixed bump counts against the
+  // cap, so Charisma has no headroom left and the points go to the next two priorities.
+  it("spends a 2014 species' budget without over-filling its fixed ability", () => {
+    const state = new CreatorState(null);
+    state.originAsi.species = {
+      id: "he", points: 2, canAllocate: true, cap: 1, fixed: { cha: 2 }, locked: []
+    };
+    allocateOriginAsi(state, "species", QUICK_BUILD.bard.abilities); // cha, dex, con, …
+    expect(state.originAbilities.species).toEqual({ str: 0, dex: 1, con: 1, int: 0, wis: 0, cha: 0 });
+    expect(state.originDeltas("species")).toEqual({ dex: 1, con: 1, cha: 2 });
+  });
+
+  // Hill Dwarf: +2 CON / +1 WIS outright, no budget. Nothing to allocate; the increase still
+  // reaches the actor through the advancement itself.
+  it("leaves a purely fixed species increase alone", () => {
+    const state = new CreatorState(null);
+    state.originAsi.species = {
+      id: "hd", points: 0, canAllocate: false, cap: 2, fixed: { con: 2, wis: 1 }, locked: []
+    };
+    allocateOriginAsi(state, "species", QUICK_BUILD.fighter.abilities);
+    expect(state.originAbilities.species).toEqual({ str: 0, dex: 0, con: 0, int: 0, wis: 0, cha: 0 });
+    expect(state.originDeltas("species")).toEqual({ con: 2, wis: 1 });
   });
 });
 
@@ -302,7 +326,9 @@ const EXTRA_DOCS = Object.fromEntries([
 const fighterCard = { uuid: UUID.fighter, name: "Fighter", identifier: "fighter", img: "c.webp" };
 const humanCard = { uuid: UUID.human, name: "Human", identifier: "human", img: "h.webp" };
 const sageCard = { uuid: UUID.sage, name: "Sage", identifier: "sage", img: "s.webp" };
-const SAGE_ASI = { id: "3O61L5uTy5jRCqJb", points: 3, cap: 2, fixed: {}, locked: ["str", "dex", "cha"] };
+const SAGE_ASI = {
+  id: "3O61L5uTy5jRCqJb", points: 3, canAllocate: true, cap: 2, fixed: {}, locked: ["str", "dex", "cha"]
+};
 
 function makeSource({ backgrounds = [sageCard], species = [humanCard] } = {}) {
   const all = [fighterCard, ...species, ...backgrounds];
@@ -357,7 +383,7 @@ describe("applyQuickBuild (fighter + sage + human fixtures)", () => {
 
     // Background step: Sage (the only one installed) with its +2/+1 fully allocated.
     expect(state.backgroundUuid).toBe(UUID.sage);
-    expect(state.backgroundAbilities).toEqual({ str: 0, dex: 0, con: 2, int: 0, wis: 1, cha: 0 });
+    expect(state.originAbilities.background).toEqual({ str: 0, dex: 0, con: 2, int: 0, wis: 1, cha: 0 });
 
     // Species + details steps.
     expect(state.speciesUuid).toBe(UUID.human);

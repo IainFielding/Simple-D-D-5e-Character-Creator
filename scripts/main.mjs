@@ -26,7 +26,13 @@ Hooks.once("init", () => {
   registerSettings();
   // Step partials are pulled in by the stage via a dynamic Handlebars partial, so they
   // must be registered up front (the rail/stage/shell themselves are loaded as PARTS).
-  foundry.applications.handlebars.loadTemplates(STEPS.map(s => tpl(`${s.template}.hbs`)));
+  // `parts/` holds the fragments the step templates include by path — the ability-increase
+  // aside is shared by the Species and Background steps — which likewise have to be registered
+  // rather than loaded as PARTS.
+  foundry.applications.handlebars.loadTemplates([
+    ...STEPS.map(s => tpl(`${s.template}.hbs`)),
+    tpl("parts/origin-abilities.hbs")
+  ]);
 
   // The `data-tooltip` payload that triggers a dnd5e *rich* item tooltip. The system's
   // global Tooltips5e observer watches the live tooltip element for a `.loading[data-uuid]`

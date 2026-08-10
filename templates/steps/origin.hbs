@@ -1,10 +1,12 @@
 {{!--
   Shared template for the three "origin" picks (class-less species/background/etc.): a searchable
   list of cards on the left, and the selected card's enriched description + granted traits on the
-  right. Data comes from origin-step.mjs context(): `cards`, `hasSelection`, `detail`, `groups`.
+  right. Data comes from origin-step.mjs context(): `cards`, `hasSelection`, `detail`, `groups`,
+  and optionally `abilities` — the shared ability-increase aside, present only when the chosen
+  origin actually grants an increase (a 2014 species does; a 2024 one does not).
   Clicking a card fires data-action="pick-origin"; the left column filters live via data-creator-search.
 --}}
-<section class="creator-pick creator-pick--solo">
+<section class="creator-pick {{#unless abilities}}creator-pick--solo{{/unless}}">
   <!-- Left column: vertical picker -->
   <div class="creator-pick-side">
     <div class="creator-toolbar creator-toolbar--stacked">
@@ -88,4 +90,8 @@
     </div>
     {{/if}}
   </div>
+
+  {{#if abilities}}
+  {{> "modules/sogrom-dnd5e-character-creator/templates/parts/origin-abilities.hbs" abilities}}
+  {{/if}}
 </section>

@@ -1,4 +1,5 @@
 import { log } from "../config.mjs";
+import { ORIGIN_ASI_SOURCES } from "../state/creator-state.mjs";
 
 /**
  * Character-creation side of the shared advancement machinery. The creator collects every
@@ -132,15 +133,20 @@ export class CreationChoiceProvider {
   }
 
   /**
-   * The ability-score assignment for the *background* ability increase (the only ASI decision a
-   * level-1 build surfaces). `backgroundDeltas()` already sums the advancement's fixed part and the
+   * The ability-score assignment for an origin's ability increase — the only ASI decisions a
+   * level-1 build surfaces. Which origin grants one is an edition question (2024 puts it on the
+   * background, 2014 on the species), so both are matched by advancement id; a build can only ever
+   * have one of them in play. `originDeltas()` already sums the advancement's fixed part and the
    * player's allocation into per-ability point totals — exactly the assignment map the ASI apply
-   * wants. Any other ASI decision (there shouldn't be one at level 1) is left unallocated.
+   * wants, and `setAsi` reverses the seeded fixed part before applying it, so nothing double-counts.
+   * Any other ASI decision (there shouldn't be one at level 1) is left unallocated.
    */
   asi(rec) {
-    const asi = this.#state.backgroundAsi;
-    if ( !asi || rec.advancement.id !== asi.id ) return null;
-    return this.#state.backgroundDeltas();
+    for ( const source of ORIGIN_ASI_SOURCES ) {
+      const asi = this.#state.originAsi[source];
+      if ( asi && (rec.advancement.id === asi.id) ) return this.#state.originDeltas(source);
+    }
+    return null;
   }
 
   /**

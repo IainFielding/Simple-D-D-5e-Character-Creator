@@ -259,6 +259,17 @@ document and the derived state (abilities, HP, proficiencies, scale values, item
 - Never nudge with `manager.render()`. It re-runs `advancement.apply(level, {}, {initial: true})`,
   and a nudge overlapping the manager's own in-flight render gives two `apply` calls that both read
   an empty `value.added` — producing duplicated grants that look exactly like a creator bug.
+- **`fillAsi` must not build its target from `data-initial`.** The flow renders that as
+  `sourceValue + fixed`, and `sourceValue` already carries the fixed bump, because the manager seeds
+  every step before rendering it. A scenario states the *total* per ability with the fixed part
+  included, so adding it to `data-initial` counts `fixed` twice. Harmless for a 2024 background,
+  whose `fixed` is all zeroes — and wrong the moment content does both, which the 2014 Half-Elf
+  (+2 Charisma, then 2 points at a cap of 1) is the first to do here. It drove Charisma to **17**,
+  one point past what the advancement's own "+" button permits: `canIncrease` gates on
+  `assignment < cap`, and a fixed 2 already exceeds a cap of 1. The form's submit path is looser
+  than its buttons, so nothing stopped it, and the resulting seven-row diff read as a creator bug
+  when the reference was the wrong side. The base is now the score *before this advancement touched
+  it* — `_source.abilities[key].value - value.assignments[key]`.
 
 ## The subclass sweep
 
@@ -417,20 +428,26 @@ cause spans many subclasses.
 
 ## Current status
 
-`node run.mjs playwright` runs six scenarios:
+`node run.mjs playwright` runs eight scenarios:
 
 | Scenario | Covers | Start of session | Now |
 | --- | --- | --- | --- |
-| `human-fighter-sage` | martial level 1: weapon mastery, fighting style, background ASI | 8 | 4 |
+| `human-fighter-sage` | martial level 1: weapon mastery, fighting style, background ASI | 8 | **identical** |
 | `human-wizard-sage` | full caster level 1: spellcasting progression, ScaleValues, Int casting | 4 | **identical** |
 | `human-wizard-sage-l3` | 1→3 in one manager: hit-point decisions, level-2 trait, subclass + its synthesised features | 6 | **identical** |
 | `human-wizard-sage-l4-halffeat` | level-4 ASI answered with a feat, and the half-feat's own increase | 6 | 1 |
 | `human-wizard-sage-featspells` | Magic Initiate's spells actually chosen, both routes | 18 | 11 |
 | `fighter-multiclass-wizard` | a second class item: secondary advancements, a real first-level HP decision | 18 | **identical** |
+| `hill-dwarf-wizard-2014` | a 2014 **species** increase that is entirely fixed (+2 CON / +1 WIS) | — | **identical** |
+| `half-elf-wizard-2014` | a 2014 species that fixes *and* allocates (+2 CHA, then 2 points at cap 1) | — | **identical** |
 
-What is left is entirely in the classes below: `human-fighter-sage` carries the four `source.book`
-rows (they land on whichever scenario runs first, so an isolated `--only` run moves them), and
-`featspells` carries the by-design feat-spells route.
+What is left is `featspells` carrying the by-design feat-spells route, and the half-feat scenario's
+one `decision.raised`. The four `source.book` rows `human-fighter-sage` used to carry are gone.
+
+Both 2014 scenarios intermittently show one row — `system.details.background` or
+`system.details.race`, native `null` against the creator's link. That is the un-awaited `_onCreate`
+race documented below, where the **native** side is the unreliable one; it fires on roughly one run
+in two and on either field. Not a finding, and not worth re-running for.
 
 The half-feat scenario's single row is a `decision.raised`, not a character difference: it reports
 the Actor feat's own `+1 Cha` ASI as raised by the native side only. That is the known asymmetry the

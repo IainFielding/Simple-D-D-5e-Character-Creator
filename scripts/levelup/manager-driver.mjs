@@ -1641,7 +1641,8 @@ export class LevelUpDriver {
   /**
    * Apply a full ability-score-improvement assignment in one shot (headless) — the reverse→apply
    * pattern of {@link adjustAsi}, but taking the whole map (fixed + the player's allocation) the
-   * creator recorded, rather than a single +/- step. Used for a background's ability increase.
+   * creator recorded, rather than a single +/- step. Used for an origin's ability increase — the
+   * 2024 background's, or the 2014 species'.
    * @param {object} record          One of {@link asiSteps}.
    * @param {Record<string, number>} assignments   Per-ability point totals.
    */

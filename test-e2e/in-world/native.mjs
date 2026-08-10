@@ -412,6 +412,9 @@ async function fillAsi(flow, answer) {
   }
 
   const root = await flowElement(flow);
+  const adv = flow.advancement;
+  const sourceAbilities = adv.actor?.system?._source?.abilities ?? {};
+
   for ( const [key, points] of Object.entries(answer) ) {
     const input = root.querySelector(`input[name="abilities.${key}"]`);
     // Silence here is how a whole ASI went missing once: the inputs were behind the mode toggle
@@ -420,8 +423,20 @@ async function fillAsi(flow, answer) {
       throw new Error(`"${flow.advancement.title}" offers no input for ${key} `
         + `(it shows: ${[...root.querySelectorAll("input[name^='abilities.']")].map(i => i.name).join(", ") || "none"})`);
     }
-    const initial = Number(input.dataset.initial ?? input.value);
-    const target = initial + Number(points);
+
+    // A scenario states the *total* for each ability, fixed part included, so the target is that
+    // total on top of the score as it stood **before this advancement touched it**.
+    //
+    // Not `data-initial`, which the flow renders as `sourceValue + fixed` — and `sourceValue`
+    // already carries the fixed bump, because the manager seeds every step before rendering it
+    // (`apply(level, {}, {initial: true})`). Adding a stated total to that counts `fixed` twice.
+    // Invisible for a 2024 background, whose `fixed` is all zeroes; the 2014 Half-Elf is the first
+    // content here that fixes *and* allocates (+2 Charisma, then 2 points at a cap of 1), and it
+    // drove Charisma to 17 — one point past what the advancement's own "+" button allows, since
+    // `canIncrease` gates on `assignment < cap` and the fixed 2 already exceeds a cap of 1. The
+    // form's submit path is looser than its buttons, so nothing stopped it.
+    const base = Number(sourceAbilities[key]?.value ?? 0) - Number(adv.value?.assignments?.[key] ?? 0);
+    const target = base + Number(points);
     if ( Number(input.value) === target ) continue;
     input.value = String(target);
     await change(input);

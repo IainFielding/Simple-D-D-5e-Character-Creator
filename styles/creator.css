@@ -728,7 +728,8 @@ body:has(.sogrom-creator-fullscreen) .application.compendium-browser {
   height: 100%;
   min-height: 0;
 }
-/* Species, and backgrounds without an ability increase, have no aside — drop the column. */
+/* An origin that grants no ability increase has no aside — drop the column. Which origin that is
+   depends on the edition: 2024 backgrounds and 2014 species carry one, their opposites don't. */
 .creator-pick--solo { grid-template-columns: 420px minmax(0, 1fr); }
 
 /* Left column: search/count on top, scrolling pick-list below. */

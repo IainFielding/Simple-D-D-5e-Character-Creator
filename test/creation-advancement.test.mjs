@@ -36,8 +36,10 @@ describe("CreationChoiceProvider", () => {
       species: { SZ1: ["sm"] },
       background: {}
     },
-    backgroundAsi: { id: "ASI-BG" },
-    backgroundDeltas: () => ({ int: 2, con: 1 })
+    // Whichever origin carries the increase is an edition question — 2024 puts it on the
+    // background, 2014 on the species — so the provider matches both by advancement id.
+    originAsi: { background: { id: "ASI-BG" }, species: { id: "ASI-SP" } },
+    originDeltas: src => (src === "background" ? { int: 2, con: 1 } : { cha: 2, dex: 1 })
   };
   const provider = new CreationChoiceProvider(resolved, state);
   const rec = (id, configuration = {}) => ({ advancement: { id, configuration } });
@@ -68,8 +70,10 @@ describe("CreationChoiceProvider", () => {
     expect(provider.defer(rec("X"))).toBe(false);
   });
 
-  it("applies the background ability increase only to the background ASI advancement", () => {
+  it("applies each origin's ability increase only to that origin's ASI advancement", () => {
     expect(provider.asi(rec("ASI-BG"))).toEqual({ int: 2, con: 1 });
+    // A 2014 species (Half-Elf: fixed +2 CHA plus a free point) goes through the same seam.
+    expect(provider.asi(rec("ASI-SP"))).toEqual({ cha: 2, dex: 1 });
     expect(provider.asi(rec("some-other-asi"))).toBeNull();
   });
 

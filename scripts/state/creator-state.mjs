@@ -1,6 +1,14 @@
 import { ABILITIES, t } from "../config.mjs";
 
 /**
+ * The origins that can carry an ability-score increase. Which one actually does depends on the
+ * edition — 2024 puts it on the background, 2014 on the species — so both are modelled and the
+ * step that owns each decides whether it has anything to show.
+ * @type {Array<"species"|"background">}
+ */
+export const ORIGIN_ASI_SOURCES = ["species", "background"];
+
+/**
  * The single source of truth for every choice the player makes in the creator.
  *
  * This is a plain data record: it holds values and performs only the data
@@ -186,18 +194,24 @@ export class CreatorState {
   rolledPool = [];
 
   /**
-   * Player-allocated ability increases granted by the chosen background, on top of
-   * any the background fixes itself. Reset whenever the background selection changes.
+   * Player-allocated ability increases granted by an origin, on top of any that origin fixes
+   * itself, keyed by which origin granted them. Which origin carries an increase depends on the
+   * edition: a 2024 background does, a 2014 species does, and neither does both. Reset whenever
+   * that origin's selection changes (see {@link resetSourceChoices}).
    */
-  backgroundAbilities = { str: 0, dex: 0, con: 0, int: 0, wis: 0, cha: 0 };
+  originAbilities = {
+    background: { str: 0, dex: 0, con: 0, int: 0, wis: 0, cha: 0 },
+    species: { str: 0, dex: 0, con: 0, int: 0, wis: 0, cha: 0 }
+  };
 
   /**
-   * The selected background's ability-score-improvement config, cached so the
-   * synchronous completion check can see it without re-resolving the document.
-   * `undefined` = not yet resolved; `null` = background grants no increase.
-   * @type {{id: string, points: number, cap: number, fixed: object, locked: string[]}|null|undefined}
+   * Each selected origin's ability-score-improvement config, cached so the synchronous completion
+   * checks can see them without re-resolving the documents. `undefined` = not yet resolved;
+   * `null` = that origin grants no increase.
+   * @type {Record<"background"|"species", {id: string, points: number, canAllocate: boolean,
+   *   cap: number, fixed: object, locked: string[]}|null|undefined>}
    */
-  backgroundAsi;
+  originAsi = { background: undefined, species: undefined };
 
   constructor(actor) {
     this.actor = actor;
@@ -240,29 +254,39 @@ export class CreatorState {
   }
 
   /**
-   * The ability increase the chosen background confers per ability: the fixed part
-   * plus whatever the player allocated in the wizard. Only abilities with a non-zero
-   * increase are present, so callers can treat a missing key as "no bonus".
+   * The ability increase one origin confers per ability: the fixed part plus whatever the player
+   * allocated in the wizard. Only abilities with a non-zero increase are present, so callers can
+   * treat a missing key as "no bonus".
+   * @param {"background"|"species"} source
    * @returns {Record<string, number>}
    */
-  backgroundDeltas() {
-    const asi = this.backgroundAsi;
+  originDeltas(source) {
+    const asi = this.originAsi[source];
     if ( !asi ) return {};
     const out = {};
     for ( const key of ABILITIES ) {
-      const total = Number(asi.fixed?.[key] ?? 0) + (this.backgroundAbilities[key] ?? 0);
+      const total = Number(asi.fixed?.[key] ?? 0) + (this.originAbilities[source]?.[key] ?? 0);
       if ( total ) out[key] = total;
     }
     return out;
   }
 
   /**
-   * Forget the current background's ability allocation and cached config. Called
-   * when the background selection changes so a previous choice never leaks across.
+   * Every origin increase merged, for the Review screen: the combined bonus per ability plus which
+   * origins contributed it, so the pill can name them rather than assuming the background. Only
+   * abilities with a non-zero increase are present.
+   * @returns {Record<string, {total: number, sources: Array<{source: string, bonus: number}>}>}
    */
-  resetBackgroundAbilities() {
-    this.backgroundAbilities = { str: 0, dex: 0, con: 0, int: 0, wis: 0, cha: 0 };
-    this.backgroundAsi = undefined;
+  abilityDeltas() {
+    const out = {};
+    for ( const source of ORIGIN_ASI_SOURCES ) {
+      for ( const [key, bonus] of Object.entries(this.originDeltas(source)) ) {
+        const entry = out[key] ??= { total: 0, sources: [] };
+        entry.total += bonus;
+        entry.sources.push({ source, bonus });
+      }
+    }
+    return out;
   }
 
   /**
@@ -279,14 +303,22 @@ export class CreatorState {
   }
 
   /**
-   * Forget one origin source's advancement choices (and equipment, where it has any).
-   * Called when that source's selection changes.
+   * Forget one origin source's advancement choices (and equipment and ability increase, where it
+   * has either). Called when that source's selection changes.
+   *
+   * The ability increase is cleared here rather than by the owning step so *every* path that drops
+   * a selection clears it — including `dropOffEditionOrigins`, which swaps a 2024 class for a 2014
+   * one and would otherwise leave the discarded background's increase on the Review screen.
    * @param {"class"|"background"|"species"} source
    */
   resetSourceChoices(source) {
     this.advChoices[source] = {};
     this.#forgetFeatSpellLists(source);
     if ( this.equipment[source] ) this.equipment[source] = { selectedOption: 0, orSelections: {} };
+    if ( this.originAbilities[source] ) {
+      this.originAbilities[source] = { str: 0, dex: 0, con: 0, int: 0, wis: 0, cha: 0 };
+      this.originAsi[source] = undefined;
+    }
   }
 
   /** Drop the feat-spells picks belonging to one origin (keys `${source}:…`). */

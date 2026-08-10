@@ -351,13 +351,14 @@ export class SourceIndex {
   }
 
   /**
-   * Resolve an origin item's level-0 Ability Score Improvement advancement into a
-   * plain config the Background step uses to drive its allocation panel. Returns
-   * null when the item grants no allocatable increase. Memoised per UUID.
+   * Resolve an origin item's level-0 Ability Score Improvement advancement into a plain config the
+   * Species and Background steps use to drive their increase panel. Returns null when the item
+   * grants no increase at all. Memoised per UUID.
    *
    * @param {string} uuid
    * @param {object} [doc]  Pre-resolved document, to skip a redundant `fromUuid` during warm-up.
-   * @returns {Promise<{id: string, points: number, cap: number, fixed: Record<string, number>, locked: string[]}|null>}
+   * @returns {Promise<{id: string, points: number, canAllocate: boolean, cap: number,
+   *   fixed: Record<string, number>, locked: string[]}|null>}
    */
   async abilityScoreIncrease(uuid, doc) {
     if ( !uuid ) return null;
@@ -520,6 +521,12 @@ function traitTags(adv) {
  * Pull the AbilityScoreImprovement advancement (preferring the level-0 one) off a
  * resolved origin document and flatten its configuration. Kept free of any state
  * or UI concern — just data extraction.
+ *
+ * Both shapes the origin packs use are returned. A 2024 background spends a point budget
+ * (`points: 3, cap: 2`) with nothing fixed; a 2014 species usually fixes its increase outright
+ * (Hill Dwarf's `+2 CON, +1 WIS`) with no budget at all, and the Half-Elf does both. Only an
+ * advancement that raises nothing — no budget *and* no non-zero fixed entry — is dropped, so the
+ * panel can show a fixed increase read-only rather than leaving the player to discover it on Review.
  */
 function readAsi(doc) {
   const byType = doc.advancement?.byType?.AbilityScoreImprovement;
@@ -532,13 +539,18 @@ function readAsi(doc) {
   if ( !adv ) return null;
 
   const config = adv.configuration ?? {};
-  const points = Number(config.points ?? 0);
-  if ( points <= 0 ) return null;
+  const points = Math.max(0, Number(config.points ?? 0));
+  const fixed = { ...(config.fixed ?? {}) };
+  const anyFixed = Object.values(fixed).some(v => Number(v) > 0);
+  if ( !points && !anyFixed ) return null;
   return {
     id: adv.id ?? adv._id,
     points,
+    // Whether there is anything for the player to *decide*. False for a purely fixed increase,
+    // which the panel renders read-only.
+    canAllocate: points > 0,
     cap: Number(config.cap ?? 2),
-    fixed: { ...(config.fixed ?? {}) },
+    fixed,
     locked: [...(config.locked ?? [])]
   };
 }

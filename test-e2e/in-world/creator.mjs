@@ -140,7 +140,7 @@ function distribute(reqs, answer, { unofferable } = {}) {
  *
  * Answers come in the shapes the *native* forms take, which are not uniform: a list of keys/uuids,
  * a bare string (a size, a casting ability), or `{ uuids, ability }`. An ability-score assignment
- * (`{ int: 2 }`) is not a pick list at all — it reaches the creator through `backgroundAbilities`,
+ * (`{ int: 2 }`) is not a pick list at all — it reaches the creator through `originAbilities`,
  * so it returns null and is skipped here.
  * @param {string[]|string|object} answer
  * @returns {string[]|null}
@@ -251,7 +251,7 @@ async function answerChoices(state, source, book, { consumed = new Set(), diagno
       // surfaces them with no options, so trying to distribute picks here would fail.
       if ( reqs.some(r => r.spellStep) ) continue;
       const picks = normalisePicks(answer);
-      if ( !picks ) continue;                              // an ASI map — handled from `backgroundAbilities`
+      if ( !picks ) continue;                              // an ASI map — handled from `originAbilities`
       consumed.add(advId);
       for ( const [selKey, keys] of distribute(reqs, picks, { unofferable: passUnofferable }) ) {
         const bucket = state.advChoices[reqs[0].source] ??= {};
@@ -364,21 +364,26 @@ export async function buildCreator(
   state.abilityMethod = "point-buy";
   state.pointBuy = { ...state.pointBuy, ...scenario.abilities };
 
-  // The background's ability increase is applied by its own ASI advancement during the driver
-  // pass, from `backgroundDeltas()` = the advancement's fixed part + the player's allocation.
-  // The scenario states the *total* assignment (as the native ASI form takes it), so the
-  // allocation is that minus whatever the advancement fixes itself.
-  const bgDoc = state.backgroundUuid ? await fromUuid(state.backgroundUuid) : null;
-  state.backgroundAsi = bgDoc ? await source.abilityScoreIncrease(state.backgroundUuid, bgDoc) : null;
-  if ( state.backgroundAsi ) {
-    // Asked with the background's *real* advancement, not the flattened `backgroundAsi` record: the
-    // native side asks about that object, and both have to put the same question to the book or the
-    // memo would hold two entries and answer them independently.
-    const asiAdv = bgDoc.advancement?.byId?.[state.backgroundAsi.id];
+  // An origin's ability increase is applied by its own ASI advancement during the driver pass, from
+  // `originDeltas(source)` = the advancement's fixed part + the player's allocation. Which origin
+  // carries one is an edition question — 2024 puts it on the background, 2014 on the species — so
+  // both are offered to the book; a scenario only ever answers whichever exists.
+  for ( const [src, field] of [["species", "speciesUuid"], ["background", "backgroundUuid"]] ) {
+    const doc = state[field] ? await fromUuid(state[field]) : null;
+    const asi = doc ? await source.abilityScoreIncrease(state[field], doc) : null;
+    state.originAsi[src] = asi;
+    if ( !asi ) continue;
+    // Asked with the origin's *real* advancement, not the flattened record: the native side asks
+    // about that object, and both have to put the same question to the book or the memo would hold
+    // two entries and answer them independently.
+    const asiAdv = doc.advancement?.byId?.[asi.id];
     const assignment = await book.answer(asiAdv, asiAdv?.level ?? 0, { asker: "creator" });
-    if ( assignment ) consumed.add(state.backgroundAsi.id);
+    if ( assignment ) consumed.add(asi.id);
+    // The scenario states the *total* assignment (as the native ASI form takes it), so the
+    // allocation is that minus whatever the advancement fixes itself. A purely fixed increase
+    // (Hill Dwarf) leaves the allocation empty and still applies, through `fixed` alone.
     for ( const [key, total] of Object.entries(assignment ?? {}) ) {
-      state.backgroundAbilities[key] = Number(total) - Number(state.backgroundAsi.fixed?.[key] ?? 0);
+      state.originAbilities[src][key] = Number(total) - Number(asi.fixed?.[key] ?? 0);
     }
   }
 
