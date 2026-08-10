@@ -55,9 +55,9 @@ export async function applyQuickBuild({ state, source, spells, equipment }, { rn
   // Start from a clean slate for everything the build derives, exactly as if the player had
   // changed each selection by hand — so a re-run never leaks picks from a previous fill.
   state.resetClassDependent();
+  // Each of these also clears that origin's ability increase and allocation.
   state.resetSourceChoices("background");
   state.resetSourceChoices("species");
-  state.resetBackgroundAbilities();
   state.backgroundUuid = null;
   state.speciesUuid = null;
   state.featSpellCache = [];
@@ -73,15 +73,19 @@ export async function applyQuickBuild({ state, source, spells, equipment }, { rn
     const card = await pickBackground(source, profile, { rules });
     if ( !card ) { warnings.push("no-backgrounds"); return; }
     state.backgroundUuid = card.uuid;
-    state.backgroundAsi = await source.abilityScoreIncrease(card.uuid);
-    allocateBackgroundAsi(state, profile.abilities);
+    state.originAsi.background = await source.abilityScoreIncrease(card.uuid);
+    allocateOriginAsi(state, "background", profile.abilities);
   });
 
-  // Species: random — every installed species is somebody's favourite.
+  // Species: random — every installed species is somebody's favourite. A 2014 species carries the
+  // ability increase its edition's backgrounds don't, so it gets the same allocation pass.
   await attempt("species", async () => {
     const list = source.species({ rules });
     if ( !list.length ) { warnings.push("no-species"); return; }
     state.speciesUuid = list[Math.floor(rng() * list.length)]?.uuid ?? null;
+    if ( !state.speciesUuid ) return;
+    state.originAsi.species = await source.abilityScoreIncrease(state.speciesUuid);
+    allocateOriginAsi(state, "species", profile.abilities);
   });
 
   // Name: rolled in the chosen species' style (the generator falls back to a generic pool).
@@ -145,23 +149,31 @@ export function assignStandardArray(state, priorities) {
 }
 
 /**
- * Spend the background's increase budget down the class's ability priorities: each unlocked
- * ability takes as much as the per-ability cap allows until the points run out. With 2024
- * backgrounds (3 points, cap 2) this is always +2 to the best unlocked priority, +1 to the
- * next. A background with no increase (2014 style) is a no-op — the step is already complete.
+ * Spend one origin's increase budget down the class's ability priorities: each unlocked ability
+ * takes as much as the per-ability cap allows until the points run out. With 2024 backgrounds
+ * (3 points, cap 2) this is always +2 to the best unlocked priority, +1 to the next; with the 2014
+ * Half-Elf (2 points, cap 1) it is +1 to each of the best two. An origin with no increase — a 2014
+ * background, a 2024 species — or a purely fixed one (Hill Dwarf's +2 CON) is a no-op: there is no
+ * budget to spend and the step is already complete.
+ *
+ * The cap counts the advancement's fixed bump alongside the allocation, matching both the panel's
+ * `canIncrease` and dnd5e's own flow, so the Half-Elf's fixed +2 CHA cannot take a third point.
  * @param {import("../state/creator-state.mjs").CreatorState} state
+ * @param {"species"|"background"} source
  * @param {string[]} priorities
  */
-export function allocateBackgroundAsi(state, priorities) {
-  const asi = state.backgroundAsi;
-  state.backgroundAbilities = { str: 0, dex: 0, con: 0, int: 0, wis: 0, cha: 0 };
+export function allocateOriginAsi(state, source, priorities) {
+  const asi = state.originAsi[source];
+  state.originAbilities[source] = { str: 0, dex: 0, con: 0, int: 0, wis: 0, cha: 0 };
   if ( !asi ) return;
   let remaining = asi.points;
   for ( const key of priorities ) {
     if ( remaining <= 0 ) break;
     if ( !ABILITIES.includes(key) || asi.locked.includes(key) ) continue;
-    const add = Math.min(asi.cap, remaining);
-    state.backgroundAbilities[key] = add;
+    const headroom = asi.cap - Number(asi.fixed?.[key] ?? 0);
+    const add = Math.min(headroom, remaining);
+    if ( add <= 0 ) continue;
+    state.originAbilities[source][key] = add;
     remaining -= add;
   }
 }

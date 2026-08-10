@@ -48,8 +48,9 @@ const PREFIX = "[e2e] ";
  *
  * Two answer kinds are legitimately unread by *both* and are exempt: hit points on a level-1 build
  * (the original class's first level takes maximum automatically, so no decision is ever raised),
- * and the background ability increase (which the creator routes through `state.backgroundAbilities`
- * rather than through a decision record — `buildCreator` marks it consumed itself).
+ * and an origin's ability increase — the 2024 background's or the 2014 species' — which the creator
+ * routes through `state.originAbilities` rather than through a decision record (`buildCreator`
+ * marks it consumed itself).
  * @param {object} answers                  The scenario's answer table.
  * @param {Set<string>} consumed            Ids either adapter read an answer for.
  * @param {Map<string, string>} advTypes    advId -> advancement type, from the origin documents.

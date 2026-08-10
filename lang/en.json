@@ -228,6 +228,7 @@
       "species": {
         "label": "Species",
         "hint": "Choose a species to continue.",
+        "hintPoints": "Assign your {count} remaining ability point(s).",
         "traits": "Traits",
         "features": "Features",
         "spells": "Spells"
@@ -385,7 +386,10 @@
         "noBackground": "No background chosen",
         "notChosen": "Not chosen",
         "grantedSpells": "Spells",
-        "bonusFromBackground": "+{bonus} from background"
+        "bonusFrom": {
+          "species": "+{bonus} from species",
+          "background": "+{bonus} from background"
+        }
       },
       "abilities": {
         "label": "Ability Scores",
@@ -400,11 +404,17 @@
         "hintAssign": "Assign a score to every ability.",
         "hintRoll": "Roll your ability scores, then assign them."
       },
-      "bgAbilities": {
+      "originAbilities": {
         "label": "Ability Increase",
         "hint": "Raise your ability scores by {points} points, up to +{cap} in any one.",
-        "none": "This background grants no ability increase.",
-        "locked": "Set by this background"
+        "fixed": {
+          "species": "This species raises these scores for you — nothing to choose.",
+          "background": "This background raises these scores for you — nothing to choose."
+        },
+        "locked": {
+          "species": "Set by this species",
+          "background": "Set by this background"
+        }
       }
     },
     "choice": {

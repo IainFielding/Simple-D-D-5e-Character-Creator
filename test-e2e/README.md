@@ -259,6 +259,17 @@ document and the derived state (abilities, HP, proficiencies, scale values, item
 - Never nudge with `manager.render()`. It re-runs `advancement.apply(level, {}, {initial: true})`,
   and a nudge overlapping the manager's own in-flight render gives two `apply` calls that both read
   an empty `value.added` — producing duplicated grants that look exactly like a creator bug.
+- **`fillAsi` must not build its target from `data-initial`.** The flow renders that as
+  `sourceValue + fixed`, and `sourceValue` already carries the fixed bump, because the manager seeds
+  every step before rendering it. A scenario states the *total* per ability with the fixed part
+  included, so adding it to `data-initial` counts `fixed` twice. Harmless for a 2024 background,
+  whose `fixed` is all zeroes — and wrong the moment content does both, which the 2014 Half-Elf
+  (+2 Charisma, then 2 points at a cap of 1) is the first to do here. It drove Charisma to **17**,
+  one point past what the advancement's own "+" button permits: `canIncrease` gates on
+  `assignment < cap`, and a fixed 2 already exceeds a cap of 1. The form's submit path is looser
+  than its buttons, so nothing stopped it, and the resulting seven-row diff read as a creator bug
+  when the reference was the wrong side. The base is now the score *before this advancement touched
+  it* — `_source.abilities[key].value - value.assignments[key]`.
 
 ## The subclass sweep
 
@@ -417,20 +428,26 @@ cause spans many subclasses.
 
 ## Current status
 
-`node run.mjs playwright` runs six scenarios:
+`node run.mjs playwright` runs eight scenarios:
 
 | Scenario | Covers | Start of session | Now |
 | --- | --- | --- | --- |
-| `human-fighter-sage` | martial level 1: weapon mastery, fighting style, background ASI | 8 | 4 |
+| `human-fighter-sage` | martial level 1: weapon mastery, fighting style, background ASI | 8 | **identical** |
 | `human-wizard-sage` | full caster level 1: spellcasting progression, ScaleValues, Int casting | 4 | **identical** |
 | `human-wizard-sage-l3` | 1→3 in one manager: hit-point decisions, level-2 trait, subclass + its synthesised features | 6 | **identical** |
 | `human-wizard-sage-l4-halffeat` | level-4 ASI answered with a feat, and the half-feat's own increase | 6 | 1 |
 | `human-wizard-sage-featspells` | Magic Initiate's spells actually chosen, both routes | 18 | 11 |
 | `fighter-multiclass-wizard` | a second class item: secondary advancements, a real first-level HP decision | 18 | **identical** |
+| `hill-dwarf-wizard-2014` | a 2014 **species** increase that is entirely fixed (+2 CON / +1 WIS) | — | **identical** |
+| `half-elf-wizard-2014` | a 2014 species that fixes *and* allocates (+2 CHA, then 2 points at cap 1) | — | **identical** |
 
-What is left is entirely in the classes below: `human-fighter-sage` carries the four `source.book`
-rows (they land on whichever scenario runs first, so an isolated `--only` run moves them), and
-`featspells` carries the by-design feat-spells route.
+What is left is `featspells` carrying the by-design feat-spells route, and the half-feat scenario's
+one `decision.raised`. The four `source.book` rows `human-fighter-sage` used to carry are gone.
+
+Both 2014 scenarios intermittently show one row — `system.details.background` or
+`system.details.race`, native `null` against the creator's link. That is the un-awaited `_onCreate`
+race documented below, where the **native** side is the unreliable one; it fires on roughly one run
+in two and on either field. Not a finding, and not worth re-running for.
 
 The half-feat scenario's single row is a `decision.raised`, not a character difference: it reports
 the Actor feat's own `+1 Cha` ASI as raised by the native side only. That is the known asymmetry the
@@ -1012,6 +1029,10 @@ diff paired `#1` against `#2` and reported every field of both as different — 
 fact identical, just crossed. `normalize.mjs` now breaks the tie on a content digest that ignores
 ids, timestamps and flags, so a duplicate always takes the same number as its counterpart.
 
+That fix holds. **Shadow Sorcery's *current* difference is not this bug** — it is the upstream
+cached-spell drop above, clean-room confirmed. Do not read a Summon Beast row as this returning
+without probing first; assuming the familiar cause is what kept it mis-filed for a week.
+
 Only traits are ordered by level, because they are the type here with an intra-type dependency. Note
 the interactive shell has the same latent hazard — it applies picks as the player clicks, so visiting
 the level-6 screen before the level-3 one would reproduce it. The screens are presented in level
@@ -1046,27 +1067,49 @@ with the same signature:
 | **Warlock Undead Patron** (Ravenloft) | Mage Armor | 5 | **1 → 0** | [premium-content#1709](https://github.com/foundryvtt/foundryvtt-premium-content/issues/1709) |
 | Ranger Hollow Warden (Ravenloft) | Hunter's Mark | 5 | 2 → 1 | clean-room confirmed, not raised — same spell and level as #1704 |
 | Artificer Reanimator (Ravenloft) | Raise Dead | 17 | — | signature matches; **not probed** |
-| Sorcerer Shadow Sorcery (Ravenloft) | Summon Beast (×2) | 7 | — | **not covered by the 6.0 fix — see below** |
+| Sorcerer Shadow Sorcery (Ravenloft) | Summon Beast | 7 | **2 → 0** | clean-room confirmed 2026-08-06; not on the 6.0 list |
+| Cleric Grave Domain (Ravenloft) | Spare the Dying | 5 | 2 → 1 | clean-room confirmed 2026-08-06; not on the 6.0 list |
 
 The rows that reach **zero** copies are the ones that bite hardest: the character loses the cast
-button outright rather than losing a spare. Undead Patron and Alchemist are both in that group.
+button outright rather than losing a spare. Alchemist and Shadow Sorcery are both in that group.
 
-**All five of the above are fixed in dnd5e 6.0**, confirmed by the maintainers. Nothing to do here —
-but **re-run the sweep after upgrading** rather than assuming, both to confirm they clear and because
-a change in this area could move other things. `module.json` still declares dnd5e 5.3.3 as its
-verified version, so that needs revisiting for a 6.0 world too.
+**The first five are fixed in dnd5e 6.0**, confirmed by the maintainers. Nothing to do here — but
+**re-run the sweep after upgrading** rather than assuming, both to confirm they clear and because a
+change in this area could move other things. `module.json` declares dnd5e 5.3.3 as its verified
+version, so that needs revisiting for a 6.0 world too.
 
-**Shadow Sorcery is the one to look at.** The maintainers' list covers the other five and not this,
-which is a reason to stop treating it as the same cause. Two things make it suspect on its own terms:
-its rows are *all* creator-only (no matching native-only row, unlike the genuine cached-spell drops),
-and this exact subclass has previous — it is the case that exposed the positional duplicate-pairing
-bug in `normalize.mjs`, fixed there with a content digest. So this may be that resurfacing, in the
-harness rather than in dnd5e. Probe it in the clean room before raising anything:
+**Grave Domain and Shadow Sorcery are not on that list**, and both are now confirmed as the same
+cause — so they are worth raising, or asking whether the 6.0 fix already covers them.
+
+### Two readings that were wrong, and why
+
+Both of these sat in the "probably ours, do not raise" pile for a while on reasoning that does not
+survive contact with `--probe-native`. Recorded because the *shape* of the mistake is easy to repeat.
+
+**"All the rows are creator-only, so it is our duplicate-pairing."** That was the argument for Shadow
+Sorcery, and it is backwards. All-creator-only is exactly what a drop to **zero** looks like; the
+both-sides shape only appears when native keeps one copy. The rule was induced from two examples that
+happened to be 2 → 1, then applied to a 2 → 0 case it never covered.
+
+**"The two builds disagree about which feature granted the spell."** That was Grave Domain, read off
+`system.sourceItem` and `flags.dnd5e.advancementOrigin` rows. Those are *pairing noise*: comparing
+one native copy against two creator copies has to mismatch fields somewhere, and the normaliser had
+lined the granted copy up against the cached one. The disagreement was an artefact of the count
+difference, not a finding of its own.
+
+The probe settles either question in about a minute, and prints the flags that identify each copy:
 
 ```bash
+node run.mjs playwright-clean --probe-native "sweep:cleric/grave-domain/Spare the Dying" --level 6
+#   L3–L4  2 copies — one advOrigin=… (granted), one cachedFor=… (the Cast-activity copy)
+#   L5     1 copy   — the cached one is gone
 node run.mjs playwright-clean --probe-native "sweep:sorcerer/shadow-sorcery/Summon Beast" --level 8
-node run.mjs --compare-item "sweep:sorcerer/shadow-sorcery/Summon Beast" --level 7 --incremental
+#   L6  2 copies … L7  0 copies
 ```
+
+**Reach for the clean room before reasoning from the diff's shape.** The diff says *what* differs; only
+the probe says *which side is wrong*, and this file now has three separate entries — the HP direction,
+these two — where the shape argued convincingly for the wrong answer.
 
 The shape of the diff reads as "the creator has a spare copy", and that reading is wrong. Count the
 copies on each side either side of the boundary and the direction reverses:

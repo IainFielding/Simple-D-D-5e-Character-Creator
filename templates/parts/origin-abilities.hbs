@@ -1,0 +1,50 @@
+{{!--
+  The ability-increase aside shared by the Species and Background steps, rendered from
+  origin-abilities-panel.mjs `asiContext()`. Include it with the panel context as the argument:
+    {{> "modules/sogrom-dnd5e-character-creator/templates/parts/origin-abilities.hbs" abilities}}
+
+  The including step is responsible for rendering it only when the context is present — a null
+  context means the chosen origin grants no increase, and the pick layout drops to two columns.
+
+  Two modes. `canAllocate` (a 2024 background, or the 2014 Half-Elf) shows the points counter, live
+  steppers and a reset. Without it (a 2014 species' outright +2/+1) every row is padlocked and the
+  panel is purely informational — the increase still applies, via the advancement itself.
+--}}
+<aside class="creator-class-aside">
+  <h2 class="creator-aside-title">{{title}}</h2>
+  <p class="creator-asi-hint">{{hint}}</p>
+
+  {{#if canAllocate}}
+  <div class="creator-points">
+    <span class="creator-points-value {{#if allSpent}}is-zero{{/if}}">{{remaining}}</span>
+    <span class="creator-points-label">{{localize "sogrom-dnd5e-character-creator.step.abilities.pointsLeft"}}</span>
+  </div>
+  {{/if}}
+
+  <ul class="creator-ability-list">
+    {{#each rows}}
+    <li class="creator-ability-row {{#if locked}}is-locked{{/if}} {{#if bonus}}is-assigned{{/if}}">
+      <span class="creator-ability-name">{{label}}</span>
+      <div class="creator-stepper">
+        <button type="button" class="creator-step-btn" data-action="stepAction" data-step-action="origin-ability-dec"
+                data-ability="{{key}}" {{#unless canDec}}disabled{{/unless}}>&minus;</button>
+        <span class="creator-ability-score">
+          {{total}}
+          {{#if locked}}<i class="creator-ability-lock fa-solid fa-lock" title="{{../lockedTip}}"></i>{{/if}}
+        </span>
+        <button type="button" class="creator-step-btn" data-action="stepAction" data-step-action="origin-ability-inc"
+                data-ability="{{key}}" {{#unless canInc}}disabled{{/unless}}>+</button>
+      </div>
+      <span class="creator-ability-mod">{{bonusLabel}}</span>
+    </li>
+    {{/each}}
+  </ul>
+
+  {{#if canAllocate}}
+  <div class="creator-ability-actions">
+    <button type="button" class="creator-btn creator-btn-ghost" data-action="stepAction" data-step-action="origin-ability-reset">
+      <i class="fa-solid fa-rotate-left"></i> {{localize "sogrom-dnd5e-character-creator.common.reset"}}
+    </button>
+  </div>
+  {{/if}}
+</aside>

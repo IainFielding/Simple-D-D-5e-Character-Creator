@@ -51,6 +51,40 @@ export const UUID = {
 };
 
 /**
+ * 2014 SRD uuids, for the species-ability-increase scenarios at the end of this file.
+ *
+ * The system still ships the 2014 origins beside the 2014 classes, and they are the only content
+ * that puts an ability increase on the **species** — under the 2024 rules it sits on the background
+ * instead. Both are built with the 2014 Wizard and Acolyte, so the edition is consistent: pairing a
+ * 2014 species with a 2024 class is the mixed-edition character the creator's scoping exists to
+ * prevent, and its disagreements would be about the pairing rather than about the increase.
+ *
+ * The 2014 Wizard rather than the Fighter because it chooses its Arcane Tradition at level 2, so a
+ * level-1 build raises no subclass decision — the fewest moving parts around the thing under test.
+ */
+export const SRD2014 = {
+  wizard: "Compendium.dnd5e.classes.Item.wZK2Q0rXB0AQo8h3",
+  acolyte: "Compendium.dnd5e.backgrounds.Item.IgJkSnLiLJOWH7eK",
+  hillDwarf: "Compendium.dnd5e.races.Item.UQiRQUTBcsz8gZU1",
+  halfElf: "Compendium.dnd5e.races.Item.Hye5IZwPOSwV0qRR"
+};
+
+/**
+ * The 2014 Acolyte + Wizard answers, shared by both species scenarios so the species is the only
+ * variable between them. The Acolyte grants Insight and Religion outright and has **no ability
+ * increase** — which is the whole point of the pairing.
+ *
+ * Celestial is an *exotic* language in the 2014 list, not a standard one; both picks are also kept
+ * clear of anything either species grants (Dwarvish for the dwarf, Elvish for the half-elf), since
+ * the creator's cross-source dedupe would reopen a slot the answer book will not fill twice.
+ */
+const ACOLYTE_WIZARD_2014 = {
+  "9YuEhI3iqUxEfIOk": ["languages:exotic:celestial",          // Acolyte: choose 2 languages
+    "languages:standard:draconic"],
+  "6blzmKC4EON0KM2e": ["skills:arc", "skills:inv"]            // Wizard: choose 2 skills
+};
+
+/**
  * The Human + Sage origin answers, shared by the scenarios that pair them with different classes
  * so a class swap is the only variable between two runs.
  *
@@ -280,6 +314,63 @@ const SCENARIO_LIST = [
         "weapon:sim:handaxe", "weapon:mar:greatsword"],
       EmTANp6x6GfXFTmU: [UUID.archery],                          // Fighting Style
       a16u6wgnJQq8HMoq: "avg"                                    // Wizard's first level: a real roll
+    }
+  },
+
+  /**
+   * A 2014 species whose ability increase is entirely **fixed**: Hill Dwarf's +2 Constitution and
+   * +1 Wisdom, with no points to place.
+   *
+   * Nothing here is a decision, which is exactly why it needs a test. The creator reads the increase
+   * (`SourceIndex#readAsi` used to discard a `points: 0` advancement outright) and shows it read-only
+   * on the Species step, while the driver applies it through `deferredAsi` without ever consulting
+   * the provider. The native wizard renders the same advancement pre-filled from its `fixed` map.
+   * Two different routes to the same six scores — and Constitution among them, so this also covers
+   * the hit-point interaction that `actor-assembler.mjs` corrects for.
+   *
+   * The tool choice is the dwarf's own (brewer/mason/smith); the language grant is automatic.
+   */
+  {
+    id: "hill-dwarf-wizard-2014",
+    name: "Equivalence: Hill Dwarf Wizard (Acolyte), 2014 rules",
+    speciesUuid: SRD2014.hillDwarf,
+    backgroundUuid: SRD2014.acolyte,
+    classUuid: SRD2014.wizard,
+    abilities: { str: 8, dex: 14, con: 13, int: 15, wis: 12, cha: 10 },
+    answers: {
+      ...ACOLYTE_WIZARD_2014,
+      "9CYW7Bj53L9G8Zsw": ["tool:art:smith"]                   // Dwarven artisan's tools (choose 1)
+      // The ASI (Z9hvZFkWUNvowbQX) is deliberately unanswered: `points: 0` means there is nothing
+      // to allocate, and both sides apply the fixed +2 CON / +1 WIS from the configuration alone.
+    }
+  },
+
+  /**
+   * A 2014 species that fixes *and* allocates: Half-Elf's +2 Charisma plus 2 free points at a cap
+   * of 1 each. The shape the creator got wrong.
+   *
+   * The driver classifies this as a real allocation and raises the decision, but
+   * `CreationChoiceProvider#asi` only ever answered the *background's* increase — so those two
+   * points were silently never spent and a creator-built Half-Elf came out two points short. This
+   * scenario is the regression test for that.
+   *
+   * The answer states the **total** per ability, fixed part included, as the native ASI form takes
+   * it: +2 Charisma is the advancement's own, +1 Dexterity and +1 Constitution are the placed
+   * points. Charisma takes none of them — its fixed bump already meets the cap of 1, which is how
+   * dnd5e's own flow gates it and now how the creator's panel does too.
+   */
+  {
+    id: "half-elf-wizard-2014",
+    name: "Equivalence: Half-Elf Wizard (Acolyte), 2014 rules",
+    speciesUuid: SRD2014.halfElf,
+    backgroundUuid: SRD2014.acolyte,
+    classUuid: SRD2014.wizard,
+    abilities: { str: 8, dex: 13, con: 12, int: 15, wis: 10, cha: 14 },
+    answers: {
+      ...ACOLYTE_WIZARD_2014,
+      Z9hvZFkWUNvowbQX: { cha: 2, dex: 1, con: 1 },             // +2 fixed, 2 points placed
+      CormRQZ5momyvS2I: ["skills:per", "skills:prc"],           // Skill Versatility (choose 2)
+      U3OO7jLU0nm0Z7zw: ["languages:standard:dwarvish"]         // Choose 1 extra language
     }
   },
 

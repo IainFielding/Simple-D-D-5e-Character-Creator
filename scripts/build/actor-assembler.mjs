@@ -15,7 +15,8 @@ import { buildCreationManager, CreationChoiceProvider } from "./creation-advance
  * then add the origin items (class, background, species) by driving them through the shared
  * level-up advancement driver, which applies every advancement on a clone and answers each
  * choice from the picks the wizard already collected (see {@link module:build/creation-advancement}).
- * The background ability increase is applied by its own advancement in that pass, not pre-baked.
+ * An origin's ability increase — the 2024 background's, or the 2014 species' — is applied by its
+ * own advancement in that pass, not pre-baked.
  * Finally the chosen spells, then the starting equipment, are granted.
  *
  * For a junior dev: this is the ONLY place that writes to the world — every step before this just
@@ -64,8 +65,8 @@ export async function assembleActor(state, source, equipment) {
   stage("class", "system.details.originalClass", data => { data.system.levels = 0; });
 
   // Write the actor-level update: identity/visuals, the base ability scores, and the detail→item
-  // links. The background ability increase is NOT layered in here — its ASI advancement applies it
-  // in the driver pass below, so it lands exactly once, the native way.
+  // links. An origin's ability increase is NOT layered in here — its ASI advancement applies it in
+  // the driver pass below, so it lands exactly once, the native way.
   const scores = state.resolvedScores();
   const update = { ...detailsUpdate(state), ...detailLinks };
   for ( const key of ABILITIES ) update[`system.abilities.${key}.value`] = scores[key];
@@ -86,10 +87,11 @@ export async function assembleActor(state, source, equipment) {
 
     // Start at full health. dnd5e's HitPoints advancement writes *current* HP by adding the hit
     // die plus the Constitution modifier as it stands at the moment it applies — and in this walk
-    // that moment is during prepare(), before the background's ability increase has been
-    // allocated (the ASI is only surfaced there and assigned later, in autoResolve). A background
-    // that raises Constitution therefore left the character starting below its own maximum: max is
-    // derived and self-corrects, but the stored current value does not. Re-applying the hit-point
+    // that moment is during prepare(), before the origin's ability increase has been allocated (the
+    // ASI is only surfaced there and assigned later, in autoResolve). An origin that raises
+    // Constitution — a 2024 background, or a 2014 species like the Hill Dwarf — therefore left the
+    // character starting below its own maximum: max is derived and self-corrects, but the stored
+    // current value does not. Re-applying the hit-point
     // decisions cannot fix it — reverse and apply both recompute from the *new* modifier, so the
     // round trip is a no-op — and a freshly created character is at full health by definition.
     const hp = actor.system.attributes?.hp;
