@@ -1,103 +1,51 @@
 {{!--
-  The Background step: the origin list/description layout plus an ability-increase panel on the
-  right (2024 backgrounds grant a small ability-score increase the player allocates here). The
-  right column only appears once a background that *has* an increase is picked — `abilities` is
-  null otherwise, which covers "nothing picked yet" and every 2014 background.
-  Data from background-step.mjs context(): `cards`, `detail`, `groups`, `abilities` (the panel).
+  The Background step: the same work surface as the other origin picks, plus the ability-increase
+  panel (2024 backgrounds grant a small increase the player allocates) below the background's page.
+  The panel only appears once a background that *has* an increase is picked — `abilities` is null
+  otherwise, which covers "nothing picked yet" and every 2014 background.
+
+  The drawer carries one extra control the other pickers don't have: `abilityOptions` drives a
+  filter for "show me backgrounds that raise this ability", which work-picker.hbs renders when the
+  context supplies it.
+
+  Data from background-step.mjs context(): `cards`/`count`/`pickAction`/`drawerOpen`,
+  `detail`/`groups`, `abilityOptions`, and `abilities` (the panel).
 --}}
-<section class="creator-pick {{#unless abilities}}creator-pick--solo{{/unless}}">
-  <!-- Left column: vertical picker -->
-  <div class="creator-pick-side">
-    <div class="creator-toolbar creator-toolbar--stacked">
-      <label class="creator-search">
-        <i class="fa-solid fa-magnifying-glass"></i>
-        <input type="search" data-creator-search autocomplete="off"
-               aria-label="{{localize 'sogrom-dnd5e-character-creator.common.search'}}"
-               placeholder="{{localize 'sogrom-dnd5e-character-creator.common.search'}}">
-      </label>
-      <label class="creator-spell-filter creator-bg-filter">
-        <i class="fa-solid fa-dumbbell"></i>
-        <select data-bg-filter-ability aria-label="{{localize 'sogrom-dnd5e-character-creator.step.background.filterAbilityAria'}}">
-          <option value="">{{localize "sogrom-dnd5e-character-creator.step.background.filterAllAbilities"}}</option>
-          {{#each abilityOptions}}<option value="{{value}}">{{label}}</option>{{/each}}
-        </select>
-      </label>
-      <span class="creator-count">{{localize "sogrom-dnd5e-character-creator.common.available"}}: {{count}}</span>
+<section class="creator-work">
+
+  {{#if hasSelection}}
+  <div class="creator-work-bar">
+    {{!-- Disclosure semantics for the chevron — see class.hbs. --}}
+    <button type="button" class="creator-work-switch"
+            data-action="openPicker"
+            aria-expanded="{{#if drawerOpen}}true{{else}}false{{/if}}"
+            aria-controls="creator-picker-drawer">
+      <img class="creator-work-switch-img" src="{{detail.img}}" alt="">
+      <span>{{detail.name}}</span>
+      <i class="fa-solid fa-chevron-down" aria-hidden="true"></i>
+    </button>
+    <span class="creator-work-bar-note">
+      {{localize "sogrom-dnd5e-character-creator.common.available"}}: {{count}}
+    </span>
+  </div>
+  {{/if}}
+
+  <div class="creator-work-body">
+    <div class="creator-work-page">
+      {{#if hasSelection}}
+      {{> "modules/sogrom-dnd5e-character-creator/templates/parts/work-detail.hbs" this}}
+      {{/if}}
     </div>
 
-    <ul class="creator-picklist">
-      {{#each cards}}
-      <li>
-        <button type="button" class="creator-pickrow {{#if selected}}is-selected{{/if}}"
-                data-action="stepAction" data-step-action="pick-origin"
-                data-uuid="{{uuid}}" data-name="{{name}}" data-abilities="{{abilities}}">
-          <img class="creator-pickrow-img" src="{{img}}" alt="">
-          <span class="creator-pickrow-name">{{name}}</span>
-          {{#if selected}}<i class="creator-pickrow-tick fa-solid fa-check"></i>{{/if}}
-        </button>
-      </li>
-      {{else}}
-      <p class="creator-empty">{{localize "sogrom-dnd5e-character-creator.common.noEntries"}}</p>
-      {{/each}}
-    </ul>
+    {{> "modules/sogrom-dnd5e-character-creator/templates/parts/work-picker.hbs" this}}
   </div>
 
-  <!-- Center column: description -->
-  <div class="creator-pick-desc">
-    {{#if hasSelection}}
-    <article class="creator-detail">
-      <header class="creator-detail-head">
-        <img class="creator-detail-img" src="{{detail.img}}" alt="">
-        <h2>{{detail.name}}</h2>
-        {{!-- Provenance badge, as on the class and subclass panels: which book this came from.
-              Omitted when the item declares no sourcebook. --}}
-        {{#if detail.source}}
-        <span class="creator-detail-source" title="{{detail.source}}">
-          <i class="fa-solid fa-book" aria-hidden="true"></i>{{detail.source}}
-        </span>
-        {{/if}}
-      </header>
-      <div class="creator-detail-body">{{{detail.enriched}}}</div>
-
-      {{#each groups}}
-      <section class="creator-adv-block">
-        <h3 class="creator-adv-heading">{{heading}}</h3>
-
-        {{#if tags.length}}
-        <ul class="creator-trait-list">
-          {{#each tags}}
-          <li class="creator-trait">
-            <span class="creator-trait-label">{{label}}</span>
-            <span class="creator-trait-value">{{value}}</span>
-          </li>
-          {{/each}}
-        </ul>
-        {{/if}}
-
-        {{#if items.length}}
-        <div class="creator-grant-list">
-          {{#each items}}
-          <div class="creator-grant">
-            <img class="creator-grant-icon" src="{{img}}" alt="">
-            <a class="content-link" data-uuid="{{uuid}}" data-link data-tooltip="{{ccItemTooltip uuid}}">{{name}}</a>
-            {{#if level}}<span class="creator-grant-tag">{{localize "sogrom-dnd5e-character-creator.step.class.levelTag" level=level}}</span>{{/if}}
-          </div>
-          {{/each}}
-        </div>
-        {{/if}}
-      </section>
-      {{/each}}
-    </article>
-    {{else}}
-    <div class="creator-pick-empty">
-      <i class="fa-solid fa-feather"></i>
-      <h2>{{localize "sogrom-dnd5e-character-creator.step.background.label"}}</h2>
-      <p>{{localize "sogrom-dnd5e-character-creator.common.selectHint"}}</p>
-    </div>
-    {{/if}}
-  </div>
-
+  {{!-- Right column: what this step asks you to set, beside what you read. Absent entirely when
+        this origin's edition grants no ability increase, and the page then takes the full width.
+        See class.hbs for why it sits outside the body. --}}
   {{#if abilities}}
-  {{> "modules/sogrom-dnd5e-character-creator/templates/parts/origin-abilities.hbs" abilities}}
+  <aside class="creator-work-side">
+    {{> "modules/sogrom-dnd5e-character-creator/templates/parts/origin-abilities.hbs" abilities}}
+  </aside>
   {{/if}}
 </section>

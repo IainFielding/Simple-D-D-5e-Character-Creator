@@ -21,35 +21,136 @@
    offline / on a LAN with no Google Fonts round-trip. */
 
 .sogrom-creator {
-  /* Palette — Arcane Midnight (violet UI accent, gold reserved for selection). */
-  --cc-bg: #0f0e15;
-  --cc-panel: #16151f;
-  --cc-panel-2: #1d1b28;
-  --cc-line: #2a2836;
-  /* Stronger hairline for emphasized edges / engraved separators. */
-  --cc-line-2: #3c3950;
-  --cc-text: #bfbccb;
-  /* Secondary text. Lifted from the old #807d92 so it clears WCAG AA (4.5:1) even on
-     the darkest raised surface (--cc-panel-2), where the previous value fell to ~4.25. */
-  --cc-muted: #8f8ca3;
+  /* --- Semantic colour: one rule for the whole creator -----------------
+     Warm means settled. Cool means outstanding.
+
+     --cc-settled   brass. Anything the player has already committed: a
+                    selected row, a completed step, a filled dossier line,
+                    a decision whose quota is met.
+     --cc-open      teal. Anything still asking for input: an unresolved
+                    choice, the Next button, the keyboard focus ring.
+
+     Before this the palette carried two accents — violet as "UI accent,
+     primary action and focus ring", gold as "selected" — with no rule
+     mapping either colour to a meaning. On the class step that put five
+     weights of emphasis on screen at once, and the two systems collided
+     directly: the violet focus ring and the gold selection ring drew a
+     double halo around the same element, which `.is-selected:focus-visible
+     { outline: none }` existed purely to suppress. Split by job instead,
+     they can never land on the same control, so that patch is gone — and a
+     player can scan for cool colour to find everything still to do.
+
+     The two differ in hue *and* in value, so the distinction survives
+     colour blindness rather than resting on red/green discrimination.
+     Neither is ever the only cue: a settled row also carries a tick, an
+     outstanding one also carries a count. */
+  --cc-settled: #c9a227;
+  --cc-settled-bright: #e3bf4b;
+  --cc-settled-soft: rgba(201, 162, 39, 0.15);
+  --cc-settled-glow: rgba(201, 162, 39, 0.30);
+  --cc-open: #4fb3a8;
+  --cc-open-bright: #6fd0c5;
+  --cc-open-soft: rgba(79, 179, 168, 0.14);
+  --cc-open-glow: rgba(79, 179, 168, 0.32);
+
+  /* Legacy names, aliased rather than swept, so the three thousand rules
+     below (and the whole level-up sheet) keep working while the meaning
+     changes in exactly one place. Each maps to whichever semantic token
+     matches the job it was already doing:
+       accent → open   (it was the focus ring and the primary action)
+       gold / select → settled  (it was "this one is chosen")
+       good → settled  ("full", "complete" and "settled" are one idea; a
+                        third green accent next to the teal would only be
+                        a third thing to learn). */
+  --cc-accent: var(--cc-open);
+  --cc-accent-soft: var(--cc-open-soft);
+  --cc-accent-glow: var(--cc-open-glow);
+  --cc-gold: var(--cc-settled);
+  --cc-gold-bright: var(--cc-settled-bright);
+  --cc-gold-glow: var(--cc-settled-glow);
+  --cc-select: var(--cc-settled);
+  --cc-select-soft: var(--cc-settled-soft);
+  --cc-good: var(--cc-settled);
+
+  /* --- Surfaces --------------------------------------------------------
+     Two surfaces, and the borders — not the fills — carrying the separation.
+
+     The Codex build stacked an index leaf (#100e17), a page (#15141e) and a
+     margin gloss (#1b1926) within about 5% luminance of each other, and let
+     1px hairlines carry the separation. On an uncalibrated monitor at the
+     brightness Foundry actually gets played at, those collapse into one flat
+     field.
+
+     An earlier pass here claimed to have fixed that by putting the surfaces
+     "roughly 30% apart". They are — in relative luminance (0.0044 vs 0.0081) —
+     but that is 1.07:1 *perceptually*, because both are essentially black. Two
+     near-black fills cannot be told apart at any brightness, and no amount of
+     nudging the hexes changes that without turning the room grey.
+
+     So the fills stay dark and the *edges* do the work, which is also what
+     WCAG 1.4.11 asks for: a component may be bounded by contrast in its border
+     rather than its fill. --cc-line-2 now clears 3:1 against every surface it
+     is drawn on, so the dossier/work split, the work-side column and the option
+     cards all have a boundary that resolves before the fills do. The fills got
+     a small supporting lift so the ladder is still legible on a good monitor.
+
+     The hue also moved off violet-black onto a cool neutral, so the warm
+     parchment text sits against it rather than in it. */
+  --cc-bg: #15161a;
+  --cc-panel: #212429;
+  --cc-panel-2: #2a2e35;
+  /* Ordinary rules: row separators inside a table, block dividers. These are
+     decoration — the thing they divide is identified by its content, not by
+     them — so they aim only to be *visible* (~1.8:1 on panel), not to hit the
+     3:1 component threshold, which at this value would read as a wireframe. */
+  --cc-line: #474d57;
+  /* Structural edges: anything that is the boundary of a component or a
+     surface — the dossier's right edge, the work-side column, the option-card
+     grid, focusable control borders. Clears 3:1 on bg, sunk and panel. */
+  --cc-line-2: #656e7b;
+  /* Warm parchment against the cool ground. */
+  --cc-text: #d9d5cc;
+  /* Secondary text. Clears WCAG AA (4.5:1) on every surface here, including
+     the lightest raised one (--cc-panel-2), where it measures ~4.7:1. */
+  --cc-muted: #9a978f;
   /* Brightest text, for headings and active labels. */
-  --cc-bright: #e7e5f0;
-  --cc-accent: #9180f2;
-  --cc-accent-soft: rgba(145, 128, 242, 0.18);
-  --cc-accent-glow: rgba(145, 128, 242, 0.38);
-  --cc-good: #4fd18b;
-  --cc-gold: #c8a24e;
-  --cc-gold-bright: #e8cd84;
-  --cc-gold-glow: rgba(200, 162, 78, 0.30);
-  /* Selection highlight — gold, distinct from the violet UI accent. */
-  --cc-select: #c8a24e;
-  --cc-select-soft: rgba(200, 162, 78, 0.16);
+  --cc-bright: #f2eee5;
+  /* Placeholders and struck-out values: an em-dash where a step has no answer
+     yet, "Not applicable" on a step this character skips. These used to borrow
+     --cc-line-2, a *border* token, which put real words on screen at 1.8:1.
+     They are text, so they get a text colour: 4.56:1 on --cc-sunk, the only
+     surface they are drawn on. */
+  --cc-text-faint: #767b88;
   /* Single semantic red for destructive actions and required-field markers, so the
-     two reds that used to drift (the asterisk and the danger button) stay in sync. */
-  --cc-danger: #d9586a;
+     two reds that used to drift (the asterisk and the danger button) stay in sync.
+     Lightened from #d9586a, which fell to 4.0:1 on --cc-panel-2 — the surface the
+     required-field asterisk is actually drawn on. */
+  --cc-danger: #ec7082;
+
+  /* The sunk column: the dossier, and the window's own chrome bands. */
+  --cc-sunk: #0d0e11;
 
   /* Subtle engraved-panel sheen reused across raised surfaces. */
-  --cc-panel-grad: linear-gradient(180deg, #1a1826, #131220);
+  /* Tracks --cc-panel-2 → --cc-panel; kept as literals because a gradient between two
+     var()s re-resolves on every paint for no benefit here. */
+  --cc-panel-grad: linear-gradient(180deg, #2a2e35, #1c1f24);
+
+  /* Legacy leaf names. The bound-spread metaphor is gone with the third
+     column (see the work-surface section), but these are still referenced by
+     the spell browser, which keeps the two-column pick layout. */
+  --cc-leaf: var(--cc-bg);
+  --cc-leaf-index: var(--cc-sunk);
+  --cc-leaf-gloss: var(--cc-panel);
+  --cc-gutter: linear-gradient(90deg, rgba(0, 0, 0, 0.55), rgba(0, 0, 0, 0) 14px);
+  --cc-page-pad: clamp(1.5rem, 3.5vw, 3rem);
+  /* Square is the point: manuscript leaves have square corners, and the 10px
+     rounding is most of what made the old build read as generic dark-mode UI.
+     A single token so the sweep stays reversible. */
+  --cc-radius: 0px;
+  --cc-radius-sm: 0px;
+  /* Pills (chips, tabs, the stepper markers) get their own token so the
+     capsule shapes can be restored independently of the card corners. */
+  --cc-radius-pill: 0px;
 
   /* Haptic depth — a faint top-edge highlight stamped into raised surfaces so they
      read as lit from above (machined) rather than printed flat. */
@@ -75,6 +176,41 @@
 
 .sogrom-creator * { box-sizing: border-box; }
 
+/* Strip the inherited list-item margin from every list in the creator's own UI.
+   Foundry's core styling gives `li` a bottom margin and removes it on `:last-child`. In a
+   grid or flex list that is not cosmetic: tracks size to an item's *margin* box while the
+   item stretches to the track minus its own margins, so every item sits short of its row
+   and the last one — with no margin to subtract — renders visibly taller than the rest.
+   That is what made the final card in the picker drawer look bigger than the other
+   twenty-three, and resetting the `<ul>` (which each list already did) never reached it.
+   Applied once here so the next list added to this file cannot inherit the bug. */
+.sogrom-creator :is(ul, ol) > li { margin: 0; }
+
+/* Definition lists: take back the colours Foundry sets on the elements themselves.
+   `@layer elements.typography` in foundry2.css contains
+
+       dl dt { color: var(--color-text-emphatic); text-shadow: 1px 1px #000; }
+       dl dd { color: var(--color-text-primary); margin: 0 0 1rem 1rem; }
+
+   and `--color-text-primary` resolves to Foundry's *dark* body colour outside a themed
+   scope. This is the one shape of host rule that inheritance cannot survive: setting
+   `color` on `.sogrom-creator` and letting it flow down does nothing here, because any
+   declaration that matches the element beats an inherited value no matter how specific
+   the ancestor. (Layer order is not the problem — this file is unlayered, so it wins
+   whenever it declares at all. It simply wasn't declaring.)
+
+   It cost the store's budget panel two of its three numbers: "Starting gold" and "Cart"
+   rendered in near-black on the near-black cart, i.e. blank, while "Remaining" showed
+   because it happened to set a gold of its own. Declared once here so a `<dl>` added to
+   this file later starts out visible. */
+.sogrom-creator :is(dt, dd) { color: var(--cc-text); }
+.sogrom-creator dt { text-shadow: none; }
+.sogrom-creator dd { margin-left: 0; }
+/* Prose enriched from the compendium is the exception: its lists are read, not laid out,
+   and want their spacing. Stated explicitly rather than via `revert`, which would restore
+   whatever Foundry happened to set rather than a value we chose. */
+.sogrom-creator .creator-detail-body :is(ul, ol) > li { margin-block: 0.25em; }
+
 /* Placeholder text — pin it to the muted token (which clears AA) at full opacity so
    it doesn't inherit the browser default grey or Firefox's reduced-opacity placeholder,
    either of which would drop below the contrast floor. */
@@ -91,18 +227,22 @@
   outline: 2px solid var(--cc-accent);
   outline-offset: 2px;
 }
-/* Already-selected rows/cards/options carry their own gold ring (border + glow),
-   so a second violet focus outline around them reads as a clashing double ring.
-   Drop the outline here and let the gold selection ring serve as the focus cue too.
-   Comes after the rule above (same specificity) so it wins by source order. */
-.sogrom-creator .is-selected:focus-visible {
-  outline: none;
-}
+/* There is deliberately no `.is-selected:focus-visible { outline: none }` here any
+   more. It used to exist because selection and focus were both drawn in the same
+   family of colour, so focusing an already-selected row stacked two rings. Now
+   selection is brass and focus is teal — warm inside, cool outside — and the two
+   read as what they are: "this one is chosen" and "you are here". Suppressing the
+   focus ring on exactly the rows a keyboard user is most likely to be sitting on
+   was always the wrong half of that trade. */
 
 /* Inscriptional caps for every heading inside the creator. Specific rules later
    in the file (gold section eyebrows, aside titles) still override the colour;
    this only establishes the family, weight and engraved relief. */
-.sogrom-creator :is(h1, h2, h3, h4) {
+/* h5 and h6 are in the list for the same reason the `dl` rule above exists: Foundry colours every
+   heading level directly, so any level this selector omits falls through to the host's colour. Our
+   own markup stops at h3, but enriched compendium prose is someone else's HTML and routinely goes
+   deeper. */
+.sogrom-creator :is(h1, h2, h3, h4, h5, h6) {
   font-family: var(--cc-font-heading);
   font-weight: 600;
   letter-spacing: 0.03em;
@@ -118,11 +258,17 @@
    without the fixed-position rules forcing it back to fullscreen. */
 .sogrom-creator-fullscreen {
   position: fixed;
+  /* `inset: 0` alone sizes this to the viewport, so the `width: 100vw; height: 100vh`
+     that used to sit here was redundant — and not equivalent: 100vw *includes* the
+     scrollbar gutter, so whenever the page behind the takeover has a vertical
+     scrollbar the window comes out wider than the space available and puts the
+     document into a horizontal scroll. Harmless while nothing sat flush to the left
+     edge; the dossier does. */
   inset: 0;
-  width: 100vw;
-  height: 100vh;
   display: flex;
   flex-direction: column;
+  /* The creator's own three parts (top bar / dossier / stage) re-layer this as a grid
+     below; the level-up window has two parts and keeps this flex column. */
   margin: 0;
   padding: 0;
   border: none;
@@ -145,6 +291,16 @@ body:has(.sogrom-creator-fullscreen) #dice-box-canvas {
   z-index: var(--z-index-tooltip, 9999) !important;
 }
 
+/* While a window the creator opened is on screen, the takeover steps below Foundry's window
+   layer so that window is visible. Set by `yieldTakeoverTo()` for the file picker, and cleared
+   when it closes. Still fixed and still covering the viewport — only floating app windows come
+   over it, which is the entire point. 90 sits just under Foundry's `--z-index-window` (100).
+
+   This is the inverse of the two rules below, and the more reliable shape: it changes our own
+   element rather than trying to out-specify an inline z-index that Foundry rewrites on every
+   render of a window whose class names we don't control. */
+.sogrom-creator-fullscreen.is-yielding { z-index: 90; }
+
 /* Same trap for the dnd5e Compendium Browser opened from inside the creator (e.g. the
    feat picker on an ASI level-up, CompendiumBrowser.selectOne). It renders as its own
    ApplicationV2 window whose z-index is Foundry's inline _maxZ (~100s), so the ~9998
@@ -154,9 +310,10 @@ body:has(.sogrom-creator-fullscreen) .application.compendium-browser {
   z-index: var(--z-index-tooltip, 9999) !important;
 }
 
-/* Arcane Midnight ambience — soft violet auras top and bottom with a faint gold
-   core. Sits behind the static content (z-index:-1 within the creator's own
-   stacking context) so it tints the backdrop without catching pointer events. */
+/* Ambience — soft teal auras top and bottom over a faint brass core, the same warm/cool
+   pair the interface itself runs on. Sits behind the static content (z-index:-1 within
+   the creator's own stacking context) so it tints the backdrop without catching
+   pointer events. */
 .sogrom-creator-fullscreen::before {
   content: "";
   position: absolute;
@@ -164,9 +321,9 @@ body:has(.sogrom-creator-fullscreen) .application.compendium-browser {
   pointer-events: none;
   z-index: -1;
   background:
-    radial-gradient(120% 80% at 50% -10%, rgba(145, 128, 242, 0.14), transparent 52%),
-    radial-gradient(100% 60% at 50% 115%, rgba(145, 128, 242, 0.09), transparent 52%),
-    radial-gradient(60% 40% at 50% 50%,   rgba(200, 162, 78, 0.03),  transparent 70%);
+    radial-gradient(120% 80% at 50% -10%, rgba(79, 179, 168, 0.10), transparent 52%),
+    radial-gradient(100% 60% at 50% 115%, rgba(79, 179, 168, 0.07), transparent 52%),
+    radial-gradient(60% 40% at 50% 50%,   rgba(201, 162, 39, 0.035), transparent 70%);
 }
 
 /* ---------------------------------------------- Windowed mode
@@ -176,7 +333,7 @@ body:has(.sogrom-creator-fullscreen) .application.compendium-browser {
    Midnight palette so the window reads as part of the creator, not stock chrome. */
 
 .sogrom-creator-windowed .window-header {
-  background: linear-gradient(180deg, #16151f, #100f17);
+  background: linear-gradient(180deg, #1b1d22, #101116);
   border-bottom: 1px solid var(--cc-line);
   color: var(--cc-text);
 }
@@ -206,13 +363,14 @@ body:has(.sogrom-creator-fullscreen) .application.compendium-browser {
   pointer-events: none;
   z-index: 0;
   background:
-    radial-gradient(120% 80% at 50% -10%, rgba(145, 128, 242, 0.14), transparent 52%),
-    radial-gradient(100% 60% at 50% 115%, rgba(145, 128, 242, 0.09), transparent 52%),
-    radial-gradient(60% 40% at 50% 50%,   rgba(200, 162, 78, 0.03),  transparent 70%);
+    radial-gradient(120% 80% at 50% -10%, rgba(79, 179, 168, 0.10), transparent 52%),
+    radial-gradient(100% 60% at 50% 115%, rgba(79, 179, 168, 0.07), transparent 52%),
+    radial-gradient(60% 40% at 50% 50%,   rgba(201, 162, 39, 0.035), transparent 70%);
 }
 
 /* Keep the content above the ambience layer. */
 .sogrom-creator-windowed .creator-topbar,
+.sogrom-creator-windowed .creator-dossier,
 .sogrom-creator-windowed .creator-stage {
   position: relative;
   z-index: 1;
@@ -244,20 +402,41 @@ body:has(.sogrom-creator-fullscreen) .application.compendium-browser {
 }
 .sogrom-creator-windowed .window-resize-handle:hover { opacity: 1; }
 
-/* ---------------------------------------------- Top bar (horizontal stepper) */
+/* ---------------------------------------------- Creator shell grid
 
-/* The navigation bar that spans the full width above the content stage. It holds
-   three things, left to right: the brand/title, the list of steps in the middle,
-   and the Cancel button on the right. Each step renders as a pill: a small circular
-   marker (the step number, or a tick once complete) followed by its label. */
+   The creator renders three parts as siblings — the top bar, the dossier and the
+   stage — so its root is a grid: one full-width band across the top, then a fixed
+   dossier column beside a flexible work surface.
+
+   Scoped by :has(.creator-dossier) rather than by the root class, because the root
+   class is shared with the level-up window. That window renders two parts (rail +
+   stage) and keeps the flex column the base rules give it. */
+.sogrom-creator-fullscreen:has(.creator-dossier),
+.sogrom-creator-windowed .window-content:has(.creator-dossier) {
+  display: grid;
+  /* The one fixed column in the layout. Everything else flexes, which is the
+     point: the surface being read is the one that keeps its measure. */
+  grid-template-columns: 292px minmax(0, 1fr);
+  grid-template-rows: auto minmax(0, 1fr);
+}
+.sogrom-creator-fullscreen:has(.creator-dossier) > .creator-topbar,
+.sogrom-creator-windowed .window-content:has(.creator-dossier) > .creator-topbar {
+  grid-column: 1 / -1;
+}
+
+/* ---------------------------------------------- Top bar
+
+   The band across the top of both windows: brand at the left, Cancel at the right,
+   and between them whatever that window uses to show where you are — a progress
+   meter in the creator (topbar.hbs), the step pills in the level-up (rail.hbs). */
 .creator-topbar {
   flex: 0 0 auto;
   display: flex;
   align-items: center;
   gap: 1.5rem;
-  padding: 0.75rem 1.5rem;
-  background: linear-gradient(180deg, #16151f, #100f17);
-  border-bottom: 1px solid var(--cc-line);
+  padding: 0.35rem 1.25rem;
+  background: linear-gradient(180deg, #1b1d22, #101116);
+  border-bottom: 1px solid var(--cc-line-2);
 }
 
 .creator-topbar-brand {
@@ -275,7 +454,9 @@ body:has(.sogrom-creator-fullscreen) .application.compendium-browser {
   text-transform: uppercase;
   text-shadow: 0 1px 0 rgba(0, 0, 0, 0.6);
 }
-.creator-topbar-brand i { color: var(--cc-accent); filter: drop-shadow(0 0 6px var(--cc-accent-glow)); }
+/* No rule for a brand icon: topbar.hbs renders the wordmark and the version only.
+   One lived here for an <i> that was dropped when the stepper became the progress
+   meter, which is exactly the kind of rule that survives a redesign unnoticed. */
 
 .creator-topbar-version {
   align-self: flex-end;
@@ -289,6 +470,66 @@ body:has(.sogrom-creator-fullscreen) .application.compendium-browser {
 
 .creator-topbar-foot { flex: 0 0 auto; margin-left: auto; }
 
+/* --- The progress meter (creator) -------------------------------------
+   One measure of how far through the player is, visible on every step.
+
+   What it replaced was a row of eleven numbered pills that scrolled sideways, plus
+   a "Step 3 of 9" counter in the stage head that was suppressed on exactly the pick
+   steps making up most of the flow — so on most screens the only progress cue was a
+   2px underscore under one pill. The step list itself moved to the dossier, where it
+   is vertical and its labels fit at any width; what a band across the top is actually
+   good at is this. */
+.creator-topbar-progress {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 0.85rem;
+}
+/* 5px, not 3px. This is the only global progress cue in the creator and it spans the
+   full width of the top bar; at 3px it was a scratch, and the brass fill's leading edge
+   — the thing actually being read — had almost no area to land on. */
+.creator-progress-track {
+  flex: 1;
+  min-width: 60px;
+  height: 5px;
+  position: relative;
+  background: var(--cc-line);
+}
+/* Brass: the fill is the ground already covered — the steps behind the player — which is the
+   warm/settled half of the palette. What is still *outstanding* is the teal chip beside it; the
+   bar deliberately does not try to say that too. See #progressContext() for why. */
+.creator-progress-fill {
+  position: absolute;
+  inset: 0 auto 0 0;
+  background: var(--cc-settled);
+  transition: width 0.3s var(--cc-ease);
+}
+.creator-progress-read {
+  flex: 0 0 auto;
+  display: flex;
+  align-items: baseline;
+  gap: 0.6rem;
+  font-size: 0.72rem;
+  letter-spacing: 0.06em;
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+.creator-progress-pos { color: var(--cc-muted); }
+/* The standing answer to "what is left". Teal, like everything outstanding — and
+   absent at zero rather than reading "0 outstanding", which would be a thing to
+   parse where nothing at all is a thing to notice. */
+.creator-progress-todo {
+  color: var(--cc-open);
+  border: 1px solid var(--cc-open);
+  background: var(--cc-open-soft);
+  padding: 0.05rem 0.4rem;
+  font-weight: 600;
+}
+
+/* --- The step pills (level-up only) -----------------------------------
+   Still the level-up window's chrome: a short, fixed list of levels and choices,
+   which is what a horizontal stepper suits. The creator's list outgrew it. */
 .creator-topbar-steps {
   list-style: none;
   margin: 0;
@@ -321,7 +562,7 @@ body:has(.sogrom-creator-fullscreen) .application.compendium-browser {
   padding: 0.4rem 0.65rem;
   background: transparent;
   border: 1px solid transparent;
-  border-radius: 999px;
+  border-radius: var(--cc-radius-pill);
   color: var(--cc-muted);
   text-align: left;
   cursor: pointer;
@@ -332,34 +573,44 @@ body:has(.sogrom-creator-fullscreen) .application.compendium-browser {
 .creator-rail-link:active:not(:disabled) { transform: scale(0.97); }
 .creator-rail-link:disabled { opacity: 0.45; cursor: not-allowed; }
 
+/* Active tab: tinted ground plus a gold underscore stamped along its foot,
+   like a tab cut into the edge of a bound book. */
 .creator-rail-step.is-active .creator-rail-link {
   background: var(--cc-select-soft);
-  border-color: var(--cc-select);
+  border-color: transparent;
+  box-shadow: inset 0 -2px 0 var(--cc-select);
   color: var(--cc-bright);
 }
 
+/* The marker is a numeral, not a badge — no disc, no ring. What carries the
+   state is colour plus the gold underscore on the active step's tab. */
 .creator-rail-marker {
-  flex: 0 0 34px;
-  height: 34px;
-  display: grid;
-  place-items: center;
-  border-radius: 50%;
-  border: 1px solid transparent;
-  background: var(--cc-panel-2);
+  flex: 0 0 auto;
+  min-width: 1.5em;
+  height: auto;
+  display: inline-block;
+  text-align: right;
+  border-radius: 0;
+  border: 0;
+  background: none;
+  box-shadow: none;
   font-family: var(--cc-font-heading);
-  font-size: 0.95rem;
+  font-size: 0.7rem;
   font-weight: 600;
+  letter-spacing: 0.1em;
+  /* A step number is text, so it takes a text token rather than the border colour
+     it used to borrow. */
+  color: var(--cc-text-faint);
 }
-/* Current step: gold ring + faint glow, so "you are here" reads instantly. */
 .creator-rail-step.is-active .creator-rail-marker {
-  border-color: var(--cc-select);
+  border-color: transparent;
   color: var(--cc-gold-bright);
-  background: var(--cc-select-soft);
-  box-shadow: 0 0 0 1px var(--cc-select-soft), 0 0 10px var(--cc-gold-glow);
+  background: none;
+  box-shadow: none;
 }
 .creator-rail-step.is-complete .creator-rail-marker {
   background: transparent;
-  border-color: var(--cc-gold);
+  border-color: transparent;
   color: var(--cc-gold);
 }
 .creator-rail-step.is-complete .creator-rail-marker i { font-size: 0.9rem; }
@@ -376,6 +627,235 @@ body:has(.sogrom-creator-fullscreen) .application.compendium-browser {
   text-overflow: ellipsis;
 }
 
+/* ---------------------------------------------- Dossier
+
+   The creator's left column: the character sheet filling up, and the step
+   navigation, as one object. See templates/dossier.hbs for why they merged.
+
+   It is the sunk surface of the two — a good 30% darker than the work ground it
+   sits beside, with a real border, so the split reads at the brightness Foundry
+   actually gets played at rather than resting on a hairline. */
+.creator-dossier {
+  grid-row: 2;
+  grid-column: 1;
+  min-height: 0;
+  overflow-y: auto;
+  background: var(--cc-sunk);
+  border-right: 1px solid var(--cc-line-2);
+}
+
+/* --- Identity --- */
+.creator-dossier-ident {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.9rem 0.9rem 0.85rem;
+  border-bottom: 1px solid var(--cc-line);
+}
+.creator-dossier-plate {
+  flex: 0 0 56px;
+  width: 56px;
+  height: 56px;
+  border: 1px solid var(--cc-line-2);
+  background: linear-gradient(160deg, #2a2d34, #191b20);
+  overflow: hidden;
+}
+.creator-dossier-plate img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.creator-dossier-names { min-width: 0; }
+.creator-dossier-name {
+  margin: 0;
+  font-family: var(--cc-font-heading);
+  font-size: 1.1rem;
+  line-height: 1.15;
+  color: var(--cc-bright);
+  overflow-wrap: anywhere;
+}
+/* Not yet named. Italic and muted so it reads as a blank on the sheet rather than
+   as a character actually called "Unnamed". */
+.creator-dossier-name.is-unset { color: var(--cc-muted); font-style: italic; font-size: 1rem; }
+.creator-dossier-sub {
+  margin: 0.2rem 0 0;
+  font-size: 0.76rem;
+  color: var(--cc-muted);
+  letter-spacing: 0.02em;
+}
+
+/* --- The six scores, as a readout ---
+   Plates, not steppers. The dossier reports; the work surface sets. */
+/* No rules between the plates at all — they are separated by space.
+
+   This block has now been through three border treatments and the bottom-right plate looked
+   wrong under every one of them. Gap lines over a coloured container left the right column
+   closed by the dossier's own lighter border; per-cell borders with the right column
+   excepted made those two plates a pixel wider inside and outlined in a different colour;
+   per-cell borders without the exception put a doubled edge down the right-hand column
+   alone. Every version had *some* asymmetry, because a border on a grid cell is always a
+   function of where that cell sits.
+
+   Space cannot be asymmetric. With no cell borders there is no box to be misaligned, the
+   six plates are identical by construction, and the block reads as a stat line rather than
+   a table — which is what it is. The one rule left is the block's own bottom edge, which
+   spans the full width and so is the same for every plate above it. */
+.creator-dossier-scores {
+  list-style: none;
+  margin: 0;
+  padding: 0.55rem 0.4rem 0.7rem;
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 0.55rem 0;
+  border-bottom: 1px solid var(--cc-line);
+}
+.creator-dossier-score {
+  position: relative;
+  margin: 0;
+  padding: 0;
+  text-align: center;
+}
+
+/* Every line in a plate has an explicit line-height, so a plate's height is decided by this
+   stylesheet and never by whichever font ends up drawing the glyphs. That is not fussiness:
+   one character falling through to a fallback face (U+2212 did exactly this) makes its line
+   box taller, and the plate holding it ends up taller than the five beside it — a difference
+   that is invisible in the CSS and reads as one misaligned box. */
+.creator-dossier-abbr {
+  display: block;
+  font-size: 0.58rem;
+  line-height: 1.3;
+  font-weight: 700;
+  letter-spacing: 0.14em;
+  /* Letter-spacing is applied after the last letter too, and centring counts that trailing
+     space — so a letterspaced label centres slightly left of the number beneath it. Pulling
+     the tracking back off the end re-centres the label over its own score. */
+  margin-right: -0.14em;
+  color: var(--cc-muted);
+}
+.creator-dossier-value {
+  display: block;
+  font-family: var(--cc-font-heading);
+  font-size: 1.25rem;
+  line-height: 1.15;
+  color: var(--cc-bright);
+  font-variant-numeric: tabular-nums;
+}
+.creator-dossier-mod {
+  display: block;
+  font-size: 0.68rem;
+  line-height: 1.2;
+  color: var(--cc-settled);
+  font-variant-numeric: tabular-nums;
+  /* Holds the line open when a plate has no modifier yet, so an unset plate is the same
+     height as a set one. */
+  min-height: 1.2em;
+}
+
+/* Before the scores are set, the plates are blanks — see #dossierAbilities() for why
+   the raw 8/8/8/8/8/8 must not be shown as if the player had chosen it. */
+.creator-dossier-score.is-unset .creator-dossier-value { color: var(--cc-text-faint); }
+/* An origin's increase, in the corner of the plate it raised. */
+.creator-dossier-bonus {
+  position: absolute;
+  top: 0.2rem;
+  right: 0.3rem;
+  font-size: 0.6rem;
+  font-weight: 700;
+  color: var(--cc-settled);
+  font-variant-numeric: tabular-nums;
+}
+
+/* --- The roll: steps as sheet lines --- */
+.creator-dossier-heading {
+  margin: 0;
+  padding: 0.85rem 0.9rem 0.4rem;
+  font-size: 0.6rem;
+  font-weight: 700;
+  letter-spacing: 0.17em;
+  text-transform: uppercase;
+  color: var(--cc-muted);
+  border: 0;
+}
+.creator-dossier-roll { list-style: none; margin: 0; padding: 0 0 1.25rem; }
+
+.creator-dossier-line {
+  display: grid;
+  /* Key, value, then whichever state marker applies. The key column is fixed so the
+     values line up down the sheet. */
+  grid-template-columns: 5.4rem minmax(0, 1fr) auto;
+  align-items: baseline;
+  gap: 0.5rem;
+  width: 100%;
+  /* Override Foundry's fixed button height and centring. */
+  height: auto;
+  min-height: auto;
+  justify-content: flex-start;
+  text-align: left;
+  padding: 0.4rem 0.8rem 0.4rem 0.55rem;
+  background: none;
+  border: 0;
+  border-left: 3px solid transparent;
+  border-radius: var(--cc-radius);
+  box-shadow: none;
+  cursor: pointer;
+  transition: background 0.18s var(--cc-ease), border-color 0.18s var(--cc-ease);
+}
+.creator-dossier-line:hover:not(:disabled) { background: rgba(255, 255, 255, 0.035); }
+/* Not reachable yet: every step before it isn't finished. Dimmed and inert — and
+   deliberately *not* marked outstanding, since there is nothing to act on.
+
+   0.42 was too far. A disabled control is exempt from the contrast floor, but this
+   is not one disabled control — it is most of the roll, and the roll is the only
+   place a player can see what the flow ahead of them contains. At 0.42 the keys
+   read 2.1:1 and the values 1.2:1, which is not "dimmed", it is gone. 0.65 keeps
+   the state obvious (still clearly inert next to a reachable line) while leaving
+   the labels legible enough to plan by. */
+.creator-dossier-line:disabled { opacity: 0.65; cursor: default; }
+
+.creator-dossier-key {
+  font-size: 0.61rem;
+  font-weight: 700;
+  letter-spacing: 0.11em;
+  text-transform: uppercase;
+  color: var(--cc-muted);
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.creator-dossier-value-line {
+  font-size: 0.88rem;
+  line-height: 1.25;
+  color: var(--cc-text-faint);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+/* Filled in: the value reads as ink on the sheet, and its key warms to match. */
+.creator-dossier-line.is-complete .creator-dossier-value-line { color: var(--cc-text); }
+.creator-dossier-line.is-complete .creator-dossier-key { color: var(--cc-settled); opacity: 0.75; }
+/* You are here. */
+.creator-dossier-line.is-active {
+  background: var(--cc-settled-soft);
+  border-left-color: var(--cc-settled);
+}
+.creator-dossier-line.is-active .creator-dossier-key { color: var(--cc-settled); opacity: 1; }
+/* Doesn't apply to this character (Spells for a non-caster). Struck rather than
+   hidden, so the roll stays the same length and the player can see it was considered. */
+.creator-dossier-line.is-skipped .creator-dossier-value-line {
+  font-style: italic;
+  color: var(--cc-text-faint);
+}
+
+.creator-dossier-tick { color: var(--cc-settled); font-size: 0.72rem; }
+/* Outstanding. Teal plus a word — the colour is never the only cue. */
+.creator-dossier-todo {
+  font-size: 0.58rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--cc-open);
+  border: 1px solid var(--cc-open);
+  background: var(--cc-open-soft);
+  padding: 0 0.3rem;
+  white-space: nowrap;
+}
+
 /* ---------------------------------------------- Stage
 
    The main content area below the top bar. It's a vertical flex column split into
@@ -383,21 +863,27 @@ body:has(.sogrom-creator-fullscreen) .application.compendium-browser {
    active step renders, and a fixed footer holding the Back/Next buttons. */
 
 .creator-stage {
+  grid-row: 2;
+  grid-column: 2;
   flex: 1;
   display: flex;
   flex-direction: column;
   min-width: 0;
-  /* Now a vertical flex item (below the top bar): without this it keeps min-height:auto
-     and grows with content, breaking the height chain its scrolling children rely on. */
+  /* Without this it keeps min-height:auto and grows with content, breaking the
+     height chain its scrolling children rely on. */
   min-height: 0;
 }
 
+/* The step head is no longer suppressed on the pick steps. It used to be —
+   `.creator-stage:has(.creator-pick) .creator-stage-head { display: none }` — to
+   reclaim about 90px, which took the position counter with it on most of the flow
+   and left those screens with no h1 at all, so their heading hierarchy started at
+   whatever option happened to be selected. The counter now lives in the progress
+   meter, so what is left here is a heading and one line of instruction, at about a
+   third of the old height. */
 .creator-stage-head {
   flex: 0 0 auto;
-  display: flex;
-  align-items: baseline;
-  justify-content: space-between;
-  padding: 1.4rem 2rem 1rem;
+  padding: 0.8rem 1.6rem 0.7rem;
   border-bottom: 1px solid var(--cc-line);
 }
 .creator-stage-head h1 {
@@ -405,24 +891,28 @@ body:has(.sogrom-creator-fullscreen) .application.compendium-browser {
   align-items: center;
   gap: 0.7rem;
   margin: 0;
-  font-size: 1.7rem;
-  letter-spacing: 0.06em;
+  font-size: 1.35rem;
+  letter-spacing: 0.05em;
   border: none;
 }
-/* Illuminated-capital accent: a slim gold bar leading the step title. */
+/* Illuminated-capital accent: a slim brass bar leading the step title. */
 .creator-stage-head h1::before {
   content: "";
   flex: 0 0 auto;
   width: 4px;
-  height: 1.4em;
-  border-radius: 2px;
-  background: var(--cc-gold);
+  height: 1.3em;
+  border-radius: var(--cc-radius);
+  background: var(--cc-settled);
 }
-.creator-stage-pos {
-  color: var(--cc-muted);
+/* What this step decides, in one line. This is what the pick steps open on now
+   instead of a full-height "select an option to see details" placeholder sitting
+   on the widest surface in the window. */
+.creator-stage-instruction {
+  margin: 0.3rem 0 0 0.9rem;
+  max-width: 78ch;
   font-size: 0.85rem;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
+  line-height: 1.45;
+  color: var(--cc-muted);
 }
 
 .creator-stage-body { flex: 1; overflow-y: auto; padding: 1.5rem 2rem; }
@@ -461,7 +951,7 @@ body:has(.sogrom-creator-fullscreen) .application.compendium-browser {
   align-items: center;
   gap: 0.5rem;
   padding: 0.6rem 1.1rem;
-  border-radius: 9px;
+  border-radius: var(--cc-radius);
   border: 1px solid var(--cc-line);
   background: var(--cc-panel-2);
   color: var(--cc-text);
@@ -475,16 +965,23 @@ body:has(.sogrom-creator-fullscreen) .application.compendium-browser {
 /* Physical press — the whole button gives slightly when struck. */
 .creator-btn:active:not(:disabled) { transform: scale(0.98); }
 .creator-btn:disabled { opacity: 0.4; cursor: not-allowed; }
+/* Next — the archetypal "still asking for you" control, so it is teal like every
+   other outstanding thing. Dark text on the fill: teal is a light colour, and
+   white on it lands around 2:1. */
 .creator-btn-primary {
-  background: linear-gradient(180deg, #9d8cf5, #7d6ae6);
-  border-color: var(--cc-accent);
-  color: #fff;
+  background: linear-gradient(180deg, #5cc4b8, #3f9d93);
+  border-color: var(--cc-open);
+  color: #06201e;
+  font-weight: 600;
   letter-spacing: 0.02em;
-  box-shadow: var(--cc-sheen), 0 0 0 1px var(--cc-accent-soft), 0 4px 14px var(--cc-accent-glow);
+  box-shadow: var(--cc-sheen), 0 0 0 1px var(--cc-open-soft), 0 4px 14px var(--cc-open-glow);
 }
 .creator-btn-primary:hover:not(:disabled) { filter: brightness(1.08); }
-/* Finish/Create — the climactic action gets gold instead of the per-step violet,
-   matching the gold reserved for selection and "you are here". */
+/* Finish/Create is the one deliberate exception to "teal asks, brass confirms".
+   It is not another Next: it is the control that turns every settled choice on
+   the sheet into a real actor, so it takes the settled colour it is about to
+   make permanent. Being the only filled brass button in the creator is also
+   what keeps it from being mistaken for one more step. */
 .creator-btn-finish {
   background: linear-gradient(180deg, var(--cc-gold-bright), var(--cc-gold));
   border-color: var(--cc-gold);
@@ -578,7 +1075,7 @@ body:has(.sogrom-creator-fullscreen) .application.compendium-browser {
   padding: 0.5rem 0.85rem;
   background: var(--cc-panel);
   border: 1px solid var(--cc-line);
-  border-radius: 9px;
+  border-radius: var(--cc-radius);
   width: min(360px, 60%);
 }
 .creator-search i { color: var(--cc-muted); }
@@ -591,22 +1088,126 @@ body:has(.sogrom-creator-fullscreen) .application.compendium-browser {
 }
 .creator-count { color: var(--cc-muted); font-size: 0.85rem; }
 
-/* The detail panel for a chosen option: a violet-edged card holding the option's
-   image, name, description, and its advancement blocks (traits/features/spells). */
+/* The detail panel for a chosen option. Outside the pick layouts it is still a
+   panel; inside them (:is(.creator-pick-desc, .creator-work-page) .creator-detail, above) it becomes the
+   page itself and this framing is stripped off. */
 .creator-detail {
   margin-top: 1.5rem;
   padding: 1.25rem 1.5rem;
   background: var(--cc-panel-grad);
-  /* Full accent-tinted hairline rather than a heavy left stripe: the violet
-     identity reads from the whole edge plus a symmetric glow, so the card stays
-     framed evenly instead of leaning on a one-sided accent bar. */
   border: 1px solid color-mix(in srgb, var(--cc-accent) 38%, var(--cc-line));
-  border-radius: 12px;
-  box-shadow: var(--cc-bezel), 0 0 18px -12px var(--cc-accent-glow);
+  border-radius: var(--cc-radius);
+  box-shadow: var(--cc-sheen);
 }
+
+/* --- The page head -------------------------------------------------------
+   Where a leaf opens: the option's name set large in Cinzel, its source as a
+   gold rubric above, and a hairline rule closing the head off from the prose.
+   The head is clipped at its own bottom edge so the artwork behind it (added
+   by the backdrop module) can bleed sideways and upward but never reaches the
+   text below. Only that one edge is cut — clipping all four, as overflow
+   would, kills the sideways bleed that makes art read as bled rather than
+   pasted on. */
+/* Compact throughout, creator and level-up alike: the title sits on a single
+   baseline row beside its rubric rather than stacked above it under a big
+   display line. This is what gets the actual content of a leaf — the traits
+   table, the subclass row — above the fold instead of below it. */
+:is(.creator-pick-desc, .creator-work-page) .creator-detail-head {
+  position: relative;
+  display: flex;
+  flex-direction: row;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: 0.3rem 1.1rem;
+  margin-bottom: 0;
+  padding-top: 1.35rem;
+  padding-bottom: 0.8rem;
+}
+:is(.creator-pick-desc, .creator-work-page) .creator-detail-head > * { position: relative; z-index: 1; }
+
+/* Provenance as a gold rubric rather than a bordered pill, trailing the title
+   on the same line. */
+:is(.creator-pick-desc, .creator-work-page) .creator-detail-source {
+  order: 2;
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  font-family: var(--cc-font-heading);
+  font-size: 0.66rem;
+  font-weight: 600;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  color: var(--cc-gold);
+}
+
+/* --- The illumination ----------------------------------------------------
+   Compendium art behind the page head was built and removed: the item images
+   are emblems and cutouts rather than scenes, and nothing about them survived
+   being bled, cropped and scrimmed. The generated sigil kept its place, but
+   moved to the Review frontispiece (below), which is the one leaf with room
+   for a figure behind its content. Injected by page-illumination.mjs. */
+/* Square, and comfortably wider than the 260px portrait it sits behind.
+
+   It used to be 560×300. The figure is a circle sized from the *shorter* side, so that box
+   drew a 276px disc — sixteen pixels wider than the portrait covering it, of which the mask
+   then faded away the outer half. The sigil was rendering correctly every time and had
+   nowhere to be seen. Square keeps the disc from being sized by a short axis, and 520px
+   leaves a good ring of it clear of the portrait on every side. */
+.creator-page-sigil {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  z-index: 0;
+  width: min(520px, 88vw);
+  height: min(520px, 88vw);
+  transform: translate(-50%, -50%);
+  pointer-events: none;
+  user-select: none;
+  /* Fades only at the outermost edge, so the ring that clears the portrait stays at full
+     strength instead of being the part that gets erased. */
+  -webkit-mask-image: radial-gradient(closest-side, #000 60%, transparent 100%);
+  mask-image: radial-gradient(closest-side, #000 60%, transparent 100%);
+}
+
+/* The frontispiece: portrait centred on its sigil, both above the leaf. */
+.creator-review-portrait { position: relative; }
+.creator-review-portrait > .creator-portrait-frame { position: relative; z-index: 1; }
+
+/* Gold hairline closing the head. It carries the full weight at the spine and
+   fades out across the measure, so it reads as a ruled page edge rather than a
+   drawn box. This is also the line the head's clip-path cuts on, so no artwork
+   ever crosses it into the prose. */
+:is(.creator-pick-desc, .creator-work-page) .creator-detail-head::after {
+  content: "";
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: 1px;
+  background: linear-gradient(90deg,
+    var(--cc-gold),
+    color-mix(in srgb, var(--cc-gold) 28%, transparent) 42%,
+    transparent 80%);
+}
+
 .creator-detail-head { display: flex; align-items: center; flex-wrap: wrap; gap: 1rem; margin-bottom: 0.75rem; }
 .creator-detail-head h2 { margin: 0; border: none; font-size: 1.35rem; letter-spacing: 0.04em; }
-.creator-detail-img { width: 56px; height: 56px; border-radius: 10px; object-fit: cover; border: 1px solid var(--cc-line-2); }
+
+:is(.creator-pick-desc, .creator-work-page) .creator-detail-head h2 {
+  margin: 0;
+  font-size: 1.5rem;
+  line-height: 1.1;
+  letter-spacing: 0.13em;
+  text-transform: uppercase;
+  text-wrap: balance;
+  text-shadow: none;
+}
+/* The option's own plate is already on screen — in the switcher bar directly above
+   on the work surface, in the list entry beside it in the spell browser — so a
+   second copy at the head of the page is the same icon twice. */
+:is(.creator-pick-desc, .creator-work-page) .creator-detail-img { display: none; }
+
+.creator-detail-img { width: 56px; height: 56px; border-radius: var(--cc-radius); object-fit: cover; border: 1px solid var(--cc-line-2); }
 /* Sourcebook badge beside the detail title, naming where the selected item originates — the same
    recipe as .levelup-block-source, so the creator and the level-up wizard read as one family.
    Quiet by design (it's provenance, not state) and truncates rather than wrapping a long title. */
@@ -618,7 +1219,7 @@ body:has(.sogrom-creator-fullscreen) .application.compendium-browser {
   min-width: 0;
   padding: 0.15rem 0.55rem;
   border: 1px solid var(--cc-line);
-  border-radius: 999px;
+  border-radius: var(--cc-radius-pill);
   font-size: 0.8rem;
   color: var(--cc-muted);
   white-space: nowrap;
@@ -627,7 +1228,51 @@ body:has(.sogrom-creator-fullscreen) .application.compendium-browser {
 }
 .creator-detail-source i { flex: 0 0 auto; font-size: 0.7rem; opacity: 0.8; }
 .creator-detail-body { line-height: 1.65; color: var(--cc-text); }
-.creator-detail-body :is(h1, h2, h3, h4) { color: var(--cc-gold); }
+.creator-detail-body :is(h1, h2, h3, h4, h5, h6) { color: var(--cc-gold); }
+/* Enriched prose can also carry figures and table footers, which Foundry colours directly. */
+.creator-detail-body :is(figcaption, tfoot) { color: var(--cc-muted); }
+
+/* Prose on a page: held to a readable measure, and set in columns once there is room
+   for a second one.
+
+   A measure has to be about 65 characters whatever the window is doing, so on a large
+   monitor a single column left a 480px ribbon of text with well over a thousand pixels
+   of nothing beside it — the trait table filled the width, the paragraphs under it did
+   not. Widening the paragraphs is not the fix; a 150-character line is worse to read
+   than a narrow one, not better.
+
+   `columns: 3 32rem` is the whole mechanism, and it needs no breakpoint: the shorthand
+   caps the count at three and sets 32rem as each column's ideal width, so the browser
+   uses only as many columns as genuinely fit and silently falls back to one everywhere
+   else — including the spell browser's 400px sidebar, which shares these rules and must
+   never be columned. Three rather than two because two columns of a 1700px surface are
+   850px each, which is the same over-long line the cap was there to prevent.
+
+   The obvious objection to multi-column prose is that it lives inside a vertically
+   scrolling pane: read to the foot of column one, scroll back up for column two. That
+   only bites when a balanced column is taller than the pane, and it cannot be here,
+   because this element holds the item's description *only* — the trait table and the
+   granted features are `.creator-adv-block` sections after it (work-detail.hbs), outside
+   the columned flow. A few paragraphs balanced three ways is a fraction of a screen. If
+   anything long is ever moved inside this element, that stops being true. */
+:is(.creator-pick-desc, .creator-work-page) .creator-detail-body {
+  padding-top: 1.5rem;
+  line-height: 1.72;
+  columns: 3 32rem;
+  column-gap: clamp(2rem, 3vw, 3.5rem);
+}
+/* Inside a column the column *is* the measure, so the paragraph cap would only make
+   each one narrower again. */
+:is(.creator-pick-desc, .creator-work-page) .creator-detail-body > p { max-width: none; }
+/* Headings, tables and rules run the full width and restart the columns beneath them,
+   so the flow reads as sections rather than as one stream sliced in half. Tables and
+   lists are also kept whole — a trait table split across a column break is unreadable. */
+:is(.creator-pick-desc, .creator-work-page) .creator-detail-body :is(h1, h2, h3, h4, h5, h6, table, hr) {
+  column-span: all;
+}
+:is(.creator-pick-desc, .creator-work-page) .creator-detail-body :is(table, ul, ol, figure) {
+  break-inside: avoid;
+}
 
 /* Categorized advancement blocks (Traits / Features / Spells) below the description. */
 .creator-adv-block { margin-top: 1.5rem; }
@@ -649,7 +1294,7 @@ body:has(.sogrom-creator-fullscreen) .application.compendium-browser {
   padding: 0;
   list-style: none;
   border: 1px solid var(--cc-line);
-  border-radius: 8px;
+  border-radius: var(--cc-radius);
   overflow: hidden;
   font-size: 0.82rem;
 }
@@ -668,10 +1313,17 @@ body:has(.sogrom-creator-fullscreen) .application.compendium-browser {
 }
 .creator-trait-value { color: var(--cc-text); }
 
-/* Granted features and spells: round icon + clickable content link + level tag. */
+/* Granted features and spells: round icon + clickable content link + level tag.
+   `columns: 22rem` sets the ideal column width and lets the browser pick the count, so a
+   short list of feature names makes as many columns as the space allows instead of two
+   very wide ones with the level tags flung to the far right. */
 .creator-grant-list {
-  columns: 2;
-  column-gap: 1.25rem;
+  columns: 22rem;
+  /* Wide enough that the gap between columns clearly beats the gap between an entry and
+     its own level tag — the columns have no rule between them, so spacing is the only
+     thing saying where one column ends. */
+  column-gap: 3rem;
+  column-rule: 1px solid var(--cc-line);
 }
 .creator-grant {
   display: flex;
@@ -689,8 +1341,15 @@ body:has(.sogrom-creator-fullscreen) .application.compendium-browser {
   border-radius: 50%;
   background: var(--cc-panel-2);
 }
+/* `0 1 auto`, not `1`: the link sizes to the name rather than stretching to fill the row.
+   Stretching it pushed the level tag to the far right of the column, which in a multi-column
+   list put "Lvl 3" a couple of hundred pixels from the spell it belongs to and a few dozen
+   from the *next* column's spell. Read across, "Ray of Sickness … Lvl 3 | Hold Person … Lvl 5"
+   pairs each tag with the wrong spell. Proximity is doing the labelling here, so the tag has
+   to sit against its own name. */
 .creator-grant .content-link {
-  flex: 1;
+  flex: 0 1 auto;
+  min-width: 0;
   background: none;
   border: none;
   padding: 0;
@@ -702,44 +1361,343 @@ body:has(.sogrom-creator-fullscreen) .application.compendium-browser {
 .creator-grant .content-link:hover { color: var(--cc-gold); }
 .creator-grant-tag {
   flex: 0 0 auto;
+  /* Trailing space is pushed after the pair, so the leftover width in a wide column falls
+     between one entry and the next rather than between an entry and its own tag. */
+  margin-right: auto;
   padding: 0.1rem 0.4rem;
   font-size: 0.68rem;
   color: var(--cc-muted);
   border: 1px solid var(--cc-line);
-  border-radius: 4px;
+  border-radius: var(--cc-radius);
 }
 
 .creator-empty { color: var(--cc-muted); font-style: italic; padding: 1rem 0; }
 /* "No matches" line appended into a pick-list whose rows are all filtered out. */
 .creator-no-results { color: var(--cc-muted); font-style: italic; padding: 1rem 0.25rem; list-style: none; }
 
-/* ---------------------------------------------- Pick steps (list + description [+ aside]) */
+/* ---------------------------------------------- Work surface
 
-/* Shared layout for class / background / species: a fixed-width picker (wide enough
-   for a two-column option list), a flexible description that takes the leftover middle
-   space, and (when the step has one) an aside on the right. Each column scrolls
-   independently within the stage height. */
+   The layout the three origin picks (class / species / background) use: one column,
+   with the option list as a drawer that opens over it.
+
+   It replaced a three-column grid — `340px minmax(0,1fr) 348px`. Two of those three
+   were chrome that never changed, so 688px of every window was permanently spent on
+   a list and an aside, and the description in the middle was the only column that
+   could give ground: on a 1400px window it got about 400px. The column that should
+   flex last was flexing first.
+
+   The picker is only wanted while you are picking, so it is a drawer; the aside's
+   contents (ability scores, target level) are blocks in the flow. What is left is a
+   single surface that keeps a readable measure at every width, which is also why
+   there is no breakpoint below: there are no columns left to collapse. */
+.creator-work {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  /* Row 1 is the switcher bar (auto, and zero-height when absent); row 2 is the work. */
+  grid-template-rows: auto minmax(0, 1fr);
+  height: 100%;
+  min-height: 0;
+}
+
+/* Two columns wherever the step has things to set: the option list and its page on the
+   left, the setters on the right.
+
+   The right column is a sibling of the body, not part of the page, and that is the whole
+   point of it. The picker drawer covers the body alone, so opening the class list never
+   takes the ability scores off screen and choosing a class never replaces them. Every
+   other arrangement tried put them somewhere they could be lost: inside the page they sat
+   below the class description and its full feature table, and while the drawer was open
+   they sat below the class list as well. */
+.creator-work:has(.creator-work-side) {
+  grid-template-columns: minmax(0, 1fr) minmax(340px, 460px);
+}
+.creator-work-side {
+  grid-column: 2;
+  grid-row: 2;
+  min-height: 0;
+  overflow-y: auto;
+  padding: 0 1.25rem 2rem;
+  background: var(--cc-panel);
+  border-left: 1px solid var(--cc-line-2);
+}
+/* First block in the column heads it, so it needs no separating rule above it. */
+.creator-work-side > .creator-work-block:first-child {
+  margin-top: 1.25rem;
+  padding-top: 0;
+  border-top: 0;
+}
+.creator-work-side .creator-work-block { max-width: none; }
+
+/* Narrow: the setters drop below the work rather than squeezing it, and keep their own
+   scroll so they can't push the list off the screen. */
+@media (max-width: 1199px) {
+  .creator-work:has(.creator-work-side) {
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-rows: auto minmax(0, 1fr) auto;
+  }
+  .creator-work-side {
+    grid-column: 1;
+    grid-row: 3;
+    max-height: 45vh;
+    border-left: 0;
+    border-top: 1px solid var(--cc-line-2);
+  }
+}
+
+/* The surface reaches the edges of the stage, so the stage body must not pad it
+   inwards. Scoped with :has() so the steps that are a single centred form (details,
+   store config) keep their padding. */
+.creator-stage-body:has(> .creator-work) { padding: 0; overflow: hidden; }
+
+/* --- The switcher bar ---
+   What you chose, and the way back to the list: a control the width of its own
+   label, in place of a column the width of the longest name in the compendium. */
+.creator-work-bar {
+  grid-column: 1 / -1;
+  grid-row: 1;
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.5rem 1.6rem;
+  background: var(--cc-panel);
+  border-bottom: 1px solid var(--cc-line);
+}
+.creator-work-switch {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  /* Override Foundry's fixed button height and centring. */
+  height: auto;
+  min-height: auto;
+  width: auto;
+  justify-content: flex-start;
+  padding: 0.28rem 0.6rem;
+  background: var(--cc-panel-2);
+  /* Brass edge: this names something settled. */
+  border: 1px solid var(--cc-settled);
+  border-radius: var(--cc-radius);
+  color: var(--cc-bright);
+  font-size: 0.88rem;
+  cursor: pointer;
+  box-shadow: var(--cc-sheen);
+  transition: background 0.18s var(--cc-ease), filter 0.18s var(--cc-ease);
+}
+.creator-work-switch:hover { filter: brightness(1.15); }
+.creator-work-switch i { font-size: 0.6rem; color: var(--cc-muted); }
+.creator-work-switch-img {
+  flex: 0 0 20px;
+  width: 20px;
+  height: 20px;
+  object-fit: cover;
+  border: 1px solid var(--cc-line-2);
+  background: linear-gradient(160deg, #2a2d34, #191b20);
+}
+.creator-work-bar-note { font-size: 0.76rem; color: var(--cc-muted); }
+
+/* --- The body: page underneath, drawer over the top --- */
+.creator-work-body {
+  grid-column: 1;
+  grid-row: 2;
+  position: relative;
+  min-height: 0;
+}
+.creator-work-page {
+  height: 100%;
+  overflow-y: auto;
+  overflow-x: hidden;
+  padding: 0 var(--cc-page-pad) 3rem;
+  background: var(--cc-bg);
+}
+
+/* Blocks the player sets values in — the ability allocator, the target level, an
+   origin's increase — as opposed to the page above or beside them, which is read. */
+.creator-work-block {
+  max-width: 62ch;
+  margin-top: 1.5rem;
+  padding-top: 1.25rem;
+  border-top: 1px solid var(--cc-line);
+}
+
+/* A step with nothing to set beside it — a 2024 species, which grants no ability increase —
+   has the whole surface to itself. Capped only so the columns below stay a sane width on a
+   very large monitor; the prose fills it in columns rather than as one long line. */
+.creator-work-page .creator-detail { max-width: 112rem; }
+.creator-work-block-title {
+  margin: 0 0 0.85rem;
+  border: none;
+  font-family: var(--cc-font-heading);
+  font-size: 0.8rem;
+  font-weight: 600;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--cc-bright);
+}
+
+/* --- The picker drawer ---
+   One state, not two: absolute and opaque over `.creator-work-body`, in every case.
+   Opaque rather than scrimmed — the point is to give the list the whole width, and a
+   translucent panel leaves the page competing with it for the same pixels.
+
+   (This comment used to describe a second, flowing variant for when nothing is chosen.
+   No such rule exists, and none is needed: the drawer's containing block is the body,
+   which is one track of the work grid, so `inset: 0` fills the body and nothing else.
+   The switcher bar above it and the setters column beside it are siblings in that grid
+   and stay on screen either way — which is the property the two-variant version was
+   reaching for. It is written down here because a comment describing behaviour the
+   stylesheet does not have is worse than no comment.) */
+.creator-drawer {
+  display: none;
+  position: absolute;
+  inset: 0;
+  z-index: 3;
+  flex-direction: column;
+  background: var(--cc-sunk);
+}
+.creator-drawer.is-open { display: flex; }
+.creator-drawer-head {
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.6rem;
+  padding: 0.75rem 1.6rem;
+  border-bottom: 1px solid var(--cc-line);
+}
+.creator-drawer-head .creator-search { width: min(320px, 100%); }
+.creator-drawer-close { margin-left: auto; padding: 0.35rem 0.7rem; font-size: 0.85rem; }
+
+/* The grid gets the full width now, so options can sit several to a row instead of
+   stacking one-per-row down a 340px column. */
+/* Descendant-scoped, not `.creator-drawer-grid` alone: this block sits above the spell
+   browser's `.creator-picklist` rules, which the drawer grid shares a class with, and at
+   equal specificity those would win on source order and force a single column. */
+.creator-drawer .creator-drawer-grid {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(232px, 1fr));
+  /* The separation is gaps showing the drawer's own dark ground — no container background
+     behind them, and no borders on the cells.
+
+     Both of the other ways of doing this break on the last row, which is nearly always
+     short. Gaps over a *lighter* container background painted that colour across the
+     unfilled tracks, leaving a pale band beside the final card. Borders on the cells gave
+     the final card a right-hand rule with nothing after it, so it alone read as a closed
+     box while every other card is separated by what looks like a shared line.
+
+     With the gaps and the unfilled remainder both showing `--cc-sunk`, a short row simply
+     ends. There is nothing whose appearance depends on how many cards happen to be in it. */
+  gap: 2px;
+  align-content: start;
+  border-top: 1px solid var(--cc-line);
+  padding: 0;
+}
+/* The raised fill, not the base one, so the 2px seam of --cc-sunk between cards has
+   something to be a seam *against*. On --cc-panel a card cleared its own gutter by
+   1.24:1 and the grid read as one field with faint scratches in it; on --cc-panel-2
+   that is 1.42:1, which is what makes a 2px line resolve as an edge. */
+.creator-drawer .creator-drawer-grid > li {
+  background: var(--cc-panel-2);
+  min-width: 0;
+}
+.creator-drawer .creator-drawer-grid .creator-pickrow { border-bottom: 0; }
+/* A no-matches message spans the grid rather than sitting in one cell. */
+.creator-drawer .creator-drawer-grid .creator-no-results { grid-column: 1 / -1; }
+
+/* Which edition an option comes from, under its name.
+
+   The 2014 and 2024 books ship the same thirteen class names, so a world with both
+   enabled lists "Artificer, Artificer, Barbarian, Barbarian…" — twenty-six rows, half
+   of them apparently identical, with nothing on screen to tell a player which is
+   which until after they have clicked one. The rules edition is already on every card;
+   it just was not being shown. */
+.creator-pickrow-rules {
+  grid-area: rules;
+  font-size: 0.65rem;
+  letter-spacing: 0.1em;
+  color: var(--cc-muted);
+  font-variant-numeric: tabular-nums;
+}
+/* Two-line rows only where the tag exists, so a list without editions is unchanged. */
+.creator-drawer .creator-pickrow:has(.creator-pickrow-rules) {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  grid-template-areas: "img name tick" "img rules tick";
+  align-items: center;
+  column-gap: 0.75rem;
+  row-gap: 0.1rem;
+}
+.creator-drawer .creator-pickrow:has(.creator-pickrow-rules) .creator-pickrow-img { grid-area: img; }
+.creator-drawer .creator-pickrow:has(.creator-pickrow-rules) .creator-pickrow-name { grid-area: name; }
+.creator-drawer .creator-pickrow:has(.creator-pickrow-rules) .creator-pickrow-tick { grid-area: tick; }
+
+/* ---------------------------------------------- List + description layout
+
+   The two-column layout: a list you scan beside a description you read. Still used by
+   the spell steps (creation and level-up) and by the level-up's class and subclass
+   picks.
+
+   The three creation origin picks moved off it to the work surface above, because
+   there the list was one of *three* columns and the description was losing to both.
+   The screens left here are genuinely two-column — neither side is chrome, and the
+   level-up ones pick from a handful of options rather than a whole compendium, so a
+   drawer would be covering a page to show six rows. */
 .creator-pick {
   display: grid;
-  grid-template-columns: 420px minmax(0, 1fr) 340px;
-  gap: 1.5rem;
-  align-items: start;
+  grid-template-columns: 340px minmax(0, 1fr) 348px;
+  /* No gap: the leaves are bound, not floating. What separates them is the
+     hairline on each leaf plus the binding shadow cast across the gutter. */
+  gap: 0;
+  align-items: stretch;
   /* Fill the stage so the columns can each own their scroll region. */
   height: 100%;
   min-height: 0;
 }
 /* An origin that grants no ability increase has no aside — drop the column. Which origin that is
    depends on the edition: 2024 backgrounds and 2014 species carry one, their opposites don't. */
-.creator-pick--solo { grid-template-columns: 420px minmax(0, 1fr); }
+.creator-pick--solo { grid-template-columns: 340px minmax(0, 1fr); }
 
-/* Left column: search/count on top, scrolling pick-list below. */
+/* The leaves reach the edges of the stage, so the stage body must not pad
+   them inwards. Scoped with :has() to the pick layouts only — the steps that
+   are a single centred form (details, store config) keep their padding. */
+.creator-stage-body:has(> .creator-pick) { padding: 0; }
+
+/* Left column — the index leaf: search/count on top, scrolling pick-list
+   below, bound at the spine. */
 .creator-pick-side {
+  position: relative;
   display: flex;
   flex-direction: column;
-  gap: 0.75rem;
+  gap: 0;
   min-width: 0;
   height: 100%;
   min-height: 0;
+  background: var(--cc-leaf-index);
+  border-right: 1px solid var(--cc-line-2);
+}
+/* The gutter — a real binding shadow falling from the index leaf onto the
+   recto. Drawn from this side so it sits *over* the page's own surface. */
+.creator-pick-side::after {
+  content: "";
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 100%;
+  width: 16px;
+  background: var(--cc-gutter);
+  pointer-events: none;
+  z-index: 2;
+}
+/* The index leaf's head. It owns the padding now that the leaf itself is
+   flush to the stage edge. */
+.creator-pick-side > .creator-toolbar--stacked {
+  flex-direction: column;
+  align-items: stretch;
+  gap: 0.5rem;
+  flex: 0 0 auto;
+  padding: 0.9rem 1rem 0.8rem;
+  border-bottom: 1px solid var(--cc-line);
 }
 .creator-toolbar--stacked { flex-direction: column; align-items: stretch; gap: 0.5rem; }
 .creator-toolbar--stacked .creator-search { width: 100%; }
@@ -748,22 +1706,34 @@ body:has(.sogrom-creator-fullscreen) .application.compendium-browser {
 
 /* Two-column option grid; collapses to one column on a narrow window (see media query).
    align-content:start keeps rows packed to the top when the list is short. */
+/* One entry per row, flush and ruled — a manuscript index, not a card grid.
+   The single column is what lets each entry carry its own meta line (hit die,
+   primary ability, size/speed) instead of being a bare name in a tile. */
 .creator-picklist {
   list-style: none;
   margin: 0;
-  padding: 0.25rem 0.25rem 0.25rem 0;
+  padding: 0;
   display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 0.4rem;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 0;
   align-content: start;
   overflow-y: auto;
   flex: 1;
   min-height: 0;
 }
-.creator-picklist li { min-width: 0; }
+/* `margin: 0` is load-bearing, not tidying.
+   Foundry's core styling gives list items a bottom margin and removes it on `:last-child`.
+   Grid tracks size to an item's *margin* box while the item itself stretches to the track
+   minus its own margins — so every card sat 4px short of its row and the last one, having
+   no margin to subtract, stretched the full height and rendered visibly taller than the
+   other twenty-three. Resetting the `<ul>` alone (which `.creator-picklist` already did)
+   does not reach it. */
+.creator-picklist li { min-width: 0; margin: 0; }
 .creator-picklist li.is-hidden { display: none; }
 
-/* A single pick row: rounded image + name, gold highlight when selected. */
+/* A single index entry: square icon plate + name, ruled off from the next.
+   Selection is a gold tab bled off the leading edge plus a tinted ground —
+   no ring, no glow, nothing that reads as a floating card. */
 .creator-pickrow {
   position: relative;
   display: flex;
@@ -773,34 +1743,40 @@ body:has(.sogrom-creator-fullscreen) .application.compendium-browser {
   width: 100%;
   height: auto;
   min-height: 0;
-  padding: 0.5rem 0.65rem;
-  background: var(--cc-panel);
-  border: 1px solid var(--cc-line);
-  border-radius: 9px;
+  padding: 0.55rem 1rem 0.55rem 0.85rem;
+  background: transparent;
+  border: 0;
+  border-bottom: 1px solid rgba(42, 40, 54, 0.55);
+  border-left: 3px solid transparent;
+  border-radius: var(--cc-radius);
   color: var(--cc-text);
   cursor: pointer;
   text-align: left;
-  box-shadow: var(--cc-sheen);
-  transition: background 0.25s var(--cc-ease), border-color 0.25s var(--cc-ease),
-    transform 0.25s var(--cc-ease);
+  box-shadow: none;
+  transition: background 0.18s var(--cc-ease), border-color 0.18s var(--cc-ease);
 }
-.creator-pickrow:hover { border-color: var(--cc-select); transform: translateX(2px); }
-.creator-pickrow:active { transform: scale(0.99); }
+.creator-pickrow:hover { background: rgba(255, 255, 255, 0.026); }
 .creator-pickrow.is-selected {
-  border-color: var(--cc-select);
   background: var(--cc-select-soft);
-  box-shadow: inset 0 0 0 1px var(--cc-select), 0 0 12px var(--cc-gold-glow);
+  border-left-color: var(--cc-select);
+  box-shadow: none;
 }
 .creator-pickrow-img {
-  flex: 0 0 56px;
-  width: 56px;
-  height: 56px;
-  border-radius: 50%;
-  object-fit: contain;
-  background: #0a0910;
-  border: 1px solid var(--cc-line);
-  padding: 4px;
+  flex: 0 0 38px;
+  width: 38px;
+  height: 38px;
+  border-radius: var(--cc-radius);
+  object-fit: cover;
+  background: linear-gradient(160deg, #2a2d34, #191b20);
+  border: 1px solid var(--cc-line-2);
+  padding: 0;
+  /* Compendium icons are saturated; settle them back until the row is live,
+     so the leaf reads as one surface rather than a row of stickers. */
+  filter: saturate(0.86) brightness(0.94);
+  transition: filter 0.18s var(--cc-ease), border-color 0.18s var(--cc-ease);
 }
+.creator-pickrow:hover .creator-pickrow-img { filter: none; }
+.creator-pickrow.is-selected .creator-pickrow-img { filter: none; }
 .creator-pickrow.is-selected .creator-pickrow-img { border-color: var(--cc-select); }
 .creator-pickrow-name {
   min-width: 0;
@@ -810,17 +1786,27 @@ body:has(.sogrom-creator-fullscreen) .application.compendium-browser {
 }
 .creator-pickrow-tick { margin-left: auto; color: var(--cc-select); font-size: 0.8rem; }
 
-/* Center column: the description panel, scrolling on its own. */
+/* Centre column — the illuminated page. It is the lit surface of the spread,
+   scrolling on its own, and it owns the page padding that the head backdrop
+   later bleeds back past. */
 .creator-pick-desc {
   min-width: 0;
   height: 100%;
   min-height: 0;
   overflow-y: auto;
+  overflow-x: hidden;
+  background: var(--cc-leaf);
 }
-/* In this layout the detail panel owns the column rather than sitting beneath a grid.
-   The small inline margin leaves room for the bezel's outer tray ring so it doesn't
-   spill past the scrolling column and trip a horizontal scrollbar. */
-.creator-pick-desc .creator-detail { margin: 1px 6px 6px; }
+/* The detail is now the page itself, not a card sitting on it: no bezel, no
+   inset margin, no second background. The leaf is the container. */
+:is(.creator-pick-desc, .creator-work-page) .creator-detail {
+  margin: 0;
+  padding: 0 var(--cc-page-pad) 3rem;
+  background: none;
+  border: 0;
+  border-radius: var(--cc-radius);
+  box-shadow: none;
+}
 
 /* Placeholder shown before anything is picked. */
 .creator-pick-empty {
@@ -860,20 +1846,26 @@ body:has(.sogrom-creator-fullscreen) .application.compendium-browser {
   background-image: var(--cc-spells-sketch, none);
 }
 
+/* The margin gloss — the third leaf. Ruled off from the page like a scribe's
+   commentary in the outer margin, not floated as a card on top of it. */
 .creator-class-aside {
   position: sticky;
   top: 0;
-  padding: 1.25rem;
-  background: var(--cc-panel-grad);
-  border: 1px solid var(--cc-line);
-  border-radius: 12px;
+  padding: 1.25rem 1.15rem;
+  background: var(--cc-leaf-gloss);
+  border: 0;
+  border-left: 1px solid var(--cc-line-2);
+  border-radius: var(--cc-radius);
 }
 .creator-aside-title {
   margin: 0 0 1rem;
   border: none;
-  font-size: 1.15rem;
-  letter-spacing: 0.06em;
-  color: var(--cc-gold);
+  font-family: var(--cc-font-heading);
+  font-size: 0.82rem;
+  font-weight: 600;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--cc-bright);
 }
 /* Quick Build: one-click recommended fill, sitting in the class detail header beside the source
    badge. Sized to its label (not the full column) since it shares a row with the class name. */
@@ -897,7 +1889,7 @@ body:has(.sogrom-creator-fullscreen) .application.compendium-browser {
   padding: 0.45rem 0.7rem;
   background: var(--cc-panel);
   border: 1px solid var(--cc-line);
-  border-radius: 999px;
+  border-radius: var(--cc-radius-pill);
   color: var(--cc-muted);
   cursor: pointer;
   box-shadow: var(--cc-sheen);
@@ -923,7 +1915,7 @@ body:has(.sogrom-creator-fullscreen) .application.compendium-browser {
   padding: 0.4rem 0.5rem;
   background: var(--cc-panel);
   border: 1px solid var(--cc-line);
-  border-radius: 999px;
+  border-radius: var(--cc-radius-pill);
   color: var(--cc-text);
   text-align: center;
   transition: border-color 0.25s var(--cc-ease);
@@ -936,34 +1928,12 @@ body:has(.sogrom-creator-fullscreen) .application.compendium-browser {
   opacity: 0.75;
 }
 
-/* Inside the narrow aside the ability rows should fill the column, not cap at 520px. */
-.creator-class-aside .creator-ability-list { max-width: none; }
-/* The 340px aside can't afford the wide-panel spacing: tighten the row's gaps and the stepper so
-   the full ability names ("Constitution", "Intelligence") fit without ellipsizing, while the
-   -/score/+ controls keep their shared vertical alignment. */
-.creator-class-aside .creator-ability-row {
-  grid-template-columns: minmax(0, 1fr) auto 2.2rem;
-  gap: 0.6rem;
-  padding-inline: 0.7rem;
-}
-.creator-class-aside .creator-stepper { gap: 0.4rem; }
-.creator-class-aside .creator-ability-score { width: 2rem; }
-/* Keep the three method tabs on a single row in the narrow aside; let them shrink to fit. */
-.creator-class-aside .creator-method-tabs { flex-wrap: nowrap; }
-.creator-class-aside .creator-tab {
-  flex: 1 1 0;
-  min-width: 0;
-  padding-inline: 0.5rem;
-  text-align: center;
-  white-space: nowrap;
-}
-
-/* In the pick layout the aside is a full-height column: cap it and scroll within. */
-.creator-pick .creator-class-aside {
-  position: static;
-  max-height: 100%;
-  overflow-y: auto;
-}
+/* The eight rules that used to live here — tightened row gaps, a 2rem score box,
+   `flex-wrap: nowrap` and shrunken padding on the method tabs — existed only to fit
+   the ability panel into a 348px aside. The panel is on the work surface now, at the
+   width the base rules were written for, so they are gone rather than retuned.
+   `.creator-class-aside` itself survives for the level-up ASI screen, which still
+   renders one. */
 
 /* On narrow stages, stack the columns and let the stage scroll as one. */
 @media (max-width: 1100px) {
@@ -977,25 +1947,66 @@ body:has(.sogrom-creator-fullscreen) .application.compendium-browser {
   .creator-pick-desc { height: auto; }
   .creator-picklist { overflow-y: visible; }
   .creator-pick .creator-class-aside { max-height: none; }
+  /* Stacked, there is no spine — so no binding shadow, and the leaves are
+     divided top-to-bottom instead of side-to-side. */
+  .creator-pick-side::after { display: none; }
+  .creator-pick-side {
+    border-right: 0;
+    border-bottom: 1px solid var(--cc-line-2);
+  }
+  .creator-pick .creator-class-aside {
+    border-left: 0;
+    border-top: 1px solid var(--cc-line-2);
+  }
   /* Stacked: let every row size to its content rather than splitting the height. */
   .creator-spells { grid-template-rows: none; }
   /* Stacked: the description column flows with the page rather than owning a scroll. */
   .creator-spells .creator-pick-desc { overflow: visible; }
   .creator-pick-desc-scroll { overflow-y: visible; }
 
-  /* Narrow window: drop the step labels so the bar stays on one row of circles
-     (the active/complete state still reads from marker colour). */
+  /* The step labels are *not* dropped here any more. They used to be, to keep the
+     level-up bar on one row of bare numerals — which is number-only navigation, and
+     costs a player the ability to tell which step is which at exactly the width where
+     the window is hardest to read. The row scrolls instead: the labels stay, and the
+     active step is scrolled into view by the browser when it takes focus. */
   .creator-topbar { gap: 1rem; }
-  .creator-topbar-steps .creator-rail-label { display: none; }
+  .creator-topbar-steps { justify-content: flex-start; }
 }
 
-/* Narrow window: the two-column option list collapses to a single column. */
+/* Narrow window: the dossier stops being a column and becomes a band above the work
+   surface. It keeps its identity block and its roll — the character-so-far is the
+   thing worth keeping at every width — but caps its height so the surface below it
+   still has room to work in. */
+@media (max-width: 900px) {
+  .sogrom-creator-fullscreen:has(.creator-dossier),
+  .sogrom-creator-windowed .window-content:has(.creator-dossier) {
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-rows: auto auto minmax(0, 1fr);
+  }
+  .creator-dossier {
+    grid-row: 2;
+    grid-column: 1;
+    max-height: 40vh;
+    border-right: 0;
+    border-bottom: 1px solid var(--cc-line-2);
+  }
+  .creator-stage { grid-row: 3; grid-column: 1; }
+  /* Two lines side by side rather than one per row, so the roll stays short. */
+  .creator-dossier-roll {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+  }
+}
+
+/* Narrow window: the spell browser's option list collapses to a single column. The
+   drawer grid is excluded — it already sizes its own columns from a minmax track, so it
+   collapses to one when, and only when, one is all that fits. */
 @media (max-width: 768px) {
-  .creator-picklist { grid-template-columns: 1fr; }
+  .creator-picklist:not(.creator-drawer-grid) { grid-template-columns: 1fr; }
 }
 
-/* Background increase aside: terse helper line. */
-.creator-asi-hint { margin: -0.5rem 0 1.25rem; color: var(--cc-muted); font-size: 0.85rem; }
+/* Origin increase: terse helper line under the block title. */
+.creator-asi-hint { margin: -0.4rem 0 1rem; color: var(--cc-muted); font-size: 0.85rem; }
 
 /* A fixed ability can't be hand-allocated: dim the whole row and stamp a padlock
    over its score so the lock reads as "this number is set" rather than a side note. */
@@ -1009,7 +2020,7 @@ body:has(.sogrom-creator-fullscreen) .application.compendium-browser {
   font-size: 0.85rem;
   color: var(--cc-gold);
   background: color-mix(in srgb, var(--cc-panel) 70%, transparent);
-  border-radius: 6px;
+  border-radius: var(--cc-radius);
 }
 
 /* ---------------------------------------------- Abilities
@@ -1023,7 +2034,7 @@ body:has(.sogrom-creator-fullscreen) .application.compendium-browser {
   padding: 0.55rem 1.1rem;
   background: var(--cc-panel);
   border: 1px solid var(--cc-line);
-  border-radius: 999px;
+  border-radius: var(--cc-radius-pill);
   color: var(--cc-muted);
   cursor: pointer;
   box-shadow: var(--cc-sheen);
@@ -1034,10 +2045,55 @@ body:has(.sogrom-creator-fullscreen) .application.compendium-browser {
 .creator-tab:active { transform: scale(0.97); }
 .creator-tab.is-active { background: var(--cc-select); border-color: var(--cc-select); color: #1a1206; }
 
-.creator-points { display: flex; align-items: baseline; justify-content: center; gap: 0.5rem; margin-bottom: 1rem; }
-.creator-points-value { font-size: 2rem; font-weight: 700; color: var(--cc-gold); }
-.creator-points-value.is-zero { color: var(--cc-good); }
+/* The allocator's head: title on the left, method tabs pushed to the right. */
+.creator-abilities-head {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+  margin-bottom: 0.9rem;
+}
+.creator-abilities-head .creator-work-block-title { margin: 0; }
+.creator-abilities-head .creator-method-tabs { margin: 0 0 0 auto; }
+
+/* --- The point-buy budget ---
+   A bar plus the numbers, rather than the numbers alone.
+
+   Point-buy used to show one large figure counting down. That answers "how many
+   points are left" but not "how far through the budget am I", which is the question
+   a player is actually asking while they push scores around. The bar is the sense of
+   a resource draining; the figures stay for the exact answer. Brass, because what the
+   fill measures is what has been committed. */
+.creator-budget { margin-bottom: 1rem; }
+.creator-budget-track {
+  position: relative;
+  height: 8px;
+  background: var(--cc-sunk);
+  border: 1px solid var(--cc-line);
+}
+.creator-budget-fill {
+  position: absolute;
+  inset: 0 auto 0 0;
+  background: var(--cc-settled);
+  transition: width 0.18s var(--cc-ease);
+}
+.creator-budget-read {
+  margin: 0.45rem 0 0;
+  font-size: 0.85rem;
+  color: var(--cc-muted);
+  font-variant-numeric: tabular-nums;
+}
+.creator-points-spent { color: var(--cc-settled); font-weight: 700; font-size: 1.05rem; }
+/* Points still to spend: outstanding, so teal — until there are none, at which point
+   the whole thing is settled and it turns brass with the rest of the step. */
+.creator-points-value { font-size: 1.05rem; font-weight: 700; color: var(--cc-open); }
+.creator-points-value.is-zero { color: var(--cc-settled); }
 .creator-points-label { color: var(--cc-muted); }
+
+/* The origin-increase panels still use the plain counter (they allocate one or two
+   points, where a bar would be three-quarters empty and say nothing). */
+.creator-points { display: flex; align-items: baseline; gap: 0.5rem; margin-bottom: 1rem; }
+.creator-points .creator-points-value { font-size: 1.6rem; }
 
 /* Available-score pool — sits in the same slot point-buy uses for "points remaining". */
 .creator-pool {
@@ -1058,7 +2114,7 @@ body:has(.sogrom-creator-fullscreen) .application.compendium-browser {
   color: var(--cc-gold);
   background: var(--cc-panel-2);
   border: 1px solid var(--cc-line);
-  border-radius: 9px;
+  border-radius: var(--cc-radius);
   font-variant-numeric: tabular-nums;
   cursor: grab;
   box-shadow: var(--cc-sheen);
@@ -1070,7 +2126,7 @@ body:has(.sogrom-creator-fullscreen) .application.compendium-browser {
 /* A value already assigned to an ability dims out, so the remaining pool reads at a glance. */
 .creator-pool-chip.is-used { opacity: 0.3; color: var(--cc-muted); }
 /* The pool is a drop target too: dragging an assigned value back here frees it. */
-.creator-pool.is-dragover { outline: 2px dashed var(--cc-select); outline-offset: 4px; border-radius: 9px; }
+.creator-pool.is-dragover { outline: 2px dashed var(--cc-select); outline-offset: 4px; border-radius: var(--cc-radius); }
 
 .creator-ability-list { list-style: none; margin: 0; padding: 0; max-width: 520px; }
 .creator-ability-row {
@@ -1085,7 +2141,7 @@ body:has(.sogrom-creator-fullscreen) .application.compendium-browser {
   margin-bottom: 0.5rem;
   background: var(--cc-panel);
   border: 1px solid var(--cc-line);
-  border-radius: 10px;
+  border-radius: var(--cc-radius);
   box-shadow: var(--cc-sheen);
   transition: border-color 0.25s var(--cc-ease), background 0.25s var(--cc-ease);
 }
@@ -1107,7 +2163,7 @@ body:has(.sogrom-creator-fullscreen) .application.compendium-browser {
   height: 30px;
   display: grid;
   place-items: center;
-  border-radius: 8px;
+  border-radius: var(--cc-radius);
   border: 1px solid var(--cc-line);
   background: var(--cc-panel-2);
   color: var(--cc-text);
@@ -1130,7 +2186,7 @@ body:has(.sogrom-creator-fullscreen) .application.compendium-browser {
   padding: 0.35rem 0.6rem;
   background: var(--cc-panel-2);
   border: 1px solid var(--cc-line);
-  border-radius: 8px;
+  border-radius: var(--cc-radius);
   color: var(--cc-text);
 }
 .creator-ability-actions { display: flex; flex-wrap: nowrap; gap: 0.6rem; margin-top: 1.25rem; }
@@ -1168,7 +2224,7 @@ body:has(.sogrom-creator-fullscreen) .application.compendium-browser {
   padding: 0.7rem;
   background: var(--cc-panel);
   border: 1px solid var(--cc-line);
-  border-radius: 10px;
+  border-radius: var(--cc-radius);
 }
 .creator-score-abbr { font-size: 0.75rem; color: var(--cc-muted); text-transform: uppercase; }
 .creator-score-value { font-size: 1.4rem; font-weight: 700; }
@@ -1184,7 +2240,7 @@ body:has(.sogrom-creator-fullscreen) .application.compendium-browser {
   color: var(--cc-gold);
   background: color-mix(in srgb, var(--cc-gold) 22%, var(--cc-panel));
   border: 1px solid color-mix(in srgb, var(--cc-gold) 50%, transparent);
-  border-radius: 999px;
+  border-radius: var(--cc-radius-pill);
   cursor: default;
 }
 
@@ -1213,7 +2269,7 @@ body:has(.sogrom-creator-fullscreen) .application.compendium-browser {
   padding: 1.25rem 1rem;
   background: var(--cc-panel);
   border: 1px solid var(--cc-line);
-  border-radius: 12px;
+  border-radius: var(--cc-radius);
   overflow-y: auto;
   min-height: 0;
 }
@@ -1224,8 +2280,8 @@ body:has(.sogrom-creator-fullscreen) .application.compendium-browser {
   align-items: center;
   justify-content: center;
   border: 2px solid var(--cc-gold);
-  border-radius: 8px;
-  box-shadow: 0 0 18px rgba(200, 162, 78, 0.25), inset 0 0 8px rgba(0, 0, 0, 0.6);
+  border-radius: var(--cc-radius);
+  box-shadow: 0 0 18px var(--cc-settled-glow), inset 0 0 8px rgba(0, 0, 0, 0.6);
   background: var(--cc-panel-2);
   overflow: hidden;
 }
@@ -1256,7 +2312,7 @@ body:has(.sogrom-creator-fullscreen) .application.compendium-browser {
   padding: 0.5rem 1rem;
   background: transparent;
   border: 1px solid var(--cc-line);
-  border-radius: 6px;
+  border-radius: var(--cc-radius);
   color: var(--cc-muted);
   font-size: 0.72rem;
   letter-spacing: 0.06em;
@@ -1285,7 +2341,7 @@ body:has(.sogrom-creator-fullscreen) .application.compendium-browser {
   display: flex;
   width: 100%;
   border: 1px solid var(--cc-line);
-  border-radius: 6px;
+  border-radius: var(--cc-radius);
   overflow: hidden;
 }
 .creator-token-tab {
@@ -1328,7 +2384,7 @@ body:has(.sogrom-creator-fullscreen) .application.compendium-browser {
   padding: 0.25rem 0.75rem;
   background: transparent;
   border: 1px solid var(--cc-line);
-  border-radius: 5px;
+  border-radius: var(--cc-radius);
   color: var(--cc-muted);
   font-size: 0.7rem;
   font-weight: 700;
@@ -1377,7 +2433,7 @@ body:has(.sogrom-creator-fullscreen) .application.compendium-browser {
   color: var(--cc-gold);
   background: transparent;
   border: 1px solid var(--cc-gold);
-  border-radius: 4px;
+  border-radius: var(--cc-radius);
   cursor: pointer;
   transition: color 0.15s, background 0.15s, border-color 0.15s;
 }
@@ -1406,7 +2462,7 @@ body:has(.sogrom-creator-fullscreen) .application.compendium-browser {
   padding: 0.7rem 0.8rem;
   background: var(--cc-panel, #232331);
   border: 1px solid var(--cc-gold);
-  border-radius: 5px;
+  border-radius: var(--cc-radius);
   box-shadow: 0 6px 20px rgba(0, 0, 0, 0.45);
 }
 .creator-name-pop.is-open { display: flex; }
@@ -1434,7 +2490,7 @@ body:has(.sogrom-creator-fullscreen) .application.compendium-browser {
   letter-spacing: 0.06em;
   color: var(--cc-muted, #807d92);
 }
-.creator-name-gender-options { display: inline-flex; border: 1px solid var(--cc-gold); border-radius: 4px; overflow: hidden; }
+.creator-name-gender-options { display: inline-flex; border: 1px solid var(--cc-gold); border-radius: var(--cc-radius); overflow: hidden; }
 .creator-name-gender-opt {
   padding: 0.2rem 0.7rem;
   font-size: 0.78rem;
@@ -1466,7 +2522,7 @@ body:has(.sogrom-creator-fullscreen) .application.compendium-browser {
   color: var(--cc-text);
   background: var(--cc-bg);
   border: 1px solid var(--cc-gold);
-  border-radius: 4px;
+  border-radius: var(--cc-radius);
   cursor: pointer;
 }
 .creator-name-style-select:focus { outline: none; border-color: var(--cc-gold-bright); }
@@ -1505,7 +2561,7 @@ body:has(.sogrom-creator-fullscreen) .application.compendium-browser {
   padding: 0.5rem 0.6rem;
   background: var(--cc-panel-2);
   border: 1px solid var(--cc-line);
-  border-radius: 6px;
+  border-radius: var(--cc-radius);
   color: var(--cc-text);
   font-family: inherit;
   font-size: 0.9rem;
@@ -1537,7 +2593,7 @@ body:has(.sogrom-creator-fullscreen) .application.compendium-browser {
   padding: 0.55rem 0.9rem;
   background: var(--cc-panel);
   border: 1px solid var(--cc-line);
-  border-radius: 999px;
+  border-radius: var(--cc-radius-pill);
   color: var(--cc-muted);
   cursor: pointer;
   box-shadow: var(--cc-sheen);
@@ -1571,7 +2627,7 @@ body:has(.sogrom-creator-fullscreen) .application.compendium-browser {
   color: var(--cc-accent);
   background: var(--cc-panel-2, var(--cc-panel));
   border: 1px solid var(--cc-line);
-  border-radius: 999px;
+  border-radius: var(--cc-radius-pill);
 }
 /* When a row carries both a level badge and a selected tick, keep them side by side at the right. */
 .creator-pickrow-tag + .creator-pickrow-tick { margin-left: 0.4rem; }
@@ -1595,9 +2651,15 @@ body:has(.sogrom-creator-fullscreen) .application.compendium-browser {
 .creator-spells .creator-pick-desc { display: flex; flex-direction: column; overflow: hidden; }
 /* Flat fill on the focused-spell detail card — no panel gradient on the spell pages. */
 .creator-spells .creator-detail { background: var(--cc-panel); }
-.creator-pick-desc-scroll { flex: 1 1 auto; min-height: 0; overflow-y: auto; }
+/* `0 1 auto`, not `1 1 auto`: the description takes the height it needs and no more.
+   Growing it was what pinned the tally to the bottom of the column and opened several
+   hundred pixels of nothing between the two on a tall window. It can still shrink and
+   scroll when a long spell description would otherwise push the tally off. */
+.creator-pick-desc-scroll { flex: 0 1 auto; min-height: 0; overflow-y: auto; }
 
-/* Running tally of picked spells, pinned to the bottom of the description column. */
+/* Running tally of picked spells. It follows the description immediately rather than
+   being pinned to the foot of the column — it is a readout of what you have chosen,
+   which belongs beside the thing you are choosing, not at the far end of the window. */
 .creator-spell-selected {
   flex: 0 0 auto;
   margin-top: 0.85rem;
@@ -1608,7 +2670,7 @@ body:has(.sogrom-creator-fullscreen) .application.compendium-browser {
   padding: 0.65rem 0.85rem;
   background: var(--cc-panel);
   border: 1px solid var(--cc-line);
-  border-radius: 10px;
+  border-radius: var(--cc-radius);
 }
 .creator-spell-selected-label {
   font-size: 0.75rem;
@@ -1635,7 +2697,7 @@ body:has(.sogrom-creator-fullscreen) .application.compendium-browser {
   padding: 0.15rem 0.5rem 0.15rem 0.2rem;
   background: var(--cc-panel-2);
   border: 1px solid var(--cc-line);
-  border-radius: 999px;
+  border-radius: var(--cc-radius-pill);
   color: var(--cc-text);
   text-decoration: none;
   font-size: 0.8rem;
@@ -1645,19 +2707,59 @@ body:has(.sogrom-creator-fullscreen) .application.compendium-browser {
 .creator-spell-chip img { width: 20px; height: 20px; border-radius: 50%; object-fit: cover; border: 1px solid var(--cc-line); }
 .creator-spell-chip:hover { border-color: var(--cc-gold); color: var(--cc-gold); }
 
-/* ---- Spell browser: two columns, choices wide + description sidebar ----
-   The spell choices take the wide main column (~2/3) so long spell names have room; the focused
-   spell's description sits in a narrower ~1/3 sidebar with the running tally pinned beneath it.
-   Shared by the level-up spell step, the restyled creation Spells step, and the feat-spells step
-   (`.creator-spells-browser`). Guarded to wide stages so the <1100px rule can stack the columns. */
+/* ---- Spell browser: choices wide + description sidebar ----
+   The spell choices take the main column; the focused spell's description sits in a sidebar.
+   Shared by the level-up spell step, the creation Spells step, and the feat-spells step
+   (`.creator-spells-browser`). Guarded to wide stages so the <1100px rule can stack the columns.
+
+   The sidebar is capped rather than being a `1fr` share. It used to be `minmax(280px, 1fr)` of a
+   2fr/1fr split, which on a wide monitor made it ~740px — three times the measure a spell
+   description needs, and the extra width bought nothing but a taller void underneath it. Capped,
+   the space goes to the list, which is where more room actually shows more spells. */
 @media (min-width: 1101px) {
   .levelup-spells,
-  .creator-spells-browser { grid-template-columns: minmax(0, 2fr) minmax(280px, 1fr); }
+  .creator-spells-browser { grid-template-columns: minmax(0, 1fr) minmax(300px, 400px); }
 }
 
-/* Search box + level/school filter dropdowns share the top toolbar row, wrapping when tight. */
+/* The spell list is a grid, not a stack.
+
+   One spell per row is right in a 340px column and absurd in a 1400px one: fifteen cantrips
+   became fifteen full-width rows and a scrollbar, each using a quarter of its own width and
+   leaving the rest blank. The same `auto-fill` track the picker drawer uses puts them in as
+   many columns as fit, so a level-1 caster's whole list is usually on screen at once —
+   which is the point of a chooser. */
+.creator-spells .creator-picklist {
+  grid-template-columns: repeat(auto-fill, minmax(224px, 1fr));
+  /* Gaps over the column's own dark ground — see the drawer grid above for why neither a
+     coloured container background nor per-cell borders survives a short last row. */
+  gap: 2px;
+  align-content: start;
+  border-top: 1px solid var(--cc-line);
+}
+.creator-spells .creator-picklist > li {
+  background: var(--cc-panel);
+  min-width: 0;
+}
+/* The 1px grid gaps are the rules now; a per-row border would double them. */
+.creator-spells .creator-picklist .creator-pickrow { border-bottom: 0; }
+.creator-spells .creator-picklist .creator-no-results { grid-column: 1 / -1; }
+
+/* Search box + level/school filter dropdowns share the top toolbar row, wrapping when tight.
+   The "choose N more" count joins them on that row rather than taking a line of its own —
+   the stacked toolbar puts each child on its own row, which for three short controls meant
+   three rows of chrome above the list. */
+.creator-spells > .creator-pick-side > .creator-toolbar--stacked {
+  flex-direction: row;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem 0.85rem;
+}
+.creator-spells > .creator-pick-side > .creator-toolbar--stacked .creator-spell-search-row { flex: 1 1 420px; }
 .creator-spell-search-row { display: flex; flex-wrap: wrap; align-items: center; gap: 0.5rem; }
 .creator-spell-search-row .creator-search { flex: 1 1 220px; width: auto; }
+
+/* Two tabs do not need the whole width of a wide stage. */
+.creator-spells .creator-spell-tabs .creator-spell-tab { flex: 0 1 18rem; }
 .creator-spell-filters { display: flex; flex: 1 1 260px; gap: 0.5rem; }
 .creator-spell-filter {
   flex: 1 1 0;
@@ -1668,7 +2770,7 @@ body:has(.sogrom-creator-fullscreen) .application.compendium-browser {
   padding: 0.5rem 0.6rem;
   background: var(--cc-panel);
   border: 1px solid var(--cc-line);
-  border-radius: 9px;
+  border-radius: var(--cc-radius);
   color: var(--cc-muted);
 }
 .creator-spell-filter i { flex: 0 0 auto; font-size: 0.8rem; }
@@ -1703,7 +2805,7 @@ body:has(.sogrom-creator-fullscreen) .application.compendium-browser {
   gap: 0.85rem;
   background: var(--cc-panel);
   border: 1px solid var(--cc-line);
-  border-radius: 12px;
+  border-radius: var(--cc-radius);
 }
 .feat-spells-choice { margin: 0; }
 /* An unmade decision is flagged: an amber rail and a soft glow draw the eye to it. */
@@ -1711,7 +2813,7 @@ body:has(.sogrom-creator-fullscreen) .application.compendium-browser {
   margin: -0.35rem -0.5rem;
   padding: 0.35rem 0.5rem;
   border-left: 3px solid var(--cc-accent);
-  border-radius: 6px;
+  border-radius: var(--cc-radius);
   background: color-mix(in srgb, var(--cc-accent) 8%, transparent);
 }
 .feat-spells-choice-label {
@@ -1735,7 +2837,7 @@ body:has(.sogrom-creator-fullscreen) .application.compendium-browser {
   letter-spacing: 0.04em;
   color: #1a1206;
   background: var(--cc-accent);
-  border-radius: 999px;
+  border-radius: var(--cc-radius-pill);
   animation: feat-spells-pulse 1.8s var(--cc-ease) infinite;
 }
 @keyframes feat-spells-pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.55; } }
@@ -1756,7 +2858,7 @@ body:has(.sogrom-creator-fullscreen) .application.compendium-browser {
   padding: 0.45rem 0.85rem;
   background: var(--cc-panel);
   border: 1px solid var(--cc-line);
-  border-radius: 999px;
+  border-radius: var(--cc-radius-pill);
   color: var(--cc-muted);
   cursor: pointer;
   box-shadow: var(--cc-sheen);
@@ -1772,7 +2874,7 @@ body:has(.sogrom-creator-fullscreen) .application.compendium-browser {
   display: flex; align-items: center; gap: 0.4rem;
   padding: 0.5rem 0.75rem; margin-bottom: 0.5rem;
   font-size: 0.85rem; color: var(--cc-muted);
-  background: var(--cc-panel); border: 1px dashed var(--cc-line); border-radius: 8px;
+  background: var(--cc-panel); border: 1px dashed var(--cc-line); border-radius: var(--cc-radius);
 }
 .feat-spells-known-note i { color: var(--cc-good); }
 /* Prompt shown in the list column until a spell list is chosen. */
@@ -1809,7 +2911,7 @@ body:has(.sogrom-creator-fullscreen) .application.compendium-browser {
 .creator-choices-progress-track {
   flex: 1;
   height: 6px;
-  border-radius: 999px;
+  border-radius: var(--cc-radius-pill);
   background: var(--cc-panel-2);
   border: 1px solid var(--cc-line);
   overflow: hidden;
@@ -1817,7 +2919,7 @@ body:has(.sogrom-creator-fullscreen) .application.compendium-browser {
 .creator-choices-progress-bar {
   height: 100%;
   background: var(--cc-select);
-  border-radius: 999px;
+  border-radius: var(--cc-radius-pill);
   transition: width 0.25s ease;
 }
 .creator-choices-progress-bar.is-full { background: var(--cc-good); }
@@ -1829,7 +2931,7 @@ body:has(.sogrom-creator-fullscreen) .application.compendium-browser {
 .creator-decision {
   background: var(--cc-panel);
   border: 1px solid var(--cc-line);
-  border-radius: 12px;
+  border-radius: var(--cc-radius);
   overflow: hidden;
   box-shadow: var(--cc-sheen);
   transition: border-color 0.25s var(--cc-ease), background 0.25s var(--cc-ease);
@@ -1860,7 +2962,7 @@ body:has(.sogrom-creator-fullscreen) .application.compendium-browser {
   color: var(--cc-muted);
   font-size: 0.78rem;
 }
-.creator-decision-chip img { width: 22px; height: 22px; border-radius: 5px; object-fit: cover; }
+.creator-decision-chip img { width: 22px; height: 22px; border-radius: var(--cc-radius); object-fit: cover; }
 .creator-decision-title { flex: 1; min-width: 0; font-size: 0.95rem; font-weight: 500; }
 .creator-decision-count { font-size: 0.8rem; color: var(--cc-muted); white-space: nowrap; }
 .creator-decision-count.is-complete { color: var(--cc-good); }
@@ -1880,10 +2982,10 @@ body:has(.sogrom-creator-fullscreen) .application.compendium-browser {
 .creator-choice-source {
   background: var(--cc-panel);
   border: 1px solid var(--cc-line);
-  border-radius: 12px;
+  border-radius: var(--cc-radius);
   padding: 1rem 1.25rem;
 }
-.creator-choice-source-img { width: 32px; height: 32px; border-radius: 6px; object-fit: cover; }
+.creator-choice-source-img { width: 32px; height: 32px; border-radius: var(--cc-radius); object-fit: cover; }
 .creator-choice { padding: 0.75rem 0; border-top: 1px solid var(--cc-line); }
 .creator-choice:first-of-type { border-top: none; }
 .creator-choice-head { display: flex; align-items: baseline; justify-content: space-between; gap: 1rem; }
@@ -1979,7 +3081,36 @@ body:has(.sogrom-creator-fullscreen) .application.compendium-browser {
   border-color: var(--cc-gold);
   box-shadow: 0 0 8px -2px var(--cc-gold);
 }
-.creator-choice-card-star { flex-shrink: 0; color: var(--cc-gold); font-size: 0.75rem; }
+/* The recommendation star.
+
+   In the row-shaped cards — the creation choices grid, and the level-up compact/chip densities —
+   it is an inline flex item sitting before the label, so it reads as "★ Charisma" on one line.
+   That is the layout it was written for.
+
+   The default card is a flex *column*, and there the same inline star claimed a line of its own
+   above the label, with the card's 0.85rem gap under it. On the level-up spell-grant ability
+   picker that is the whole bug: Charisma is the recommended ability for a Sorcerer and therefore
+   the only starred option, so it rendered two lines tall — and clipped — beside an Intelligence
+   and a Wisdom that stayed one. A marker must not change the shape of the thing it marks, so in
+   the column card it becomes a corner marker instead, mirroring the tick already pinned opposite
+   it at top-right.
+
+   Top-left is free wherever a star can appear: the "Current"/"Known" badge that also sits there
+   belongs to the owned-card branch of levelup/choices.hbs, which never renders a star. */
+.creator-choice-card-star {
+  position: absolute;
+  top: 0.35rem;
+  left: 0.45rem;
+  flex-shrink: 0;
+  color: var(--cc-gold);
+  font-size: 0.75rem;
+}
+/* Row-shaped cards: back into the flow, ahead of the label, where it always worked. */
+.creator-choices .creator-choice-card-star,
+.levelup-block[data-density="compact"] .creator-choice-card-star,
+.levelup-block[data-density="chip"] .creator-choice-card-star {
+  position: static;
+}
 .creator-choices .creator-choice-card.is-recommended::after,
 .creator-levelup-grant .creator-choice-card.is-recommended::after,
 .creator-levelup-choices .creator-choice-card.is-recommended::after {
@@ -2018,7 +3149,7 @@ body:has(.sogrom-creator-fullscreen) .application.compendium-browser {
   padding: 1rem 1.25rem;
   background: var(--cc-panel);
   border: 1px solid var(--cc-line);
-  border-radius: 12px;
+  border-radius: var(--cc-radius);
 }
 .creator-equip-head { display: flex; align-items: center; gap: 0.6rem; margin-bottom: 0.5rem; }
 .creator-equip-head h2 { margin: 0; font-size: 1.1rem; border: none; }
@@ -2028,14 +3159,14 @@ body:has(.sogrom-creator-fullscreen) .application.compendium-browser {
   padding: 0.35rem 0.7rem;
   background: var(--cc-panel-2);
   border: 1px solid var(--cc-line);
-  border-radius: 8px;
+  border-radius: var(--cc-radius);
   color: var(--cc-muted);
   cursor: pointer;
 }
 .creator-equip-tab.is-selected { border-color: var(--cc-select); color: var(--cc-text); background: var(--cc-select-soft); }
 .creator-equip-rows { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 0.4rem; }
 .creator-equip-row { display: flex; align-items: center; gap: 0.5rem; }
-.creator-equip-row img, .creator-equip-pill img { width: 22px; height: 22px; border-radius: 4px; object-fit: cover; }
+.creator-equip-row img, .creator-equip-pill img { width: 22px; height: 22px; border-radius: var(--cc-radius); object-fit: cover; }
 .creator-equip-orgroup { display: flex; flex-direction: column; gap: 0.35rem; }
 .creator-equip-orlabel { font-size: 0.8rem; color: var(--cc-muted); }
 .creator-equip-orpills { display: flex; flex-wrap: wrap; gap: 0.4rem; }
@@ -2046,7 +3177,7 @@ body:has(.sogrom-creator-fullscreen) .application.compendium-browser {
   padding: 0.3rem 0.6rem;
   background: var(--cc-panel-2);
   border: 1px solid var(--cc-line);
-  border-radius: 999px;
+  border-radius: var(--cc-radius-pill);
   color: var(--cc-text);
   cursor: pointer;
 }
@@ -2095,7 +3226,7 @@ body:has(.sogrom-creator-fullscreen) .application.compendium-browser {
   aspect-ratio: 1;
   object-fit: cover;
   border: 1px solid var(--cc-line);
-  border-radius: 12px;
+  border-radius: var(--cc-radius);
   background: var(--cc-panel-2);
 }
 
@@ -2127,7 +3258,7 @@ body:has(.sogrom-creator-fullscreen) .application.compendium-browser {
 .creator-review-text p { color: var(--cc-text); line-height: 1.5; margin: 0 0 0.5rem; }
 .creator-review-spells { list-style: none; margin: 0; padding: 0; display: flex; flex-wrap: wrap; gap: 0.5rem 1.25rem; }
 .creator-review-spells li { display: flex; align-items: center; gap: 0.4rem; }
-.creator-review-spells img { width: 20px; height: 20px; border-radius: 4px; object-fit: cover; }
+.creator-review-spells img { width: 20px; height: 20px; border-radius: var(--cc-radius); object-fit: cover; }
 .creator-trait.is-empty .creator-trait-value { color: var(--cc-muted); font-style: italic; }
 
 /* Review trait values hold a mix of plain-text proficiencies and clickable item links. */
@@ -2141,7 +3272,7 @@ body:has(.sogrom-creator-fullscreen) .application.compendium-browser {
   padding: 0.05rem 0.45rem;
   background: var(--cc-panel-2);
   border: 1px solid var(--cc-line);
-  border-radius: 999px;
+  border-radius: var(--cc-radius-pill);
   font-size: 0.78rem;
 }
 .creator-review .content-link {
@@ -2158,7 +3289,7 @@ body:has(.sogrom-creator-fullscreen) .application.compendium-browser {
 }
 .creator-review .content-link i { display: none; }
 .creator-review .content-link img {
-  width: 20px; height: 20px; border-radius: 4px; object-fit: cover;
+  width: 20px; height: 20px; border-radius: var(--cc-radius); object-fit: cover;
   border: 1px solid var(--cc-line);
 }
 .creator-review .content-link:hover { color: var(--cc-gold); }
@@ -2226,7 +3357,7 @@ body:has(.sogrom-creator-fullscreen) .application.compendium-browser {
   gap: 0.35rem;
   padding: 0.15rem 0.65rem;
   border: 1px solid var(--cc-line-2);
-  border-radius: 999px;
+  border-radius: var(--cc-radius-pill);
   background: var(--cc-panel-2);
   font-size: 0.78rem;
   color: var(--cc-muted);
@@ -2243,7 +3374,7 @@ body:has(.sogrom-creator-fullscreen) .application.compendium-browser {
   display: inline-flex;
   align-items: center;
   padding: 0.05rem 0.45rem;
-  border-radius: 999px;
+  border-radius: var(--cc-radius-pill);
   background: var(--cc-gold);
   color: #1a1206;
   font-size: 0.66rem;
@@ -2256,7 +3387,7 @@ body:has(.sogrom-creator-fullscreen) .application.compendium-browser {
 .creator-levelup-featlist li.is-new {
   padding: 0.2rem 0.55rem 0.2rem 0.35rem;
   border: 1px solid var(--cc-gold);
-  border-radius: 999px;
+  border-radius: var(--cc-radius-pill);
   background: var(--cc-select-soft);
 }
 
@@ -2309,7 +3440,7 @@ body:has(.sogrom-creator-fullscreen) .application.compendium-browser {
   padding: 0.5rem 0.75rem;
   background: var(--cc-panel-2);
   border: 1px solid var(--cc-line);
-  border-radius: 12px;
+  border-radius: var(--cc-radius);
   color: var(--cc-text);
   cursor: pointer;
   transition: border-color 0.15s, background 0.15s;
@@ -2346,7 +3477,7 @@ body:has(.sogrom-creator-fullscreen) .application.compendium-browser {
   padding: 0.5rem 1.25rem;
   background: var(--cc-panel);
   border: 1px solid var(--cc-line-2);
-  border-radius: 12px;
+  border-radius: var(--cc-radius);
 }
 .creator-hp-result.is-manual { border-color: var(--cc-select); background: var(--cc-select-soft); }
 
@@ -2369,7 +3500,7 @@ body:has(.sogrom-creator-fullscreen) .application.compendium-browser {
   color: var(--cc-gold-bright);
   background: var(--cc-panel-2);
   border: 1px solid var(--cc-line-2);
-  border-radius: 8px;
+  border-radius: var(--cc-radius);
   padding: 0 0.4rem;
 }
 .creator-hp-input:focus { border-color: var(--cc-select); outline: none; }
@@ -2412,7 +3543,7 @@ body:has(.sogrom-creator-fullscreen) .application.compendium-browser {
   min-width: 0;
   background: var(--cc-panel-2);
   border: 1px solid var(--cc-line);
-  border-radius: 14px;
+  border-radius: var(--cc-radius);
   overflow: hidden;
 }
 .levelup-block.is-complete { border-color: var(--cc-line-2); }
@@ -2453,7 +3584,7 @@ body:has(.sogrom-creator-fullscreen) .application.compendium-browser {
   flex: 0 0 auto;
   width: 30px;
   height: 30px;
-  border-radius: 8px;
+  border-radius: var(--cc-radius);
   background: var(--cc-select-soft);
   color: var(--cc-gold-bright);
   font-size: 0.95rem;
@@ -2473,7 +3604,7 @@ body:has(.sogrom-creator-fullscreen) .application.compendium-browser {
   flex: 0 0 auto;
   padding: 0.15rem 0.55rem;
   border: 1px solid var(--cc-line);
-  border-radius: 999px;
+  border-radius: var(--cc-radius-pill);
   font-size: 0.8rem;
   color: var(--cc-muted);
   white-space: nowrap;
@@ -2494,7 +3625,7 @@ body:has(.sogrom-creator-fullscreen) .application.compendium-browser {
   min-width: 0;
   padding: 0.15rem 0.55rem;
   border: 1px solid var(--cc-line);
-  border-radius: 999px;
+  border-radius: var(--cc-radius-pill);
   font-size: 0.8rem;
   color: var(--cc-muted);
   white-space: nowrap;
@@ -2534,7 +3665,7 @@ body:has(.sogrom-creator-fullscreen) .application.compendium-browser {
   height: 56px;
   display: grid;
   place-items: center;
-  border-radius: 10px;
+  border-radius: var(--cc-radius);
   border: 1px solid var(--cc-line-2);
   background: var(--cc-panel-2);
   color: var(--cc-gold-bright);
@@ -2674,7 +3805,7 @@ body:has(.sogrom-creator-fullscreen) .application.compendium-browser {
   padding: 1.5rem 1rem;
   background: var(--cc-panel-2);
   border: 1px solid var(--cc-line);
-  border-radius: 12px;
+  border-radius: var(--cc-radius);
   color: var(--cc-text);
   cursor: pointer;
   transition: border-color 0.15s, background 0.15s;
@@ -2686,7 +3817,7 @@ body:has(.sogrom-creator-fullscreen) .application.compendium-browser {
 .creator-choice-card-img {
   width: 72px;
   height: 72px;
-  border-radius: 10px;
+  border-radius: var(--cc-radius);
   object-fit: cover;
   border: 1px solid var(--cc-line);
 }
@@ -2711,7 +3842,7 @@ body:has(.sogrom-creator-fullscreen) .application.compendium-browser {
   text-transform: uppercase;
   letter-spacing: 0.05em;
   padding: 0.1rem 0.4rem;
-  border-radius: 999px;
+  border-radius: var(--cc-radius-pill);
   background: var(--cc-select-soft);
   color: var(--cc-gold-bright);
   border: 1px solid var(--cc-select);
@@ -2746,12 +3877,12 @@ body:has(.sogrom-creator-fullscreen) .application.compendium-browser {
   padding: 0.35rem 0.7rem 0.35rem 0.4rem;
   background: var(--cc-panel-2);
   border: 1px solid var(--cc-line);
-  border-radius: 999px;
+  border-radius: var(--cc-radius-pill);
 }
 .creator-grant-spell-img {
   width: 28px;
   height: 28px;
-  border-radius: 6px;
+  border-radius: var(--cc-radius);
   object-fit: cover;
   border: 1px solid var(--cc-line);
 }
@@ -2872,7 +4003,7 @@ body:has(.sogrom-creator-fullscreen) .application.compendium-browser {
   padding: 0.25rem 0.7rem 0.25rem 0.25rem;
   background: var(--cc-panel);
   border: 1px solid var(--cc-line);
-  border-radius: 999px;
+  border-radius: var(--cc-radius-pill);
 }
 .levelup-route-chip img {
   flex: 0 0 26px;
@@ -2907,7 +4038,7 @@ body:has(.sogrom-creator-fullscreen) .application.compendium-browser {
   padding: 0.85rem 1rem;
   background: var(--cc-panel);
   border: 1px solid var(--cc-line);
-  border-radius: 11px;
+  border-radius: var(--cc-radius);
   color: var(--cc-text);
   text-align: left;
   cursor: pointer;
@@ -3000,6 +4131,11 @@ body:has(.sogrom-creator-fullscreen) .application.compendium-browser {
 /* The shelf is a compact row list: icon, name (a content-link — hover for the rich item
    tooltip, click to open the full sheet), muted type, right-aligned price, qty controls.
    Containers (the adventuring packs) sit in their own headed section above the goods. */
+/* One shelf section: its heading and its rows. The wrapper exists so the search filter can hide
+   a whole section once every row in it is filtered out, rather than leaving a stranded heading. */
+.creator-store-group + .creator-store-group { margin-top: 1.1rem; }
+.creator-store-group.is-hidden { display: none; }
+
 .creator-store-section {
   margin: 0.4rem 0 0.2rem;
   padding-bottom: 0.2rem;
@@ -3018,12 +4154,31 @@ body:has(.sogrom-creator-fullscreen) .application.compendium-browser {
 .creator-store-packlist .creator-store-row { background: var(--cc-panel-2); }
 .creator-store-packlist .creator-store-row:hover { background: var(--cc-select-soft); }
 .creator-store-packlist .creator-store-row.is-in-cart { background: var(--cc-select-soft); }
+/* The shelf, in columns.
+
+   As one full-width column the row was a flex line — icon, name (flex: 1 1 auto), price, qty —
+   and that `1 1 auto` handed the name every spare pixel. On the surface this step actually gets,
+   that put about a thousand pixels of nothing between "Battleaxe" and "10 gp", so reading a price
+   off a row meant tracking across the width of the window and hoping the eye stayed on the line.
+   Right-aligning the price is correct within a column and wrong when the column is that wide.
+
+   A grid of ~380px tracks fixes both halves of it at once: the name and its price are a few
+   centimetres apart because the track is only that wide, and the width the gap used to occupy now
+   carries two or three more items instead of whitespace. `auto-fill` with a minmax track needs no
+   breakpoint — it drops to one column when one is all that fits, which is what the narrow stage
+   and the GM's smaller windows get.
+
+   Row-major order (the grid default) keeps the alphabetical run reading left-to-right across a
+   row then down, the way a printed shop list reads. */
 .creator-store-list {
   list-style: none;
   margin: 0;
   padding: 0;
-  display: flex;
-  flex-direction: column;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(min(380px, 100%), 1fr));
+  /* Column gap only: the rows keep their own bottom rule, so a row gap would double the
+     separation between rows while leaving the columns to run together. */
+  column-gap: 2rem;
 }
 .creator-store-row {
   display: flex;
@@ -3040,7 +4195,7 @@ body:has(.sogrom-creator-fullscreen) .application.compendium-browser {
   width: 30px;
   height: 30px;
   flex: 0 0 auto;
-  border-radius: 6px;
+  border-radius: var(--cc-radius);
   object-fit: cover;
   background: #0a0910;
   border: 1px solid var(--cc-line);
@@ -3063,12 +4218,16 @@ body:has(.sogrom-creator-fullscreen) .application.compendium-browser {
 .creator-store-row .content-link i { display: none; }
 .creator-store-row .content-link:hover { color: var(--cc-gold); }
 .creator-store-row-type { color: var(--cc-muted); font-size: 0.72rem; }
+/* Right-aligned inside a ~380px track, so it still forms a scannable column of prices down each
+   section without being flung to the far side of the window. Tabular figures so those columns
+   line up digit for digit. */
 .creator-store-row-price {
   flex: 0 0 auto;
   min-width: 5.5rem;
   text-align: right;
   font-size: 0.82rem;
   color: var(--cc-gold);
+  font-variant-numeric: tabular-nums;
 }
 .creator-store-row.is-unaffordable .creator-store-row-price { color: var(--cc-muted); }
 .creator-store-qty {
@@ -3106,13 +4265,13 @@ body:has(.sogrom-creator-fullscreen) .application.compendium-browser {
   padding: 1rem;
   background: var(--cc-panel);
   border: 1px solid var(--cc-line);
-  border-radius: 12px;
+  border-radius: var(--cc-radius);
 }
 .creator-store-cart-head { margin: 0; font-size: 1rem; border: none; display: flex; align-items: center; gap: 0.5rem; }
 .creator-store-cart-list { flex: 1; min-height: 0; overflow-y: auto; }
 .creator-store-cart-rows { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 0.4rem; }
 .creator-store-cart-row { display: flex; align-items: center; gap: 0.5rem; font-size: 0.85rem; }
-.creator-store-cart-row img { width: 24px; height: 24px; border-radius: 4px; object-fit: cover; flex: 0 0 auto; }
+.creator-store-cart-row img { width: 24px; height: 24px; border-radius: var(--cc-radius); object-fit: cover; flex: 0 0 auto; }
 .creator-store-cart-name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .creator-store-cart-line { flex: 0 0 auto; color: var(--cc-muted); font-size: 0.8rem; }
 .creator-store-cart-empty { color: var(--cc-muted); font-size: 0.85rem; margin: 0; }
@@ -3154,7 +4313,7 @@ body:has(.sogrom-creator-fullscreen) .application.compendium-browser {
   margin: 0;
   padding: 0.5rem 0.6rem;
   border: 1px solid #a33;
-  border-radius: 8px;
+  border-radius: var(--cc-radius);
   background: rgba(170, 51, 51, 0.15);
   color: #e88;
   font-size: 0.82rem;
@@ -3170,7 +4329,10 @@ body:has(.sogrom-creator-fullscreen) .application.compendium-browser {
 }
 .creator-store-totals div { display: flex; justify-content: space-between; gap: 0.5rem; }
 .creator-store-totals dt { color: var(--cc-muted); }
-.creator-store-totals dd { margin: 0; }
+/* The colour is not optional here — see the `dl` note in the reset near the top of this file.
+   Without it these two lines render in Foundry's near-black body colour on our near-black panel,
+   i.e. invisible, while Remaining survives only because it sets a gold of its own below. */
+.creator-store-totals dd { margin: 0; color: var(--cc-text); }
 .creator-store-remaining dd { color: var(--cc-gold); font-weight: 600; }
 .creator-store-totals.is-over .creator-store-remaining dd { color: #e88; }
 
@@ -3190,7 +4352,7 @@ body:has(.sogrom-creator-fullscreen) .application.compendium-browser {
 .sogrom-store-config.is-dragover .sogrom-store-config-fields {
   outline: 2px dashed var(--color-border-highlight, #ff6400);
   outline-offset: -2px;
-  border-radius: 6px;
+  border-radius: var(--cc-radius);
 }
 
 .sogrom-store-inv-toolbar { display: flex; align-items: center; gap: 0.5rem; }
@@ -3209,7 +4371,7 @@ body:has(.sogrom-creator-fullscreen) .application.compendium-browser {
 .sogrom-store-inv tbody tr.is-broken .sogrom-store-inv-name { opacity: 0.6; text-decoration: line-through; }
 .sogrom-store-inv tbody tr.is-broken .fa-link-slash { color: var(--color-level-error, #ce0707); margin-left: 0.3rem; }
 .sogrom-store-inv-col-img { width: 32px; }
-.sogrom-store-inv-col-img img { width: 28px; height: 28px; border-radius: 4px; object-fit: cover; display: block; }
+.sogrom-store-inv-col-img img { width: 28px; height: 28px; border-radius: var(--cc-radius); object-fit: cover; display: block; }
 .sogrom-store-inv-col-price { width: 5.5rem; text-align: right; white-space: nowrap; }
 .sogrom-store-inv-eff { font-weight: 600; }
 .sogrom-store-inv-col-override { width: 8.5rem; white-space: nowrap; }
@@ -3231,7 +4393,7 @@ body:has(.sogrom-creator-fullscreen) .application.compendium-browser {
   opacity: 0.7;
   text-align: center;
   border: 2px dashed var(--color-border-light-2, rgba(120, 120, 120, 0.4));
-  border-radius: 8px;
+  border-radius: var(--cc-radius);
   padding: 1rem;
 }
 .sogrom-store-inv-empty i { font-size: 1.6rem; }

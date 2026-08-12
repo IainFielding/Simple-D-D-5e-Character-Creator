@@ -44,7 +44,11 @@
         </label>
         {{/if}}
       </div>
-      <span class="creator-count">{{localize "sogrom-dnd5e-character-creator.common.available"}}: {{count}}</span>
+      {{!-- Rewritten by the filter pass and announced politely — same readout as the picker
+            drawer's, and for the same reason: filtering hides rows in the DOM without a
+            re-render, so a Handlebars number would go stale the moment anything is typed. --}}
+      <span class="creator-count" data-creator-count aria-live="polite" aria-atomic="true"
+      >{{localize "sogrom-dnd5e-character-creator.common.available"}}: {{count}}</span>
     </div>
 
     {{!-- One shelf row, shared by the packs section and the general goods list. --}}
@@ -77,29 +81,42 @@
     </li>
     {{/inline}}
 
+    {{!--
+      The shelf, as headed sections rather than one alphabetical run.
+
+      Every section is a `.creator-store-group` wrapping its own heading and list, and that
+      wrapper is what the search filter hides when every row inside it is filtered out — see
+      #filterCards() in creator-shell.mjs. Without it, searching "rope" left a column of empty
+      headings with one row somewhere among them.
+    --}}
     <div class="creator-store-shelf">
       {{#if hasPacks}}
-      <h3 class="creator-store-section">
-        <i class="fa-solid fa-suitcase"></i>
-        {{localize "sogrom-dnd5e-character-creator.step.store.packsHeading"}}
-      </h3>
-      <ul class="creator-store-list creator-store-packlist">
-        {{#each packCards}}{{> storeRow}}{{/each}}
-      </ul>
-      {{#if hasGoods}}
-      <h3 class="creator-store-section">
-        <i class="fa-solid fa-boxes-stacked"></i>
-        {{localize "sogrom-dnd5e-character-creator.step.store.goodsHeading"}}
-      </h3>
+      <section class="creator-store-group">
+        <h3 class="creator-store-section">
+          <i class="fa-solid fa-suitcase" aria-hidden="true"></i>
+          {{localize "sogrom-dnd5e-character-creator.step.store.packsHeading"}}
+        </h3>
+        <ul class="creator-store-list creator-store-packlist">
+          {{#each packCards}}{{> storeRow}}{{/each}}
+        </ul>
+      </section>
       {{/if}}
-      {{/if}}
-      {{#if hasGoods}}
-      <ul class="creator-store-list">
-        {{#each cards}}{{> storeRow}}{{/each}}
-      </ul>
-      {{else}}{{#unless hasPacks}}
+
+      {{#each groups}}
+      <section class="creator-store-group">
+        <h3 class="creator-store-section">
+          <i class="fa-solid {{icon}}" aria-hidden="true"></i>
+          {{label}}
+        </h3>
+        <ul class="creator-store-list">
+          {{#each cards}}{{> storeRow}}{{/each}}
+        </ul>
+      </section>
+      {{/each}}
+
+      {{#unless hasGoods}}{{#unless hasPacks}}
       <p class="creator-empty">{{localize "sogrom-dnd5e-character-creator.step.store.empty"}}</p>
-      {{/unless}}{{/if}}
+      {{/unless}}{{/unless}}
     </div>
   </div>
 

@@ -1,0 +1,87 @@
+{{!--
+  The picker drawer: the searchable grid of options for a pick step, shown *over* the work
+  surface rather than beside it.
+
+  It used to be a permanent 340px column. Together with the 348px aside on the other side that
+  meant 688px of the window was always spent on chrome, and the description — the column the
+  whole step exists to let you read — was the one that flexed down, to around 400px on a 1400px
+  window. The picker is only needed while you are picking; it is a drawer now, so the surface
+  underneath owns the full width the rest of the time.
+
+  Open by default when nothing is chosen (the step *is* the choice, so there is nothing to cover
+  up); closed the moment something is, and reopened from the switcher bar. The shell derives that
+  from `state.pickerFor` — see #drawerOpen() in creator-shell.mjs — so it needs no reset on
+  navigation.
+
+  Reads from the step context: `cards` (each with uuid/name/img/selected), `count`, `pickAction`
+  (which step action a card fires), and optionally `abilityOptions` for the background step's
+  increased-ability filter.
+--}}
+{{!-- The id is what the switcher's aria-controls points at. Only one drawer is ever in the DOM
+      at a time (one pick step is active), so a fixed id is safe. --}}
+<div class="creator-drawer {{#if drawerOpen}}is-open{{/if}}" id="creator-picker-drawer">
+  <div class="creator-drawer-head">
+    <label class="creator-search">
+      <i class="fa-solid fa-magnifying-glass"></i>
+      <input type="search" data-creator-search autocomplete="off"
+             aria-label="{{localize 'sogrom-dnd5e-character-creator.common.search'}}"
+             placeholder="{{localize 'sogrom-dnd5e-character-creator.common.search'}}">
+    </label>
+
+    {{#if abilityOptions}}
+    <label class="creator-spell-filter creator-bg-filter">
+      <i class="fa-solid fa-dumbbell"></i>
+      <select data-bg-filter-ability aria-label="{{localize 'sogrom-dnd5e-character-creator.step.background.filterAbilityAria'}}">
+        <option value="">{{localize "sogrom-dnd5e-character-creator.step.background.filterAllAbilities"}}</option>
+        {{#each abilityOptions}}<option value="{{value}}">{{label}}</option>{{/each}}
+      </select>
+    </label>
+    {{/if}}
+
+    {{!-- The running total, and the only spoken feedback the search has.
+
+          Two things were wrong. The number was a static Handlebars value while the filtering is
+          done in the DOM without a re-render (so the field keeps focus while typing) — so it went
+          on reading "Available: 87" beside a grid showing one card. And a screen-reader user
+          typing here heard nothing at all: rows are hidden with a class, and the "no matches"
+          line is inserted as ordinary markup.
+
+          `data-creator-count` lets the filter pass rewrite it, and aria-live announces the new
+          total. One live region covers both the running count and the empty case, so there is no
+          second region competing to speak. Polite, not assertive: this is feedback on what the
+          user is already doing, and it must not interrupt their typing. --}}
+    <span class="creator-count" data-creator-count data-count-total="{{count}}"
+          aria-live="polite" aria-atomic="true"
+    >{{localize "sogrom-dnd5e-character-creator.common.available"}}: {{count}}</span>
+
+    {{!-- Only offered once there is something to go back to. With nothing chosen the drawer is
+          the step, and a close button would be a control that does nothing. --}}
+    {{#if hasSelection}}
+    <button type="button" class="creator-btn creator-btn-ghost creator-drawer-close"
+            data-action="closePicker">
+      <i class="fa-solid fa-xmark"></i> {{localize "sogrom-dnd5e-character-creator.common.close"}}
+    </button>
+    {{/if}}
+  </div>
+
+  <ul class="creator-picklist creator-drawer-grid">
+    {{#each cards}}
+    <li>
+      <button type="button" class="creator-pickrow {{#if selected}}is-selected{{/if}}"
+              data-action="stepAction" data-step-action="{{../pickAction}}"
+              data-uuid="{{uuid}}" data-name="{{name}}"
+              {{#if abilities}}data-abilities="{{abilities}}"{{/if}}>
+        <img class="creator-pickrow-img" src="{{img}}" alt="">
+        <span class="creator-pickrow-name">{{name}}</span>
+        {{!-- Both editions of a class share its name, so a world with the 2014 and 2024 books
+              enabled lists thirteen apparently-duplicate pairs. The edition is the only thing
+              telling them apart, and it is already on the card. --}}
+        {{#if rules}}<span class="creator-pickrow-rules">{{rules}}</span>{{/if}}
+        {{#if selected}}<i class="creator-pickrow-tick fa-solid fa-check"></i>{{/if}}
+      </button>
+    </li>
+    {{else}}
+    <p class="creator-empty">{{localize "sogrom-dnd5e-character-creator.common.noEntries"}}</p>
+    {{/each}}
+  </ul>
+</div>

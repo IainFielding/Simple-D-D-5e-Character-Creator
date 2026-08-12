@@ -1,111 +1,80 @@
 {{!--
-  The Class step: like origin.hbs (list + description) but with a third column — the ability-score
-  panel (abilities-step.mjs) as a fixed aside — so the player sets scores while choosing a class.
-  Data from class-step.mjs context(): `cards`, `detail`, `groups`, and `abilities` for the panel.
-  Cards fire data-action="pick-class"; ability controls fire their own ability* actions.
+  The Class step. One work surface: the chosen class's page, with the ability allocator beneath it
+  and the class picker available as a drawer over the top.
+
+  What changed, and why. This used to be three columns — a 340px picker, a flexible description,
+  and a 348px aside holding the target level and the whole ability panel. The ability scores are
+  the most consequential numbers in character creation and they had the least room on the screen:
+  the stylesheet had to tighten the row gaps, narrow the score box to 2rem and pin the three method
+  tabs to `nowrap` just to fit "Standard Array" into the column. Meanwhile the description they
+  were meant to be read alongside was being squeezed from the other side.
+
+  The rule now is read on the left, write on the right: the dossier shows the resolved scores as a
+  readout, and this surface is where they are set, at full width, with a budget meter that shows
+  points being spent rather than a bare number counting down.
+
+  Data from class-step.mjs context(): `cards`/`count`/`pickAction`/`drawerOpen` for the drawer,
+  `detail`/`groups` for the page, `abilities` for the allocator, `targetLevel` for the level picker.
 --}}
-<section class="creator-pick">
-  <!-- Left column: vertical class picker -->
-  <div class="creator-pick-side">
-    <div class="creator-toolbar creator-toolbar--stacked">
-      <label class="creator-search">
-        <i class="fa-solid fa-magnifying-glass"></i>
-        <input type="search" data-creator-search autocomplete="off"
-               aria-label="{{localize 'sogrom-dnd5e-character-creator.common.search'}}"
-               placeholder="{{localize 'sogrom-dnd5e-character-creator.common.search'}}">
-      </label>
-      <span class="creator-count">{{localize "sogrom-dnd5e-character-creator.common.available"}}: {{count}}</span>
+<section class="creator-work">
+
+  {{!-- The switcher: what you chose, and the way back to the list. Replaces a permanently-open
+        column with a control the width of its own label.
+
+        It carries a chevron, so it reads as a disclosure — and now says so: aria-expanded tells
+        a screen reader whether the list it controls is open, and aria-controls names it. The
+        chevron alone told sighted users something no assistive technology could hear. --}}
+  {{#if hasSelection}}
+  <div class="creator-work-bar">
+    <button type="button" class="creator-work-switch"
+            data-action="openPicker"
+            aria-expanded="{{#if drawerOpen}}true{{else}}false{{/if}}"
+            aria-controls="creator-picker-drawer">
+      <img class="creator-work-switch-img" src="{{detail.img}}" alt="">
+      <span>{{detail.name}}</span>
+      <i class="fa-solid fa-chevron-down" aria-hidden="true"></i>
+    </button>
+    <span class="creator-work-bar-note">
+      {{localize "sogrom-dnd5e-character-creator.common.available"}}: {{count}}
+    </span>
+  </div>
+  {{/if}}
+
+  {{!-- Left column: the class list, and the chosen class's page under it. --}}
+  <div class="creator-work-body">
+    <div class="creator-work-page">
+      {{#if hasSelection}}
+      {{> "modules/sogrom-dnd5e-character-creator/templates/parts/work-detail.hbs" this}}
+      {{/if}}
     </div>
 
-    <ul class="creator-picklist">
-      {{#each cards}}
-      <li>
-        <button type="button" class="creator-pickrow {{#if selected}}is-selected{{/if}}"
-                data-action="stepAction" data-step-action="pick-class"
-                data-uuid="{{uuid}}" data-name="{{name}}">
-          <img class="creator-pickrow-img" src="{{img}}" alt="">
-          <span class="creator-pickrow-name">{{name}}</span>
-          {{#if selected}}<i class="creator-pickrow-tick fa-solid fa-check"></i>{{/if}}
-        </button>
-      </li>
-      {{else}}
-      <p class="creator-empty">{{localize "sogrom-dnd5e-character-creator.common.noEntries"}}</p>
-      {{/each}}
-    </ul>
+    {{> "modules/sogrom-dnd5e-character-creator/templates/parts/work-picker.hbs" this}}
   </div>
 
-  <!-- Center column: class description -->
-  <div class="creator-pick-desc">
+  {{!--
+    Right column: the things this step asks you to *set*, as opposed to the class page on the
+    left, which is what you read.
+
+    It is a sibling of the body rather than part of the page, and that is the whole point: the
+    picker drawer covers the body only, so opening the class list never takes the ability scores
+    off screen, and choosing a class never replaces them. They were inside the page before, which
+    put them below the class description and its entire feature table — a couple of screens down
+    on a large monitor, for the one control the footer blocks Next on — and, while the drawer was
+    open with nothing chosen, below the class list as well.
+
+    Starting Level lives here too: it is a decision, not a description.
+  --}}
+  <aside class="creator-work-side">
     {{#if hasSelection}}
-    <article class="creator-detail">
-      <header class="creator-detail-head">
-        <img class="creator-detail-img" src="{{detail.img}}" alt="">
-        <h2>{{detail.name}}</h2>
-        {{!-- Provenance badge, mirroring the level-up subclass block's source pill. Omitted
-              when the class declares no sourcebook. --}}
-        {{#if detail.source}}
-        <span class="creator-detail-source" title="{{detail.source}}">
-          <i class="fa-solid fa-book" aria-hidden="true"></i>{{detail.source}}
-        </span>
-        {{/if}}
-        {{!-- Quick Build rides the header rather than the aside: it acts on the class shown here,
-              and this is the first thing a player sees after picking one. --}}
-        <button type="button" class="creator-btn creator-quick-build-btn"
-                data-action="stepAction" data-step-action="quick-build">
-          <i class="fa-solid fa-bolt"></i>
-          {{localize "sogrom-dnd5e-character-creator.quickBuild.button"}}
-        </button>
-      </header>
-      <div class="creator-detail-body">{{{detail.enriched}}}</div>
-
-      {{#each groups}}
-      <section class="creator-adv-block">
-        <h3 class="creator-adv-heading">{{heading}}</h3>
-
-        {{#if tags.length}}
-        <ul class="creator-trait-list">
-          {{#each tags}}
-          <li class="creator-trait">
-            <span class="creator-trait-label">{{label}}</span>
-            <span class="creator-trait-value">{{value}}</span>
-          </li>
-          {{/each}}
-        </ul>
-        {{/if}}
-
-        {{#if items.length}}
-        <div class="creator-grant-list">
-          {{#each items}}
-          <div class="creator-grant">
-            <img class="creator-grant-icon" src="{{img}}" alt="">
-            <a class="content-link" data-uuid="{{uuid}}" data-link data-tooltip="{{ccItemTooltip uuid}}">{{name}}</a>
-            {{#if level}}<span class="creator-grant-tag">{{localize "sogrom-dnd5e-character-creator.step.class.levelTag" level=level}}</span>{{/if}}
-          </div>
-          {{/each}}
-        </div>
-        {{/if}}
-      </section>
-      {{/each}}
-    </article>
-    {{else}}
-    <div class="creator-pick-empty">
-      <i class="fa-solid fa-chess-rook"></i>
-      <h2>{{localize "sogrom-dnd5e-character-creator.step.class.label"}}</h2>
-      <p>{{localize "sogrom-dnd5e-character-creator.common.selectHint"}}</p>
-    </div>
-    {{/if}}
-  </div>
-
-  {{#with abilities}}
-  <aside class="creator-class-aside">
-    {{#with ../targetLevel}}
+    {{#with targetLevel}}
     {{!--
-      Target level: the creator always builds a level-1 character; anything above 1 hands off to the
-      level-up wizard after Create (see class-step.mjs targetLevelContext / creator-shell #onFinish).
-      Presets cover the common picks; the custom field carries everything else up to the system cap.
+      Target level: the creator always builds a level-1 character; anything above 1 hands off to
+      the level-up wizard after Create (see class-step.mjs targetLevelContext / creator-shell
+      #onFinish). Presets cover the common picks; the custom field carries everything else up to
+      the system cap.
     --}}
-    <div class="creator-target-level">
-      <h2 class="creator-aside-title">{{localize "sogrom-dnd5e-character-creator.step.class.targetLevel.label"}}</h2>
+    <section class="creator-work-block creator-target-level">
+      <h3 class="creator-work-block-title">{{localize "sogrom-dnd5e-character-creator.step.class.targetLevel.label"}}</h3>
       <div class="creator-level-chips">
         {{#each presets}}
         <button type="button" class="creator-level-chip {{#if active}}is-active{{/if}}"
@@ -126,82 +95,12 @@
         {{localize "sogrom-dnd5e-character-creator.step.class.targetLevel.hintOne"}}
         {{/if}}
       </p>
-    </div>
+    </section>
     {{/with}}
-
-    <h2 class="creator-aside-title">{{localize "sogrom-dnd5e-character-creator.step.abilities.label"}}</h2>
-
-    <div class="creator-method-tabs">
-      {{#each methods}}
-      <button type="button" class="creator-tab {{#if active}}is-active{{/if}}"
-              data-action="stepAction" data-step-action="ability-method" data-method="{{id}}">
-        {{label}}
-      </button>
-      {{/each}}
-    </div>
-
-    {{#if isPointBuy}}
-    <div class="creator-points">
-      <span class="creator-points-value {{#unless remaining}}is-zero{{/unless}}">{{remaining}}</span>
-      <span class="creator-points-label">{{localize "sogrom-dnd5e-character-creator.step.abilities.pointsLeft"}} / {{budget}}</span>
-    </div>
-    <ul class="creator-ability-list">
-      {{#each rows}}
-      <li class="creator-ability-row">
-        <span class="creator-ability-name">{{label}}</span>
-        <div class="creator-stepper">
-          <button type="button" class="creator-step-btn" data-action="stepAction" data-step-action="ability-dec"
-                  data-ability="{{key}}" {{#unless canDec}}disabled{{/unless}}>&minus;</button>
-          <span class="creator-ability-score">{{value}}</span>
-          <button type="button" class="creator-step-btn" data-action="stepAction" data-step-action="ability-inc"
-                  data-ability="{{key}}" {{#unless canInc}}disabled{{/unless}}>+</button>
-        </div>
-        <span class="creator-ability-mod">{{modifier}}</span>
-      </li>
-      {{/each}}
-    </ul>
-
-    {{else}}
-      {{#if hasPool}}
-      <ul class="creator-pool" data-step-drop="ability-unassign">
-        {{#each pool}}
-        <li class="creator-pool-chip {{#if used}}is-used{{/if}}" data-step-drag="{{index}}">{{value}}</li>
-        {{/each}}
-      </ul>
-      {{/if}}
-
-      {{#if hasPool}}
-      <ul class="creator-ability-list">
-        {{#each rows}}
-        <li class="creator-ability-row {{#if assigned}}is-assigned{{/if}}"
-            data-step-drop="ability-drop" data-ability="{{key}}">
-          <span class="creator-ability-name">{{label}}</span>
-          <select class="creator-assign" data-step-change="ability-assign" data-ability="{{key}}">
-            <option value="">{{localize "sogrom-dnd5e-character-creator.step.abilities.unassigned"}}</option>
-            {{#each options}}
-            <option value="{{index}}" {{#if selected}}selected{{/if}}>{{value}}</option>
-            {{/each}}
-          </select>
-          <span class="creator-ability-mod">{{modifier}}</span>
-        </li>
-        {{/each}}
-      </ul>
-      {{else}}
-      <p class="creator-empty">{{localize "sogrom-dnd5e-character-creator.step.abilities.rollPrompt"}}</p>
-      {{/if}}
     {{/if}}
 
-    <div class="creator-ability-actions">
-      {{#if isRoll}}
-      <button type="button" class="creator-btn creator-btn-ghost" data-action="stepAction" data-step-action="ability-roll">
-        <i class="fa-solid fa-dice"></i>
-        {{localize "sogrom-dnd5e-character-creator.step.abilities.rollScores"}}
-      </button>
-      {{/if}}
-      <button type="button" class="creator-btn creator-btn-ghost" data-action="stepAction" data-step-action="ability-reset">
-        <i class="fa-solid fa-rotate-left"></i> {{localize "sogrom-dnd5e-character-creator.common.reset"}}
-      </button>
-    </div>
+    {{!-- Rendered whether or not a class is chosen: ability scores do not depend on the class,
+          and a player who wants to roll first and pick after should not be blocked. --}}
+    {{> "modules/sogrom-dnd5e-character-creator/templates/parts/abilities-panel.hbs" abilities}}
   </aside>
-  {{/with}}
 </section>

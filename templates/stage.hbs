@@ -17,9 +17,20 @@
     <p>{{loadingLabel}}</p>
   </div>
   {{else}}
+  {{!--
+    The step's heading. It is always rendered now. It used to be suppressed on the pick steps
+    (`.creator-stage:has(.creator-pick) .creator-stage-head { display: none }`) to reclaim the
+    vertical space, which cost two things: the "Step 3 of 9" counter, on precisely the steps that
+    make up most of the flow; and the h1 itself, so the heading hierarchy on those screens started
+    at the h2 of whatever option happened to be selected.
+
+    The counter has moved to the progress meter in the top bar, where it is visible on every step,
+    so this band is now just the heading and a one-line instruction — small enough to keep.
+    `instruction` is optional; steps that need no framing simply omit it.
+  --}}
   <header class="creator-stage-head">
     <h1>{{step.label}}</h1>
-    <span class="creator-stage-pos">{{nav.position}}</span>
+    {{#if step.instruction}}<p class="creator-stage-instruction">{{step.instruction}}</p>{{/if}}
   </header>
 
   <div class="creator-stage-body">

@@ -76,6 +76,32 @@ export function railStageParts(scrollable = []) {
   };
 }
 
+/**
+ * The creator's own `PARTS`: a full-width top bar, the dossier column, and the stage.
+ *
+ * The creator and the level-up window used to share {@link railStageParts}, because both were a
+ * step list plus a stage. They aren't the same shape any more. The creator assembles one character
+ * across many steps, so its step list is folded into a dossier that shows the character so far
+ * (templates/dossier.hbs); the level-up window applies advancements to a character that already
+ * exists, where there is no "so far" to show, and keeps the plain rail.
+ *
+ * Three parts rather than two so the top bar can span both columns, and so a cheap re-render can
+ * refresh the dossier and the meter without touching the image-heavy stage.
+ * @param {string[]} scrollable   Stage selectors whose scroll position must survive a re-render.
+ * @returns {object}
+ */
+export function dossierStageParts(scrollable = []) {
+  return {
+    topbar: { id: "topbar", template: `modules/${MODULE_ID}/templates/topbar.hbs` },
+    dossier: { id: "dossier", template: `modules/${MODULE_ID}/templates/dossier.hbs`, scrollable: [""] },
+    stage: {
+      id: "stage",
+      template: `modules/${MODULE_ID}/templates/stage.hbs`,
+      scrollable: [".creator-stage-body", ...scrollable]
+    }
+  };
+}
+
 export class CreatorShellBase extends HandlebarsApplicationMixin(ApplicationV2) {
 
   /** Index of the step currently on screen, into whatever list the subclass walks. */

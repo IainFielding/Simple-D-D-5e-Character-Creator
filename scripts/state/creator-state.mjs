@@ -61,6 +61,14 @@ export class CreatorState {
   tokenRingEnabled = false;
   tokenLockRotation = false;
 
+  /**
+   * Transient pick-step UI: the id of the step whose option drawer the player has explicitly
+   * opened, or null. The drawer's actual open state is derived from this plus whether anything is
+   * chosen — see `#drawerOpen()` in creator-shell.mjs. Holding the *step id* rather than a boolean
+   * is what makes navigating away close it without any reset logic. Not persisted.
+   */
+  pickerFor = null;
+
   /** Transient Details-step UI: which token image tab is shown ("token"|"ring"). Not persisted. */
   tokenTab = "token";
 

@@ -25,12 +25,17 @@ import { StoreConfigApp } from "./app/store-config.mjs";
 Hooks.once("init", () => {
   registerSettings();
   // Step partials are pulled in by the stage via a dynamic Handlebars partial, so they
-  // must be registered up front (the rail/stage/shell themselves are loaded as PARTS).
-  // `parts/` holds the fragments the step templates include by path — the ability-increase
-  // aside is shared by the Species and Background steps — which likewise have to be registered
-  // rather than loaded as PARTS.
+  // must be registered up front (the topbar/dossier/rail/stage themselves are loaded as PARTS).
+  // `parts/` holds the fragments the step templates include by path — the work surface's
+  // picker drawer, its detail page and its ability allocator are shared by the three origin
+  // picks, and the ability-increase panel by two of them — which likewise have to be
+  // registered rather than loaded as PARTS. A partial missing from this list fails at render
+  // with "The partial … could not be found", so add to it whenever a step includes a new one.
   foundry.applications.handlebars.loadTemplates([
     ...STEPS.map(s => tpl(`${s.template}.hbs`)),
+    tpl("parts/work-picker.hbs"),
+    tpl("parts/work-detail.hbs"),
+    tpl("parts/abilities-panel.hbs"),
     tpl("parts/origin-abilities.hbs")
   ]);
 

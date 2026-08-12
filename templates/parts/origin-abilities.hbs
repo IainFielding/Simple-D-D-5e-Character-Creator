@@ -4,14 +4,18 @@
     {{> "modules/sogrom-dnd5e-character-creator/templates/parts/origin-abilities.hbs" abilities}}
 
   The including step is responsible for rendering it only when the context is present — a null
-  context means the chosen origin grants no increase, and the pick layout drops to two columns.
+  context means the chosen origin grants no increase, and nothing renders at all.
+
+  It was a third column beside the picker and the description; it is now a block on the work
+  surface, below the origin's own page, for the same reason the class step's allocator moved:
+  the numbers a player is setting should not be in the narrowest part of the window.
 
   Two modes. `canAllocate` (a 2024 background, or the 2014 Half-Elf) shows the points counter, live
   steppers and a reset. Without it (a 2014 species' outright +2/+1) every row is padlocked and the
   panel is purely informational — the increase still applies, via the advancement itself.
 --}}
-<aside class="creator-class-aside">
-  <h2 class="creator-aside-title">{{title}}</h2>
+<section class="creator-work-block creator-origin-asi">
+  <h3 class="creator-work-block-title">{{title}}</h3>
   <p class="creator-asi-hint">{{hint}}</p>
 
   {{#if canAllocate}}
@@ -47,4 +51,4 @@
     </button>
   </div>
   {{/if}}
-</aside>
+</section>

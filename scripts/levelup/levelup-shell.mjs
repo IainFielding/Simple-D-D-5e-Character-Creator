@@ -1,5 +1,6 @@
 import { MODULE_ID, tpl, t, log } from "../config.mjs";
 import { CreatorShellBase, shellOptions, railStageParts } from "../app/shell-base.mjs";
+import { illuminatePages } from "../app/page-illumination.mjs";
 import { buildSteps } from "./registry.mjs";
 import { getSources, isStale, invalidateSources } from "../data/source-cache.mjs";
 import { forEachLimit, WARM_CONCURRENCY } from "../data/concurrency.mjs";
@@ -205,6 +206,9 @@ export class LevelUpShell extends CreatorShellBase {
   _onRender(context, options) {
     super._onRender(context, options);
     this.#warmSpellPool();
+    // Subclass and spell steps are pick layouts here too, so their heads get the
+    // same illumination as the creator's.
+    illuminatePages(this.element);
     // Everything below binds to stage DOM, which a rail-only render leaves in place — see
     // {@link CreatorShellBase#_stageRendered}. This shell renders whole today, so the guard is
     // insurance against a partial render being added later, not a fix for a live fault.

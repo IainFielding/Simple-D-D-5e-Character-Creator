@@ -14,7 +14,8 @@
       "off": "Off",
       "selectHint": "Choose an option from the list to see its full description.",
       "noResults": "No matches for “{query}”.",
-      "noResultsFilters": "No matches — try adjusting the filters."
+      "noResultsFilters": "No matches — try adjusting the filters.",
+      "close": "Close"
     },
     "loading": {
       "indexing": "Reading the compendiums…",
@@ -29,6 +30,17 @@
       "position": "Step {current} of {total}",
       "incomplete": "Finish this step to continue.",
       "missing": "Still needed: {steps}"
+    },
+    "dossier": {
+      "aria": "Character so far",
+      "roll": "The roll",
+      "unnamed": "Unnamed",
+      "noClass": "No class chosen",
+      "levelClass": "Level {level} {class}",
+      "todo": "to do",
+      "notApplicable": "not applicable",
+      "outstanding": "{count} outstanding",
+      "progressAria": "Progress through the steps"
     },
     "cancel": {
       "title": "Discard unsaved choices?",
@@ -223,7 +235,8 @@
           "armor": "Armor",
           "tool": "Tools",
           "languages": "Languages"
-        }
+        },
+        "instruction": "Your class sets your hit die, your saving throws and everything you can do at first level. Choose one, then set your ability scores beneath it."
       },
       "species": {
         "label": "Species",
@@ -231,7 +244,8 @@
         "hintPoints": "Assign your {count} remaining ability point(s).",
         "traits": "Traits",
         "features": "Features",
-        "spells": "Spells"
+        "spells": "Spells",
+        "instruction": "Your species gives you size, speed and a handful of traits — and, under the 2014 rules, an ability score increase."
       },
       "background": {
         "label": "Background",
@@ -241,7 +255,8 @@
         "features": "Features",
         "spells": "Spells",
         "filterAllAbilities": "Any ability",
-        "filterAbilityAria": "Filter by increased ability"
+        "filterAbilityAria": "Filter by increased ability",
+        "instruction": "Your background covers what you did before adventuring: skills, tools, and under the 2024 rules an ability score increase and an origin feat."
       },
       "details": {
         "label": "Details",
@@ -375,7 +390,7 @@
         "allSubtypes": "All kinds",
         "filterSubtypeAria": "Filter by kind",
         "packsHeading": "Adventuring Packs",
-        "goodsHeading": "Goods",
+        "armorHeading": "Armor & Shields",
         "grantedHeading": "From your class & background"
       },
       "review": {
@@ -402,7 +417,10 @@
         "rollPrompt": "Roll to generate six scores, then assign them to your abilities.",
         "hintPoints": "Spend all {count} remaining ability point(s).",
         "hintAssign": "Assign a score to every ability.",
-        "hintRoll": "Roll your ability scores, then assign them."
+        "hintRoll": "Roll your ability scores, then assign them.",
+        "spentOf": "of {budget} spent ·",
+        "raise": "Raise {ability}",
+        "lower": "Lower {ability}"
       },
       "originAbilities": {
         "label": "Ability Increase",

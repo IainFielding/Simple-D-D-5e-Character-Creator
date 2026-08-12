@@ -1,0 +1,63 @@
+{{!--
+  The chosen option's page: its name, its provenance, its description, and the traits and items it
+  grants. Shared by the class, species and background steps, which rendered three near-identical
+  copies of this markup before.
+
+  Note there is no empty state. The old layout showed a centred icon and "select an option to see
+  details" on the widest, brightest surface in the window — a new player's first moment in the
+  creator, spent on a panel telling them it had nothing to say. With the picker as a drawer, that
+  moment is instead spent on the options themselves, which is what the step is for. This partial
+  simply isn't rendered until there is something to render.
+--}}
+<article class="creator-detail">
+  <header class="creator-detail-head">
+    <img class="creator-detail-img" src="{{detail.img}}" alt="">
+    <h2>{{detail.name}}</h2>
+    {{#if detail.source}}
+    <span class="creator-detail-source" title="{{detail.source}}">
+      <i class="fa-solid fa-book" aria-hidden="true"></i>{{detail.source}}
+    </span>
+    {{/if}}
+    {{!-- Quick Build rides this header on the class step only: it acts on the class shown here,
+          and this is the first thing a player sees after picking one. Flagged in the step's own
+          context rather than injected as a partial block, so the partial can be called with the
+          plain `{{> }}` form everywhere. --}}
+    {{#if quickBuild}}
+    <button type="button" class="creator-btn creator-quick-build-btn"
+            data-action="stepAction" data-step-action="quick-build">
+      <i class="fa-solid fa-bolt"></i>
+      {{localize "sogrom-dnd5e-character-creator.quickBuild.button"}}
+    </button>
+    {{/if}}
+  </header>
+  <div class="creator-detail-body">{{{detail.enriched}}}</div>
+
+  {{#each groups}}
+  <section class="creator-adv-block">
+    <h3 class="creator-adv-heading">{{heading}}</h3>
+
+    {{#if tags.length}}
+    <ul class="creator-trait-list">
+      {{#each tags}}
+      <li class="creator-trait">
+        <span class="creator-trait-label">{{label}}</span>
+        <span class="creator-trait-value">{{value}}</span>
+      </li>
+      {{/each}}
+    </ul>
+    {{/if}}
+
+    {{#if items.length}}
+    <div class="creator-grant-list">
+      {{#each items}}
+      <div class="creator-grant">
+        <img class="creator-grant-icon" src="{{img}}" alt="">
+        <a class="content-link" data-uuid="{{uuid}}" data-link data-tooltip="{{ccItemTooltip uuid}}">{{name}}</a>
+        {{#if level}}<span class="creator-grant-tag">{{localize "sogrom-dnd5e-character-creator.step.class.levelTag" level=level}}</span>{{/if}}
+      </div>
+      {{/each}}
+    </div>
+    {{/if}}
+  </section>
+  {{/each}}
+</article>

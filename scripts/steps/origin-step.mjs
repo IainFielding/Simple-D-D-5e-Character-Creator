@@ -22,6 +22,7 @@
  * @param {string} cfg.id           Step id (also its rail/template key).
  * @param {string} cfg.icon         FontAwesome classes for the rail.
  * @param {string} cfg.labelKey     i18n key for the step label.
+ * @param {string} [cfg.instructionKey]  i18n key for the one-line instruction under the heading.
  * @param {string} cfg.field        CreatorState property holding the chosen UUID.
  * @param {string} [cfg.hintKey]    i18n key for the "nothing picked yet" Next-button hint.
  * @param {"species"|"background"} [cfg.asiSource]  Compose in the shared ability-increase panel
@@ -37,11 +38,12 @@ import {
   ASI_ACTIONS, asiComplete, asiContext, asiHandle, asiHint, asiSummary
 } from "./origin-abilities-panel.mjs";
 
-export function originStep({ id, icon, labelKey, field, cards, hintKey, asiSource }) {
+export function originStep({ id, icon, labelKey, instructionKey, field, cards, hintKey, asiSource }) {
   return {
     id,
     icon,
     labelKey,
+    instructionKey,
     template: "steps/origin",
 
     isComplete(state) {
@@ -55,7 +57,7 @@ export function originStep({ id, icon, labelKey, field, cards, hintKey, asiSourc
       return asiSource ? asiHint(state, asiSource) : null;
     },
 
-    /** Short label shown on the rail once a choice is made, plus any increase it granted. */
+    /** The dossier line's value once a choice is made, plus any increase it granted. */
     summary(state, source) {
       const name = source.card(state[field])?.name ?? "";
       if ( !name || !asiSource ) return name;
@@ -94,11 +96,13 @@ export function originStep({ id, icon, labelKey, field, cards, hintKey, asiSourc
         cards: list,
         count: list.length,
         hasSelection: !!selected,
+        // Which step action a drawer card fires, so parts/work-picker.hbs stays step-agnostic.
+        pickAction: "pick-origin",
         selectedName: detail?.name ?? "",
         detail,
         groups,
         // Null unless this origin both composes the panel and actually grants an increase; the
-        // template renders no aside in that case and the description widens into the free column.
+        // work surface simply renders nothing in that case.
         abilities: (asiSource && selected) ? asiContext(state, asiSource) : null
       };
     }

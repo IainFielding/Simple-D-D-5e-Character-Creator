@@ -22,6 +22,7 @@ export const STEPS = [
     id: "species",
     icon: "fa-solid fa-paw",
     labelKey: "step.species.label",
+    instructionKey: "step.species.instruction",
     field: "speciesUuid",
     hintKey: "step.species.hint",
     // A 2014 species carries the ability-score increase its edition's backgrounds don't; the panel

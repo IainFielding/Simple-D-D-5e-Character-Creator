@@ -19,6 +19,7 @@ export const backgroundStep = {
   id: "background",
   icon: "fa-solid fa-feather",
   labelKey: "step.background.label",
+  instructionKey: "step.background.instruction",
   template: "steps/background",
 
   isComplete(state) {
@@ -32,7 +33,7 @@ export const backgroundStep = {
     return asiHint(state, "background");
   },
 
-  /** Rail summary: background name, then the chosen increases beneath it. */
+  /** The dossier line's value: background name, then the chosen increases. */
   summary(state, source) {
     const name = source.card(state.backgroundUuid)?.name;
     if ( !name ) return "";
@@ -81,11 +82,13 @@ export const backgroundStep = {
       cards: list,
       count: list.length,
       hasSelection: !!selected,
+      // Which step action a drawer card fires, so parts/work-picker.hbs stays step-agnostic.
+      pickAction: "pick-origin",
       detail,
       groups,
       abilityOptions: ABILITIES.map(key => ({ value: key, label: abilityLabel(key) })),
-      // Null when the chosen background grants no increase (every 2014 one) — the template then
-      // renders no aside and the description widens into the freed column.
+      // Null when the chosen background grants no increase (every 2014 one) — the work surface
+      // simply renders nothing in that case.
       abilities: selected ? asiContext(state, "background") : null
     };
   }
