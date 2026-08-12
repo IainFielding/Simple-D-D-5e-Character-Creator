@@ -27,36 +27,106 @@
    Ember's palette (see ember/styles/variables.less) mapped onto the creator's
    tokens: near-black cool purples for surfaces, parchment lights for text, the
    warm ember red as the interactive accent, and parchment gold — Ember's ridge
-   borders — for the "selected / you are here" state. */
+   borders — for the "selected / you are here" state.
+
+   IMPORTANT — set the *semantic* tokens, not the legacy aliases.
+
+   This block used to override --cc-accent / --cc-gold / --cc-select, which was
+   right when those were creator.css's real tokens. They are not any more: the
+   Codex redesign split the palette by meaning and made them aliases —
+
+       --cc-accent: var(--cc-open);      // teal: still asking for input
+       --cc-gold:   var(--cc-settled);   // brass: already committed
+       --cc-select: var(--cc-settled);
+       --cc-good:   var(--cc-settled);
+
+   — with creator.css then using --cc-settled (15 places) and --cc-open (7)
+   *directly* for the progress fill, the dossier ticks, the active dossier line,
+   the ability modifiers, the origin bonus corner, and the "to do" chip. Skinning
+   only the aliases left every one of those drawing Arcane Midnight brass and teal
+   on top of Ember's parchment and red — two palettes on one screen, worst of all
+   in the new dossier, which is the column the player reads most.
+
+   Setting the two sources fixes all of it and the four aliases follow for free,
+   which is the whole reason creator.css keeps them pointing at these. */
 
 .sogrom-creator.sogrom-ember {
-  /* Surfaces — Ember cool-5 (#0b0a13) up through cool-4 (#302831). */
-  --cc-bg: #0b0a13;
-  --cc-panel: #17131e;
-  --cc-panel-2: #211b29;
-  --cc-line: #302831;
-  --cc-line-2: #453b50;
+  /* --- Surfaces ------------------------------------------------------
+     Ember lays *translucent* near-black panels over its paper texture (its own
+     options use cool-5 at 50-75% alpha) rather than solid plates, so the ground
+     reads through everything. Following that here is what makes our window feel
+     like a continuation of Ember's room rather than a lid over it.
 
-  /* Text — Ember's parchment lights. */
+     --cc-sunk stays opaque on purpose: it is the picker drawer's ground, and the
+     drawer's job is to cover the page underneath (see the drawer note in
+     creator.css). A translucent drawer would leave the page competing with the
+     list for the same pixels. */
+  --cc-bg: rgba(11, 10, 19, 0.50);
+  --cc-sunk: #07060d;
+  --cc-panel: rgba(23, 19, 30, 0.72);
+  --cc-panel-2: rgba(33, 27, 41, 0.80);
+
+  /* Borders. Same two-tier split as the base theme: --cc-line is decoration and
+     only has to be visible; --cc-line-2 bounds components and clears 3:1 on
+     Ember's surfaces. The values this block shipped with (#302831 / #453b50)
+     measured 1.28 and 1.74 on the panel — below even the base theme's old
+     hairlines, so the Ember skin was the *worse* of the two for edges. */
+  --cc-line: #483d53;
+  --cc-line-2: #6c5c7d;
+
+  /* Text — Ember's parchment lights. All clear AA on every surface above. */
   --cc-text: #f5eadf;          /* light-2, Ember's primary text */
   --cc-muted: #9f8475;         /* light-5, Ember's subtle text */
   --cc-bright: #fffbf0;        /* light-1, Ember's emphatic text */
+  /* Placeholders and struck-out values. Ember has no token this quiet that still
+     clears AA, so this is light-5 darkened to 4.5:1 on --cc-sunk. */
+  --cc-text-faint: #8a7366;
 
-  /* Accent — Ember's warm ember red replaces the violet. */
-  --cc-accent: #e04e4e;        /* warm-1 */
-  --cc-accent-soft: rgba(224, 78, 78, 0.18);
-  --cc-accent-glow: rgba(224, 78, 78, 0.38);
+  /* --- The two semantic halves ---------------------------------------
+     settled = Ember's ridge parchment, the colour its own UI uses for the frames
+     around things that are decided. open = Ember's --color-active, the colour it
+     uses for the live selection.
 
-  /* Selection — parchment gold, matching Ember's ridge-parchment borders. */
-  --cc-gold: #d0b8a3;          /* light-4 */
-  --cc-gold-bright: #f0dab9;   /* light-3 */
-  --cc-gold-glow: rgba(208, 184, 163, 0.32);
-  --cc-select: #d0b8a3;
-  --cc-select-soft: rgba(208, 184, 163, 0.16);
+     One honest caveat, and it is the place this skin is weakest. In Arcane
+     Midnight these two are warm/cool: they differ in hue *and* value, which is
+     what lets the distinction survive colour blindness. Ember's palette is warm
+     throughout, so parchment and ember-red separate mostly by saturation — their
+     luminance is only 1.46:1 apart. Normal vision reads them apart easily; a
+     deuteranope may not.
 
-  --cc-danger: #c93f4b;        /* warm-2 */
+     What carries it instead is that colour is never the only cue in this UI: a
+     settled row also has a tick, an outstanding one also has the word "to do",
+     a complete step also has a filled value on its dossier line. That redundancy
+     was built into creator.css for its own reasons and is what makes this skin
+     safe. Do not remove those non-colour cues while this skin exists. */
+  --cc-settled: #d0b8a3;       /* light-4 */
+  --cc-settled-bright: #f0dab9;/* light-3 */
+  --cc-settled-soft: rgba(208, 184, 163, 0.16);
+  --cc-settled-glow: rgba(208, 184, 163, 0.32);
 
-  --cc-panel-grad: linear-gradient(180deg, #1d1826, #120e19);
+  /* #ff6b6b is Ember's own --color-active. The warm-1 #e04e4e this block used
+     before fell to 4.28:1 on --cc-panel-2 — under AA on the surface the buttons
+     and chips actually sit on. Ember's active red is both more faithful and
+     passes at 6.0:1. */
+  --cc-open: #ff6b6b;
+  --cc-open-bright: #ff9a9a;
+  --cc-open-soft: rgba(255, 107, 107, 0.16);
+  --cc-open-glow: rgba(255, 107, 107, 0.35);
+
+  /* warm-2 #c93f4b measured 3.4:1 on --cc-panel-2 — under AA for the required-field
+     asterisk and the destructive button. Lifted to the same hue at 4.5:1. */
+  --cc-danger: #eb4a58;
+
+  --cc-panel-grad: linear-gradient(180deg, rgba(29, 24, 38, 0.85), rgba(18, 14, 25, 0.85));
+
+  /* --- Shape ---------------------------------------------------------
+     Arcane Midnight is square by decision — manuscript leaves have square corners.
+     Ember is not: its options are 12px pills and its crests are circles. Since the
+     radius is a single token by design ("so the sweep stays reversible"), this is
+     the sweep, and it moves 85 declarations at once. */
+  --cc-radius: 12px;
+  --cc-radius-sm: 8px;
+  --cc-radius-pill: 999px;
 
   /* Ember's type system. */
   --cc-font-heading: "Pirate Scroll", "Vollkorn", serif;
@@ -115,6 +185,15 @@
   background: rgba(11, 10, 19, 0.55);
 }
 .sogrom-ember .creator-stage-foot {
+  background: rgba(11, 10, 19, 0.55);
+}
+
+/* The dossier is the creator's left column — and Ember's left column, the option
+   menu, is exactly where it lays its translucent cool-5-50 plates. It shares the
+   --cc-sunk token with the picker drawer, which must stay opaque (its whole job is
+   covering the page beneath it), so the two are separated here rather than in the
+   token: the column lets the texture through, the drawer does not. */
+.sogrom-ember .creator-dossier {
   background: rgba(11, 10, 19, 0.55);
 }
 

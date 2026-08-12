@@ -1,5 +1,6 @@
 import { t } from "../config.mjs";
 import { generateName, nameStyleOptions } from "../data/name-generator.mjs";
+import { yieldTakeoverTo } from "../app/takeover.mjs";
 
 /**
  * The Details step: the character's name (the only mandatory field) plus the
@@ -194,36 +195,7 @@ async function pickImage(state, app, slot) {
   return picker;
 }
 
-/**
- * Let a window the creator opens sit above the fullscreen takeover, for as long as it is open.
- *
- * Fullscreen mode covers the viewport at roughly z-index 9998, far above Foundry's window layer
- * (`_maxZ`, in the low hundreds), so anything opened from inside it renders *behind* the takeover
- * and looks like it never opened at all. That is what these three image buttons did: the picker
- * was there every time, just invisible underneath.
- *
- * The obvious fix — raise the picker — does not hold. Foundry rewrites an ApplicationV2's inline
- * z-index on every render, and the FilePicker re-renders each time you open a folder, so the
- * window vanished again on the first click. Beating that from CSS means naming the picker in a
- * selector, and its class names are not ours to depend on across Foundry versions.
- *
- * So this lowers the creator instead. It is our element, the change is scoped to exactly the
- * window's lifetime, and it survives any number of re-renders because it never touches the picker
- * at all. `close()` is wrapped rather than hooked so every exit path restores the takeover —
- * choosing a file, cancelling, or Escape.
- * @param {foundry.applications.api.ApplicationV2} application
- */
-function yieldTakeoverTo(application) {
-  const root = document.querySelector(".sogrom-creator-fullscreen");
-  if ( !root || !application ) return;                   // windowed mode already stacks correctly
-  root.classList.add("is-yielding");
-  const restore = () => root.classList.remove("is-yielding");
-  const close = application.close.bind(application);
-  application.close = async (...args) => {
-    try {
-      return await close(...args);
-    } finally {
-      restore();
-    }
-  };
-}
+/* `yieldTakeoverTo` used to live here, written for these three image buttons. It is shared now —
+   see app/takeover.mjs — because the same trap catches every window opened from inside the
+   takeover, including the item sheets the Review screen's content links open. The shared version
+   also counts, so two open windows no longer restore the takeover when the first of them closes. */

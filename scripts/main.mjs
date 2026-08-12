@@ -4,6 +4,7 @@ import { CreatorShell } from "./app/creator-shell.mjs";
 import { warmSources } from "./data/source-cache.mjs";
 import { registerLevelUp, triggerLevelUp, canLevelUp } from "./levelup/intercept.mjs";
 import { StoreConfigApp } from "./app/store-config.mjs";
+import { watchForeignWindows } from "./app/takeover.mjs";
 
 /*
  * This is the module's entry point — module.json points Foundry here via "esmodules".
@@ -24,6 +25,10 @@ import { StoreConfigApp } from "./app/store-config.mjs";
 // pre-load templates so they're ready by the time anything renders.
 Hooks.once("init", () => {
   registerSettings();
+  // Let item/actor/journal sheets opened from inside the fullscreen takeover — the Review screen's
+  // content links, mostly — actually be visible, by stepping the takeover below Foundry's window
+  // layer while one is open. See app/takeover.mjs for why we lower ourselves rather than raise them.
+  watchForeignWindows();
   // Step partials are pulled in by the stage via a dynamic Handlebars partial, so they
   // must be registered up front (the topbar/dossier/rail/stage themselves are loaded as PARTS).
   // `parts/` holds the fragments the step templates include by path — the work surface's
