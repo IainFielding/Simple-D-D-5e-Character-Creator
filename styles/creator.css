@@ -291,10 +291,15 @@ body:has(.sogrom-creator-fullscreen) #dice-box-canvas {
   z-index: var(--z-index-tooltip, 9999) !important;
 }
 
-/* While a window the creator opened is on screen, the takeover steps below Foundry's window
-   layer so that window is visible. Set by `yieldTakeoverTo()` for the file picker, and cleared
-   when it closes. Still fixed and still covering the viewport — only floating app windows come
-   over it, which is the entire point. 90 sits just under Foundry's `--z-index-window` (100).
+/* While a window opened from inside the takeover is on screen, the takeover steps below Foundry's
+   window layer so that window is visible. Set by `yieldTakeoverTo()` (app/takeover.mjs) — for the
+   Details step's file picker, and for any document sheet a content link opens, which is how the
+   Review screen's features, spells and gear become clickable at all. Still fixed and still covering
+   the viewport, so nothing behind it is revealed; only floating app windows come over it, which is
+   the entire point. 90 sits just under Foundry's `--z-index-window` (100).
+
+   The class is reference-counted on the element (`data-yield-count`), because more than one such
+   window can be open at once and restoring on the first close would bury the rest.
 
    This is the inverse of the two rules below, and the more reliable shape: it changes our own
    element rather than trying to out-specify an inline z-index that Foundry rewrites on every
