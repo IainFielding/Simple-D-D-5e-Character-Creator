@@ -4,6 +4,7 @@ import { matchesRules } from "./source-index.mjs";
 import { getEnabledPacks, isUsableItemPack } from "./compendium-util.mjs";
 import { toolCategoryKey, toolChoices } from "./tool-source.mjs";
 import { phbWeaponIcon } from "./weapon-source.mjs";
+import { bg3TraitIcon } from "./bg3-icons.mjs";
 import { forEachLimit, WARM_CONCURRENCY } from "./concurrency.mjs";
 
 /**
@@ -369,8 +370,11 @@ function proficientSkillKeys(defs) {
   return [...keys].map(k => ({ key: k, label: traitKeyLabel(k), img: traitKeyIcon(k) }));
 }
 
-/** The system's generic icon for a trait key (skills, tools, languages, …), or null. */
-const traitKeyIcon = k => dnd5e.documents.Trait?.keyIcon?.(k) ?? null;
+/**
+ * The icon for a trait key (skills, tools, languages, …), or null. Prefers the Baldur's Gate 3
+ * module's proficiency art when that module is enabled, else the system's generic key icon.
+ */
+const traitKeyIcon = k => bg3TraitIcon(k) ?? dnd5e.documents.Trait?.keyIcon?.(k) ?? null;
 
 /**
  * Stamp each trait option with the icon the level-up trait screen uses — PHB weapon art where a
