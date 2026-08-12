@@ -23,8 +23,18 @@ export const TOOL_IMG = {
   music: "icons/tools/instruments/harp-yellow-teal.webp"
 };
 
-/** category -> choice[], memoised for the page session (tools never change at runtime). */
+/**
+ * category -> choice[], memoised. The tools themselves never change at runtime, but *which packs
+ * they may be read from* does — {@link toolChoices} fetches through the Compendium Browser, which
+ * applies the world's source configuration — so this is cleared alongside the other pack-derived
+ * caches. See {@link resetToolCache}.
+ */
 const toolCache = new Map();
+
+/** Drop the tool memo. Called from `invalidateSources()` when the enabled-source set changes. */
+export function resetToolCache() {
+  toolCache.clear();
+}
 
 /**
  * A tool key that needs the player to pick a specific tool (e.g. "art"), or null for an

@@ -205,6 +205,10 @@ export class LevelUpShell extends CreatorShellBase {
   _onRender(context, options) {
     super._onRender(context, options);
     this.#warmSpellPool();
+    // Everything below binds to stage DOM, which a rail-only render leaves in place — see
+    // {@link CreatorShellBase#_stageRendered}. This shell renders whole today, so the guard is
+    // insurance against a partial render being added later, not a fix for a live fault.
+    if ( !this._stageRendered(options) ) return;
     this._wireStepChanges(this.element);
     // Client-side spell-list filters on the spell step — search box plus the level/school
     // dropdowns. All filter in the DOM without a re-render, so the search field keeps focus

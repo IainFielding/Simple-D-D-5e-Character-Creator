@@ -95,4 +95,99 @@ describe("the optional-grant screen", () => {
   it("never blocks Next", () => {
     expect(optionalGrantStep.isCompleteAt()).toBe(true);
   });
+
+  /* -------------------------------------------- */
+  /*  Grouping                                    */
+  /* -------------------------------------------- */
+
+  /** The `members` of each rendered group, as arrays. */
+  async function groupsOf(rec) {
+    const { sections } = await optionalGrantStep.sectionsAt({ state: { optionalGrantSteps: [rec] }, driver }, 1);
+    return sections[0].groups.map(g => g.members.split("|"));
+  }
+
+  it("folds an unnamed alternative into the group of the grant's only base", async () => {
+    // The map names Deft Explorer; Canny is a replacement for the same base that it never records.
+    // With one base there is only one group it can belong to, so it belongs there.
+    const rec = record({
+      items: [
+        { uuid: uuid("naturalExplorer"), optional: true },
+        { uuid: uuid("deftExplorer"), optional: true },
+        { uuid: uuid("canny"), optional: true },
+        { uuid: uuid("rangerArchetype") }
+      ],
+      replacements: { [bare("naturalExplorer")]: uuid("deftExplorer") },
+      selected: [uuid("naturalExplorer"), uuid("rangerArchetype")]
+    });
+
+    const groups = await groupsOf(rec);
+    expect(groups).toHaveLength(1);
+    expect(new Set(groups[0]))
+      .toEqual(new Set([uuid("naturalExplorer"), uuid("deftExplorer"), uuid("canny")]));
+    // The non-optional item is in no group — it is granted either way, not a choice.
+    expect(groups[0]).not.toContain(uuid("rangerArchetype"));
+  });
+
+  it("keeps two bases in separate groups instead of pooling their alternatives", async () => {
+    // Each group is exclusive to the handler, so a shared member would let a click under one base
+    // silently drop the *other* base's pick. Nothing must appear in both.
+    const rec = record({
+      items: [
+        { uuid: uuid("favoredEnemy"), optional: true },
+        { uuid: uuid("favoredFoe"), optional: true },
+        { uuid: uuid("naturalExplorer"), optional: true },
+        { uuid: uuid("deftExplorer"), optional: true }
+      ],
+      replacements: {
+        [bare("favoredEnemy")]: uuid("favoredFoe"),
+        [bare("naturalExplorer")]: uuid("deftExplorer")
+      },
+      selected: [uuid("favoredEnemy"), uuid("naturalExplorer")]
+    });
+
+    const groups = await groupsOf(rec);
+    expect(groups).toHaveLength(2);
+    expect(new Set(groups[0])).toEqual(new Set([uuid("favoredEnemy"), uuid("favoredFoe")]));
+    expect(new Set(groups[1])).toEqual(new Set([uuid("naturalExplorer"), uuid("deftExplorer")]));
+    const shared = groups[0].filter(m => groups[1].includes(m));
+    expect(shared).toEqual([]);
+  });
+
+  it("leaves an unattributable alternative out rather than sharing it between bases", async () => {
+    // Two bases and a Canny the map attributes to neither: it cannot be placed without guessing,
+    // and guessing wrong lets one group unpick the other. Dropping the option is the safe answer.
+    const rec = record({
+      items: [
+        { uuid: uuid("favoredEnemy"), optional: true },
+        { uuid: uuid("favoredFoe"), optional: true },
+        { uuid: uuid("naturalExplorer"), optional: true },
+        { uuid: uuid("deftExplorer"), optional: true },
+        { uuid: uuid("canny"), optional: true }
+      ],
+      replacements: {
+        [bare("favoredEnemy")]: uuid("favoredFoe"),
+        [bare("naturalExplorer")]: uuid("deftExplorer")
+      },
+      selected: [uuid("favoredEnemy"), uuid("naturalExplorer")]
+    });
+
+    const groups = await groupsOf(rec);
+    expect(groups.flat()).not.toContain(uuid("canny"));
+  });
+
+  it("marks the currently-applied member of each group as selected", async () => {
+    const rec = record({
+      items: [
+        { uuid: uuid("naturalExplorer"), optional: true },
+        { uuid: uuid("deftExplorer"), optional: true }
+      ],
+      replacements: { [bare("naturalExplorer")]: uuid("deftExplorer") },
+      selected: [uuid("deftExplorer")]
+    });
+
+    const { sections } = await optionalGrantStep.sectionsAt(
+      { state: { optionalGrantSteps: [rec] }, driver }, 1);
+    const picked = sections[0].groups[0].options.filter(o => o.selected).map(o => o.uuid);
+    expect(picked).toEqual([uuid("deftExplorer")]);
+  });
 });

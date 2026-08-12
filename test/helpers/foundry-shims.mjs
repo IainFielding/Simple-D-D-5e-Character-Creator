@@ -75,7 +75,20 @@ export function installFoundryShims() {
         for ( const k of keys ) cur = (cur[k] ??= {});
         cur[last] = value;
       },
-      diffObject: (a, b) => structuredClone(b)
+      diffObject: (a, b) => structuredClone(b),
+      // Flatten nested objects to dotted keys, as Foundry does. The replacement-grant grouping
+      // reads `configuration.replacements` through this; real content stores it flat, but the
+      // source calls flattenObject because a uuid key can contain dots of its own.
+      flattenObject(obj, _d = 0) {
+        const out = {};
+        for ( const [key, value] of Object.entries(obj ?? {}) ) {
+          if ( value && (typeof value === "object") && !Array.isArray(value) ) {
+            for ( const [k, v] of Object.entries(this.flattenObject(value, _d + 1)) ) out[`${key}.${k}`] = v;
+          } else out[key] = value;
+        }
+        return out;
+      },
+      isEmpty: obj => !obj || (Object.keys(obj).length === 0)
     },
     applications: {
       ux: { TextEditor: { implementation: { enrichHTML: async html => html } } }
@@ -97,6 +110,9 @@ export function installFoundryShims() {
 
   globalThis.Hooks = { on: () => 1, off: () => {}, once: () => {} };
   globalThis.fromUuid = async () => null;
+  // The document class the Compendium Browser's `fetch` is handed. Never constructed — it is a
+  // token identifying which collection to search — so an empty class is enough.
+  globalThis.Item = class Item {};
 }
 
 installFoundryShims();

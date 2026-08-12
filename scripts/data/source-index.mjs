@@ -460,15 +460,21 @@ export class SourceIndex {
     if ( !uuid ) return null;
     if ( !this.#meta.has(uuid) ) {
       const promise = (async () => {
-        try {
-          const doc = fromUuidSync(uuid) ?? await fromUuid(uuid);
-          if ( doc ) return { uuid: doc.uuid, name: doc.name, img: doc.img || "icons/svg/item-bag.svg", type: doc.type };
-        } catch {
-          const doc = await fromUuid(uuid).catch(() => null);
-          if ( doc ) return { uuid: doc.uuid, name: doc.name, img: doc.img || "icons/svg/item-bag.svg", type: doc.type };
-        }
+        // Sync first (the pack is usually already cached), falling back to the async fetch — which
+        // is also the only thing the old catch branch could do, so it duplicated this line rather
+        // than adding a recovery path.
+        const doc = fromUuidSync(uuid) ?? await fromUuid(uuid);
+        if ( !doc ) return null;
+        return { uuid: doc.uuid, name: doc.name, img: doc.img || "icons/svg/item-bag.svg", type: doc.type };
+      })().catch(err => {
+        // Un-cache so a transient failure isn't remembered for the session, but still resolve
+        // `null` rather than rejecting: this memo's caller ({@link #buildGroups}) skips a row it
+        // can't resolve, and the row's own failure must not take the whole advancement panel — and
+        // so the class step's render — down with it.
+        this.#meta.delete(uuid);
+        log(`failed to resolve granted item ${uuid}`, err);
         return null;
-      })();
+      });
       this.#meta.set(uuid, promise);
     }
     return this.#meta.get(uuid);

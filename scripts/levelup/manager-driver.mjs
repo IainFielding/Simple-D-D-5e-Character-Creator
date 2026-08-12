@@ -19,7 +19,7 @@ import { phbWeaponIcon } from "../data/weapon-source.mjs";
  * synchronous {@link canDrive} gate ensures we only claim such level-ups; anything carrying an
  * ASI, subclass, or feature/trait *choice* is left to the native flow for now.
  *
- * ── For a junior dev: how to read this ~900-line file ──
+ * ── For a junior dev: how to read this file ──
  * The system's AdvancementManager is a state machine with a private `steps` array and a private
  * cursor. Normally it renders a wizard and walks itself. We can't call its private walk, so we
  * re-implement the walk here against its `clone` (a throwaway copy of the actor). Roughly:
@@ -664,7 +664,9 @@ export class LevelUpDriver {
    * level allows it) which earlier pick is currently marked for replacement.
    * @param {object} record   One of {@link choiceSteps}.
    * @returns {{ current: number, max: number, full: boolean, selected: Set<string>,
-   *            replaceable: boolean, replacing: string|null, priorEntries: {id: string, uuid: string}[] }}
+   *            replaceable: boolean, replacing: string|null, priorEntries: {id: string, uuid: string}[],
+   *            ownedElsewhere: Set<string> }}   `ownedElsewhere` — pool uuids the character already
+   *            holds from another source, shown taken rather than pickable.
    */
   choiceState(record) {
     const adv = record.advancement;
@@ -1215,7 +1217,8 @@ export class LevelUpDriver {
    * records it added, so the caller can reverse them cleanly later.
    * @param {Item5e} item
    * @param {number} maxLevel
-   * @returns {Promise<{flows: object[], choices: object[], asi: object[], traits: object[]}>}
+   * @returns {Promise<{flows: object[], choices: object[], asi: object[], traits: object[],
+   *                    grants: object[]}>}
    */
   async #ingestItemFeatures(item, maxLevel) {
     const beforeChoices = this.choiceSteps.length;
@@ -1423,28 +1426,6 @@ export class LevelUpDriver {
   /* -------------------------------------------- */
 
   /**
-   * Persist the driven clone onto the real actor — a port of the manager's private `#complete`:
-   * diff the clone's items into create/update/delete sets and write everything with
-   * `isAdvancement: true`, then fire the system's completion hook so other modules react exactly
-   * as they would after a native level-up.
-   *
-   * Two deliberate departures from the native code, both for Apply speed:
-   *  - The native manager re-writes *every* item the actor owns (`diff: false` over the full
-   *    list), so applying scales with inventory size. Untouched items are byte-identical between
-   *    the clone and the actor, so they are compared and skipped here — only what the level-up
-   *    actually changed is written.
-   *  - The four writes suppress their per-operation renders (each would re-render the open
-   *    character sheet behind the wizard); the sheet is re-rendered once at the end instead.
-   *
-   * The wholesale `clone.toObject()` actor write looks like it should race the hooks this very
-   * `Promise.all` triggers — `SubclassData._onCreate` sets `attributes.spellcasting` from a
-   * deliberately un-awaited `actor.update` — and an earlier note here proposed writing only changed
-   * keys to avoid it. Measured, it does not: `Promise.all` starts the actor update first, so the
-   * hook's write always lands after and survives. The equivalence harness reported otherwise only
-   * because it read the actor before that un-awaited write arrived. Left as the faithful port.
-   * @returns {Promise<Actor5e>}  The updated real actor.
-   */
-  /**
    * Whether an item still carries a rider list the system would have cleaned away.
    *
    * `flags.dnd5e.riders` records which of an item's activities and effects ride along with an
@@ -1470,6 +1451,29 @@ export class LevelUpDriver {
     return !lists.length || lists.some(v => Array.isArray(v) ? !v.length : !v);
   }
 
+  /**
+   * Persist the driven clone onto the real actor — a port of the manager's private `#complete`:
+   * diff the clone's items into create/update/delete sets and write everything with
+   * `isAdvancement: true`, then fire the system's completion hook so other modules react exactly
+   * as they would after a native level-up.
+   *
+   * Two deliberate departures from the native code, both for Apply speed:
+   *  - The native manager re-writes *every* item the actor owns (`diff: false` over the full
+   *    list), so applying scales with inventory size. Untouched items are byte-identical between
+   *    the clone and the actor, so they are compared and skipped here — only what the level-up
+   *    actually changed is written. {@link #hasStaleRiders} covers the one thing that rewrite did
+   *    for free.
+   *  - The four writes suppress their per-operation renders (each would re-render the open
+   *    character sheet behind the wizard); the sheet is re-rendered once at the end instead.
+   *
+   * The wholesale `clone.toObject()` actor write looks like it should race the hooks this very
+   * `Promise.all` triggers — `SubclassData._onCreate` sets `attributes.spellcasting` from a
+   * deliberately un-awaited `actor.update` — and an earlier note here proposed writing only changed
+   * keys to avoid it. Measured, it does not: `Promise.all` starts the actor update first, so the
+   * hook's write always lands after and survives. The equivalence harness reported otherwise only
+   * because it read the actor before that un-awaited write arrived. Left as the faithful port.
+   * @returns {Promise<Actor5e>}  The updated real actor.
+   */
   async commit() {
     const updates = this.clone.toObject();
     const items = updates.items;
@@ -1620,8 +1624,13 @@ export class LevelUpDriver {
    */
   async setOptionalGrant(record, uuids) {
     const adv = record.advancement;
-    const wanted = new Set(uuids);
-    const current = new Set(Object.values(adv.value?.added ?? {}));
+    // Both sides normalised, as {@link optionalGrantState} and the replacement-grant ingest already
+    // are: this content stores its uuids in the pre-v10 shape while `value.added` records whatever
+    // `apply` was handed, so comparing them raw never matched. The no-op short-circuit below then
+    // never fired, and every click on a replacement grant paid a full reverse-and-re-apply to end
+    // up exactly where it started.
+    const wanted = new Set(uuids.map(withItemSegment));
+    const current = new Set(Object.values(adv.value?.added ?? {}).map(withItemSegment));
     if ( (wanted.size === current.size) && [...wanted].every(u => current.has(u)) ) return;
     await adv.reverse(record.level);
     if ( wanted.size ) await adv.apply(record.level, { selected: [...wanted] });

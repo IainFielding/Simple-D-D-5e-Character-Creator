@@ -26,6 +26,15 @@ const PHB_PREFIX = "dnd-players-handbook.";
 let phbWeaponImgs = null;
 
 /**
+ * Drop the weapon-icon map. Called from `invalidateSources()` when the enabled-source set changes:
+ * {@link phbWeaponMap} skips a PHB pack the world has switched off, so the map is only valid while
+ * that configuration holds.
+ */
+export function resetWeaponIcons() {
+  phbWeaponImgs = null;
+}
+
+/**
  * Build (once) the base-item -> image map from the Player's Handbook equipment pack,
  * honouring the world's dnd5e source configuration the same way the creator does: a
  * PHB pack that exists but is switched off in the source config is treated as inactive.

@@ -121,6 +121,25 @@ export class CreatorShellBase extends HandlebarsApplicationMixin(ApplicationV2) 
   }
 
   /**
+   * Whether this render replaced the stage — i.e. whether the stage's listeners need re-wiring.
+   *
+   * `_onRender` runs after *every* render, including a partial one, but only the parts that were
+   * rendered have fresh DOM. The abilities panel re-renders the rail alone on each point-buy
+   * stepper press ({@link module:steps/class-step}) precisely so the image-heavy stage survives
+   * untouched — and a `_onRender` that re-wires unconditionally then adds a second, third, nth set
+   * of listeners to those surviving nodes. One keystroke in the search box afterwards ran the
+   * filter once per press; one change on a `[data-step-change]` control dispatched (and so
+   * re-rendered) that many times.
+   *
+   * A full render leaves `options.parts` listing every part, so this reads true in the normal case.
+   * @param {object} options   The render options `_onRender` was handed.
+   * @returns {boolean}
+   */
+  _stageRendered(options) {
+    return !options?.parts || options.parts.includes("stage");
+  }
+
+  /**
    * Wire the change events the `actions` map can't: a `<select>`/`<input>` carrying
    * `[data-step-change]` dispatches through the same funnel as a click. Call from `_onRender`.
    * @param {HTMLElement} root
