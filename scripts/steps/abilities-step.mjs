@@ -40,11 +40,11 @@ export function abilitiesHint(state) {
   return t("step.abilities.hintAssign");
 }
 
-/** Compact "15 / 14 / …" line for the rail. */
-export function abilitiesSummary(state) {
-  const scores = state.resolvedScores();
-  return ABILITIES.map(k => scores[k]).join(" / ");
-}
+/* There was an `abilitiesSummary()` here — the compact "15 / 14 / …" line — with the class
+   step as its only caller, for the tail of its dossier line. That line now carries the class
+   name alone (see class-step.mjs summary()), because the dossier's six ability plates already
+   show these numbers a hundred pixels above it. With the duplicate gone the helper had no
+   callers left, so it went with it rather than staying as an export nothing reaches. */
 
 /** Apply one ability-panel action to the state. Returns nothing; caller re-renders. */
 export async function abilitiesHandle(action, el, state) {
@@ -130,6 +130,17 @@ export function patchPointBuy(root, state) {
     points.textContent = remaining;
     points.classList.toggle("is-zero", remaining === 0);
   }
+  // The budget meter is patched here too, for the same reason the numbers are: a stepper press
+  // must move the bar it is spending from, and a full re-render to move one width would rebuild
+  // the drawer's icons underneath.
+  const budget = pointBuyBudget();
+  const spent = pointsSpent(state);
+  const spentNode = root.querySelector(".creator-points-spent");
+  if ( spentNode ) spentNode.textContent = spent;
+  const fill = root.querySelector(".creator-budget-fill");
+  if ( fill ) fill.style.width = `${budget ? Math.round((spent / budget) * 100) : 0}%`;
+  const track = root.querySelector(".creator-budget-track");
+  if ( track ) track.setAttribute("aria-valuenow", String(spent));
   for ( const key of ABILITIES ) {
     const dec = root.querySelector(`[data-step-action="ability-dec"][data-ability="${key}"]`);
     const row = dec?.closest(".creator-ability-row");
@@ -177,7 +188,12 @@ function pointBuyContext(state) {
       canDec: value > PB_MIN
     };
   });
-  return { rows, budget: pointBuyBudget(), spent: pointsSpent(state), remaining };
+  const budget = pointBuyBudget();
+  const spent = pointsSpent(state);
+  // Width of the budget meter's fill. A budget of zero (a world that configured point-buy off)
+  // would otherwise divide by zero and render a NaN width, which paints as a full bar.
+  const percent = budget ? Math.round((spent / budget) * 100) : 0;
+  return { rows, budget, spent, remaining, percent };
 }
 
 /* -------------------------------------------- */

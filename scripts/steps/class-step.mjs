@@ -1,5 +1,5 @@
 import {
-  abilitiesContext, abilitiesHandle, abilitiesComplete, abilitiesSummary, abilitiesHint,
+  abilitiesContext, abilitiesHandle, abilitiesComplete, abilitiesHint,
   ABILITY_ACTIONS, POINT_BUY_LIVE_ACTIONS, patchPointBuy
 } from "./abilities-step.mjs";
 import { spellInfoFor } from "./spells-step.mjs";
@@ -9,11 +9,15 @@ import { t, log, levelUpEnabled } from "../config.mjs";
 import { matchesRules } from "../data/source-index.mjs";
 
 /**
- * The Class step. Class selection and ability scores share one step: the class
- * card grid fills the main column and the ability panel sits in a fixed aside on
- * the right, so a player sees how a class frames their scores while choosing both.
+ * The Class step. Class selection and ability scores share one step: the chosen class's page and
+ * the ability allocator stack down one work surface, with the class list available as a drawer
+ * over it, so a player sets their scores against the class that frames them.
  *
- * It is built by composition, not inheritance — it owns the class-grid context and
+ * The allocator used to sit in a 348px aside beside a 340px picker, which left the description
+ * they were both meant to be read against about 400px on a 1400px window — see templates/steps/
+ * class.hbs for the full reasoning.
+ *
+ * It is built by composition, not inheritance — it owns the class-list context and
  * routes ability clicks to the standalone ability panel (abilities-step.mjs). The
  * two halves stay independent; this module only stitches their context, handling,
  * and completion together.
@@ -22,6 +26,10 @@ export const classStep = {
   id: "class",
   icon: "fa-solid fa-chess-rook",
   labelKey: "step.class.label",
+  // One line under the heading saying what this step decides. The pick steps used to open on a
+  // centred "select an option to see details" placeholder filling the widest surface in the
+  // window; this says something useful in a fraction of the space, and never goes away.
+  instructionKey: "step.class.instruction",
   template: "steps/class",
 
   isComplete(state) {
@@ -34,11 +42,20 @@ export const classStep = {
     return abilitiesHint(state);
   },
 
-  /** Rail summary: class name, then the resolved score line beneath it. */
+  /**
+   * The dossier line's value: the class name, and nothing else.
+   *
+   * It used to append the resolved score line — `Fighter · 15 / 14 / 13 / 12 / 10 / 8`,
+   * thirty-six characters into a value column about twenty-three wide, with no tooltip
+   * behind the ellipsis. So the one line the dossier was designed around was the one
+   * line it could not show.
+   *
+   * Dropping the scores rather than widening the column, because the six plates sit a
+   * hundred pixels above this line in the same dossier and already carry them. Read
+   * once: the plates are where scores live, this line is where the class lives.
+   */
   summary(state, source) {
-    const name = source.card(state.classUuid)?.name;
-    if ( !name ) return "";
-    return `${name} · ${abilitiesSummary(state)}`;
+    return source.card(state.classUuid)?.name ?? "";
   },
 
   async handle(action, el, { state, source, spells, equipment, app }) {
@@ -75,15 +92,16 @@ export const classStep = {
     if ( ABILITY_ACTIONS.has(action) ) {
       await abilitiesHandle(action, el, state);
       // Point-buy steppers fire in rapid succession; a full stage re-render would rebuild
-      // the class pick-list images and flicker the class icons on every press. Patch the
-      // panel and the Next gate in place, refresh only the image-free rail (completion tick
-      // + downstream step reachability), and skip the default re-render.
+      // the drawer's class icons and flicker them on every press. Patch the panel and the
+      // Next gate in place, refresh only the image-free parts, and skip the default re-render.
       if ( POINT_BUY_LIVE_ACTIONS.has(action) && state.abilityMethod === "point-buy" ) {
         const stage = el.closest(".creator-stage");
         patchPointBuy(stage, state);
         const next = stage?.querySelector('.creator-stage-foot [data-action="navNext"]');
         if ( next ) next.disabled = !(state.classUuid && abilitiesComplete(state));
-        app.render({ parts: ["rail"] });
+        // Refresh only the two image-free parts: the dossier's score plates and completion tick,
+        // and the progress meter. Re-rendering the stage would rebuild the drawer's class icons.
+        app.render({ parts: ["topbar", "dossier"] });
         return false;
       }
       return;
@@ -124,6 +142,10 @@ export const classStep = {
       cards,
       count: cards.length,
       hasSelection: !!selected,
+      // Which step action a drawer card fires, so parts/work-picker.hbs stays step-agnostic.
+      pickAction: "pick-class",
+      // Puts the Quick Build button in the shared detail header; only this step has one.
+      quickBuild: true,
       detail,
       groups,
       abilities: abilitiesContext(state),

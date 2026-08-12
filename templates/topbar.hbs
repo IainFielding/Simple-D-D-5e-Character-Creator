@@ -1,0 +1,54 @@
+{{!--
+  The window's top band: brand, a progress meter, and Cancel. It spans the full width above the
+  dossier and the work surface.
+
+  This replaced a horizontal stepper that listed all eleven steps as numbered pills. Two things
+  were wrong with that. The stepper was the only progress cue on screen, and the stage head that
+  carried the "Step 3 of 9" counter was suppressed on exactly the pick steps that make up most of
+  the flow — so on most screens there was no counter at all, only a small underscore under one pill
+  in a horizontally-scrolling row. And below 1100px the pill labels were dropped entirely, leaving
+  bare numerals: number-only navigation, which is the discoverability anti-pattern that rule exists
+  to prevent.
+
+  Both problems come from trying to fit a list of steps across the top of a window. The list moved
+  to the dossier, where it is vertical and its labels always fit at any width. What is left here is
+  the one thing a bar across the top is actually good at: a single measure of how far through the
+  player is, always visible, on every step.
+
+  `progress` comes from the shell's #progressContext(). The bar and the "Step 3 of 10" beside it
+  are one reading, not two: `done`/`total`/`percent` are the position counts, so the fill is simply
+  the graphic of that label and the two can never contradict each other. (They did — the fill used
+  to measure completed required steps, which drew a full bar beside "Step 9 of 10" the moment
+  everything but Review was done, and a full bar reads as "finished" on a screen where the player
+  has not pressed Create.)
+
+  `outstanding` — how many required steps still need input — is the separate question, and gets its
+  own readout: teal, because it is the standing answer to "what is left", and absent at zero rather
+  than reading "0 outstanding", which would be a thing to parse instead of a thing to notice.
+--}}
+<header class="creator-topbar">
+  <div class="creator-topbar-brand">
+    <span>{{localize "sogrom-dnd5e-character-creator.window.brand"}}</span>
+    {{#if version}}<span class="creator-topbar-version">v{{version}}</span>{{/if}}
+  </div>
+
+  <div class="creator-topbar-progress">
+    <div class="creator-progress-track" role="progressbar"
+         aria-valuemin="0" aria-valuemax="{{progress.total}}" aria-valuenow="{{progress.done}}"
+         aria-label="{{localize 'sogrom-dnd5e-character-creator.dossier.progressAria'}}">
+      <div class="creator-progress-fill" style="width: {{progress.percent}}%"></div>
+    </div>
+    <span class="creator-progress-read">
+      <span class="creator-progress-pos">{{progress.position}}</span>
+      {{#if progress.outstanding}}
+      <span class="creator-progress-todo">{{progress.outstandingLabel}}</span>
+      {{/if}}
+    </span>
+  </div>
+
+  <div class="creator-topbar-foot">
+    <button type="button" class="creator-btn creator-btn-ghost" data-action="cancel">
+      <i class="fa-solid fa-xmark"></i> {{cancelLabel}}
+    </button>
+  </div>
+</header>

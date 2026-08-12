@@ -1,0 +1,102 @@
+{{!--
+  The ability allocator, on the work surface.
+
+  This is the same panel as before — same actions, same three methods, same drag-and-drop — moved
+  out of a 348px aside and given room. Two things it can afford now that it couldn't:
+
+  A budget you can see being spent. Point-buy showed a bare remaining number counting down, which
+  told a player how many points were left but nothing about how far through the budget they were.
+  The meter reads as a resource draining, and the number stays for the exact answer.
+
+  Full-width rows. The aside forced 0.6rem gaps, a 2rem score box and `white-space: nowrap` on the
+  method tabs so that "Standard Array" would fit; none of that is needed here.
+
+  The dossier's ability plates are the readout of whatever this produces. Read on the left, write
+  on the right — which is why nothing here is duplicated there, and nothing there is clickable.
+--}}
+<section class="creator-work-block creator-abilities">
+  <div class="creator-abilities-head">
+    <h3 class="creator-work-block-title">{{localize "sogrom-dnd5e-character-creator.step.abilities.label"}}</h3>
+    <div class="creator-method-tabs">
+      {{#each methods}}
+      <button type="button" class="creator-tab {{#if active}}is-active{{/if}}"
+              data-action="stepAction" data-step-action="ability-method" data-method="{{id}}">
+        {{label}}
+      </button>
+      {{/each}}
+    </div>
+  </div>
+
+  {{#if isPointBuy}}
+  <div class="creator-budget">
+    <div class="creator-budget-track" role="progressbar"
+         aria-valuemin="0" aria-valuemax="{{budget}}" aria-valuenow="{{spent}}"
+         aria-label="{{localize 'sogrom-dnd5e-character-creator.step.abilities.pointsLeft'}}">
+      <div class="creator-budget-fill" style="width: {{percent}}%"></div>
+    </div>
+    <p class="creator-budget-read">
+      <span class="creator-points-spent">{{spent}}</span>
+      {{localize "sogrom-dnd5e-character-creator.step.abilities.spentOf" budget=budget}}
+      <span class="creator-points-value {{#unless remaining}}is-zero{{/unless}}">{{remaining}}</span>
+      {{localize "sogrom-dnd5e-character-creator.step.abilities.pointsLeft"}}
+    </p>
+  </div>
+
+  <ul class="creator-ability-list">
+    {{#each rows}}
+    <li class="creator-ability-row">
+      <span class="creator-ability-name">{{label}}</span>
+      <div class="creator-stepper">
+        <button type="button" class="creator-step-btn" data-action="stepAction" data-step-action="ability-dec"
+                data-ability="{{key}}" {{#unless canDec}}disabled{{/unless}}
+                aria-label="{{localize 'sogrom-dnd5e-character-creator.step.abilities.lower' ability=label}}">&minus;</button>
+        <span class="creator-ability-score">{{value}}</span>
+        <button type="button" class="creator-step-btn" data-action="stepAction" data-step-action="ability-inc"
+                data-ability="{{key}}" {{#unless canInc}}disabled{{/unless}}
+                aria-label="{{localize 'sogrom-dnd5e-character-creator.step.abilities.raise' ability=label}}">+</button>
+      </div>
+      <span class="creator-ability-mod">{{modifier}}</span>
+    </li>
+    {{/each}}
+  </ul>
+
+  {{else}}
+    {{#if hasPool}}
+    <ul class="creator-pool" data-step-drop="ability-unassign">
+      {{#each pool}}
+      <li class="creator-pool-chip {{#if used}}is-used{{/if}}" data-step-drag="{{index}}">{{value}}</li>
+      {{/each}}
+    </ul>
+
+    <ul class="creator-ability-list">
+      {{#each rows}}
+      <li class="creator-ability-row {{#if assigned}}is-assigned{{/if}}"
+          data-step-drop="ability-drop" data-ability="{{key}}">
+        <span class="creator-ability-name">{{label}}</span>
+        <select class="creator-assign" data-step-change="ability-assign" data-ability="{{key}}">
+          <option value="">{{localize "sogrom-dnd5e-character-creator.step.abilities.unassigned"}}</option>
+          {{#each options}}
+          <option value="{{index}}" {{#if selected}}selected{{/if}}>{{value}}</option>
+          {{/each}}
+        </select>
+        <span class="creator-ability-mod">{{modifier}}</span>
+      </li>
+      {{/each}}
+    </ul>
+    {{else}}
+    <p class="creator-empty">{{localize "sogrom-dnd5e-character-creator.step.abilities.rollPrompt"}}</p>
+    {{/if}}
+  {{/if}}
+
+  <div class="creator-ability-actions">
+    {{#if isRoll}}
+    <button type="button" class="creator-btn creator-btn-ghost" data-action="stepAction" data-step-action="ability-roll">
+      <i class="fa-solid fa-dice"></i>
+      {{localize "sogrom-dnd5e-character-creator.step.abilities.rollScores"}}
+    </button>
+    {{/if}}
+    <button type="button" class="creator-btn creator-btn-ghost" data-action="stepAction" data-step-action="ability-reset">
+      <i class="fa-solid fa-rotate-left"></i> {{localize "sogrom-dnd5e-character-creator.common.reset"}}
+    </button>
+  </div>
+</section>

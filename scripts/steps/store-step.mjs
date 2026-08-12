@@ -23,6 +23,73 @@ import { summarizeOption } from "../data/equipment-source.mjs";
  * add time.
  */
 
+/**
+ * The order the shelf sections appear in, and the icon each one gets.
+ *
+ * The goods used to be one alphabetical list under a single "Goods" heading, which put a
+ * battleaxe between a bedroll and a bell. Alphabetical is the right order *within* a kind of
+ * thing and the wrong one across kinds: nobody shops for "something beginning with B", they shop
+ * for a weapon, or armour, or rope. The containers already had their own headed section — this is
+ * the same treatment for everything else.
+ *
+ * Weapons and armour first because they are what a level-1 character is usually short of, then
+ * the consumables, then the tools and sundries. Any item type not listed (a system or module adds
+ * one) still gets a section; it sorts to the end by its localised label rather than being dropped.
+ * Icons are FontAwesome 6 Free Solid, which is what Foundry ships.
+ *
+ * A section is keyed on the item type with one deliberate exception: armour. dnd5e files armour
+ * and clothing and rings and wands all as `type: "equipment"`, so grouping on the type alone put
+ * a suit of plate, a signet ring and a wand of wonder under one heading — which is the same
+ * complaint as the original single "Goods" list, one level down. The armour subtypes are exactly
+ * the keys of CONFIG.DND5E.armorTypes (light/medium/heavy/natural/shield), so they split out into
+ * their own section and the remainder keeps the system's own "Equipment" label. See sectionKey().
+ */
+const STORE_SECTIONS = [
+  { key: "weapon", icon: "fa-gavel" },
+  { key: "armor", icon: "fa-shield-halved" },
+  { key: "equipment", icon: "fa-shirt" },
+  { key: "consumable", icon: "fa-flask" },
+  { key: "tool", icon: "fa-screwdriver-wrench" },
+  { key: "loot", icon: "fa-box" }
+];
+const STORE_SECTION_FALLBACK_ICON = "fa-boxes-stacked";
+
+/**
+ * Which shelf section a stock entry belongs in: its item type, except that `equipment` splits
+ * into armour and everything else.
+ *
+ * Read from CONFIG rather than a hard-coded list of subtype keys, so a system update that adds an
+ * armour kind files it correctly without a change here.
+ * @param {object} entry  A stock entry (`type` plus dnd5e's `subtype`).
+ * @returns {string}
+ */
+function sectionKey(entry) {
+  if ( entry.type !== "equipment" ) return entry.type;
+  return (entry.subtype in (CONFIG.DND5E?.armorTypes ?? {})) ? "armor" : "equipment";
+}
+
+/**
+ * Split the shelf cards into headed sections, in {@link STORE_SECTIONS} order.
+ * @param {object[]} cards            Cards from the goods stock, already filtered and sorted by name.
+ * @param {(key: string) => string} label  The localiser for a section key.
+ * @returns {object[]}  `{key, label, icon, cards}`, empty sections omitted.
+ */
+function groupCards(cards, label) {
+  const bySection = new Map();
+  for ( const card of cards ) {
+    if ( !bySection.has(card.section) ) bySection.set(card.section, []);
+    bySection.get(card.section).push(card);
+  }
+  const known = STORE_SECTIONS
+    .filter(s => bySection.has(s.key))
+    .map(s => ({ key: s.key, label: label(s.key), icon: s.icon, cards: bySection.get(s.key) }));
+  const extra = [...bySection.keys()]
+    .filter(key => !STORE_SECTIONS.some(s => s.key === key))
+    .map(key => ({ key, label: label(key), icon: STORE_SECTION_FALLBACK_ICON, cards: bySection.get(key) }))
+    .sort((a, b) => a.label.localeCompare(b.label, game.i18n.lang));
+  return [...known, ...extra];
+}
+
 /** Whether the GM has switched the store on for this world. */
 function storeEnabled() {
   return storeConfig().enabled;
@@ -167,6 +234,9 @@ export const storeStep = {
       return {
         uuid: e.uuid, name: e.name, img: e.img, cp: e.cp,
         price: formatCp(e.cp),
+        // `section` for the grouping below; `typeLabel` for the line under the name, which stays
+        // useful because the subtype (Martial, Heavy Armor…) is not in the heading.
+        section: sectionKey(e),
         typeLabel: typeLabel(e.type),
         qty, inCart: qty > 0,
         canAfford: e.cp <= remaining
@@ -209,6 +279,13 @@ export const storeStep = {
     return {
       hasBudget: true,
       intro: t("step.store.intro"),
+      // The goods, split into headed sections — see groupCards(). `cards` is kept alongside for
+      // the count and for anything that wants the flat list.
+      //
+      // "armor" is our own section key rather than a dnd5e item type, so it needs its own string;
+      // every other key is a real item type and takes the system's label, which keeps the headings
+      // and the category dropdown speaking the same words.
+      groups: groupCards(cards, key => key === "armor" ? t("step.store.armorHeading") : typeLabel(key)),
       cards,
       packCards,
       hasPacks: packCards.length > 0,

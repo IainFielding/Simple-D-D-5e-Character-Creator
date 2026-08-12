@@ -1,0 +1,101 @@
+{{!--
+  The dossier: the creator's left-hand column, and the answer to two problems that used to be
+  solved separately and badly.
+
+  It is the character sheet filling up in front of the player — portrait, name, class line, the six
+  ability plates — and it is *also* the step navigation. Those were two objects before: a stepper
+  across the top that showed ticks but no values, and a Review step at the very end that was the
+  only place to see what you had actually chosen. Four steps in, a player could not answer "what
+  species did I take?" without navigating away and losing their place.
+
+  Merging them means a step line carries its own answer. `summary` is the short line each step
+  module already produced for the old stepper (class-step.mjs summary(), etc.) — it was being
+  rendered as a tooltip. Here it is the value on the line, so the roll reads as a sheet:
+
+      CLASS        Fighter · 15 / 14 / 13 / 10 / 12 / 8   ✔
+      SPECIES      —                                      to do
+      BACKGROUND   —                                      (dim: not reachable yet)
+
+  State is carried by `dossier.steps[]`, built by the shell's #dossierContext():
+    active     – the step on screen                complete  – done (brass tick)
+    reachable  – everything before it is done, so the line is clickable
+    applicable – shown but struck (e.g. Spells for a non-caster)
+  Clicking a line fires data-action="goto" with its index, exactly as the old stepper did.
+
+  Nothing here takes input. The dossier is strictly a readout; every control that *sets* one of
+  these values lives on the work surface to its right. That rule is why the ability plates below
+  are plates and not steppers.
+--}}
+<aside class="creator-dossier" aria-label="{{localize 'sogrom-dnd5e-character-creator.dossier.aria'}}">
+
+  {{!-- Identity. The portrait is whatever the Details step has set; until then it is the
+        system's mystery-man, which reads as an empty frame rather than a broken image. --}}
+  <div class="creator-dossier-ident">
+    <div class="creator-dossier-plate">
+      <img src="{{dossier.portrait}}" alt="">
+    </div>
+    <div class="creator-dossier-names">
+      <p class="creator-dossier-name {{#unless dossier.name}}is-unset{{/unless}}">
+        {{#if dossier.name}}{{dossier.name}}{{else}}{{localize "sogrom-dnd5e-character-creator.dossier.unnamed"}}{{/if}}
+      </p>
+      <p class="creator-dossier-sub">
+        {{#if dossier.className}}
+        {{localize "sogrom-dnd5e-character-creator.dossier.levelClass" level=dossier.level class=dossier.className}}
+        {{else}}
+        {{localize "sogrom-dnd5e-character-creator.dossier.noClass"}}
+        {{/if}}
+      </p>
+    </div>
+  </div>
+
+  {{!-- The six scores, as a readout. `set` is false until the ability step has produced a
+        complete set, so the plates read as blanks on the sheet rather than as a rolled 8/8/8/8/8/8
+        the player never chose. The bonus corner appears only where an origin actually adds one. --}}
+  <ul class="creator-dossier-scores">
+    {{#each dossier.abilities}}
+    <li class="creator-dossier-score {{#unless ../dossier.abilitiesSet}}is-unset{{/unless}}">
+      <span class="creator-dossier-abbr">{{abbr}}</span>
+      <span class="creator-dossier-value">{{#if ../dossier.abilitiesSet}}{{value}}{{else}}&mdash;{{/if}}</span>
+      <span class="creator-dossier-mod">{{#if ../dossier.abilitiesSet}}{{modifier}}{{/if}}</span>
+      {{#if bonus}}<span class="creator-dossier-bonus" data-tooltip="{{bonusTip}}">{{bonus}}</span>{{/if}}
+    </li>
+    {{/each}}
+  </ul>
+
+  {{!-- The roll: every step, with its value and its state. This is the navigation — so it is a
+        <nav>, giving screen-reader and keyboard users a landmark to jump straight to it. The
+        surrounding <aside> covers the whole dossier, most of which is readout; without this the
+        step list had no landmark of its own and had to be found by tabbing. --}}
+  <nav aria-labelledby="creator-dossier-roll-heading">
+  <h2 class="creator-dossier-heading" id="creator-dossier-roll-heading">{{localize "sogrom-dnd5e-character-creator.dossier.roll"}}</h2>
+  <ol class="creator-dossier-roll">
+    {{#each dossier.steps}}
+    <li>
+      <button type="button"
+              class="creator-dossier-line {{#if active}}is-active{{/if}} {{#if complete}}is-complete{{/if}} {{#unless applicable}}is-skipped{{/unless}} {{#if open}}is-open{{/if}}"
+              data-action="goto" data-index="{{index}}"
+              {{#unless reachable}}disabled{{/unless}}
+              {{#if active}}aria-current="step"{{/if}}>
+        <span class="creator-dossier-key">{{label}}</span>
+        {{!-- The value column is about 150px, so a long name (a species from a third-party
+              module, a custom background) still runs past the ellipsis. The summaries are
+              short by design now — see class-step.mjs summary() — but "short by design" is a
+              promise about our own steps, not about the compendium, so the full text is on
+              the element as a tooltip whenever there is any. --}}
+        <span class="creator-dossier-value-line" {{#if summary}}data-tooltip="{{summary}}"{{/if}}>
+          {{#if summary}}{{summary}}
+          {{else if applicable}}&mdash;
+          {{else}}{{localize "sogrom-dnd5e-character-creator.dossier.notApplicable"}}{{/if}}
+        </span>
+        {{!-- State is never carried by colour alone: complete gets a tick, outstanding gets a
+              word. `open` is set only where the player can actually act — a reachable,
+              applicable, unfinished step — so the teal never marks something they can't do
+              anything about yet. --}}
+        {{#if complete}}<i class="creator-dossier-tick fa-solid fa-check" aria-hidden="true"></i>{{/if}}
+        {{#if open}}<span class="creator-dossier-todo">{{localize "sogrom-dnd5e-character-creator.dossier.todo"}}</span>{{/if}}
+      </button>
+    </li>
+    {{/each}}
+  </ol>
+  </nav>
+</aside>

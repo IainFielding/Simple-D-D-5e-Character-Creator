@@ -31,6 +31,16 @@ export const ABILITIES = ["str", "dex", "con", "int", "wis", "cha"];
  */
 export function formatMod(score) {
   const mod = Math.floor((score - 10) / 2);
+  // Plain ASCII hyphen-minus. This briefly used U+2212 MINUS SIGN, on the reasoning that it
+  // matches the plus in width and height where a hyphen does not — which is true in a font
+  // that has the glyph. Spectral's subset declares U+2212 in its `unicode-range` but does not
+  // actually carry it, so the browser rendered that one character from a fallback face, and
+  // the fallback's taller metrics grew the line box. The result was a dossier plate 4px taller
+  // than its neighbours on exactly the one ability with a negative modifier.
+  //
+  // Any character outside the shipped subsets will do the same thing. Keep modifiers to
+  // characters the fonts certainly have, and see `.creator-dossier-mod`, whose line-height is
+  // now pinned so a stray glyph can never change a box's height again.
   return mod >= 0 ? `+${mod}` : `${mod}`;
 }
 
