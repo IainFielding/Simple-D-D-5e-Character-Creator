@@ -1,6 +1,7 @@
 import { log, levelUpHpRollToChat } from "../config.mjs";
 import { withItemSegment } from "../data/advancement-util.mjs";
 import { phbWeaponIcon } from "../data/weapon-source.mjs";
+import { bg3TraitIcon } from "../data/bg3-icons.mjs";
 
 /**
  * Drives a native dnd5e {@link AdvancementManager} from the outside.
@@ -881,7 +882,8 @@ export class LevelUpDriver {
     // Keys are prefixed (e.g. "weapon:mar:longsword"), so keyLabel/keyIcon derive the trait type,
     // and the prefix-minus-leaf ("weapon:mar") labels the category the option belongs to. For weapon
     // picks (Weapon Mastery) we prefer the Player's Handbook item art when that pack is active,
-    // matching the creator's grids, and fall back to the system's generic icon otherwise.
+    // matching the creator's grids, then the Baldur's Gate 3 module's proficiency art for skills
+    // and armour/weapon categories, and fall back to the system's generic icon otherwise.
     const options = await Promise.all([...keys].map(async key => {
       const isGrant = granted.has(key) && chosen.has(key);
       const isChosen = chosen.has(key) && !isGrant;
@@ -892,7 +894,7 @@ export class LevelUpDriver {
       return {
         key,
         label: Trait.keyLabel(key),
-        img: (await phbWeaponIcon(key)) ?? Trait.keyIcon(key),
+        img: (await phbWeaponIcon(key)) ?? bg3TraitIcon(key) ?? Trait.keyIcon(key),
         selected: isChosen || owned,
         owned,
         disabled: owned || (!isChosen && full),
