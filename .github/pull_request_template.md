@@ -40,6 +40,8 @@ in a real world.
 
 ## Checklist
 
+- [ ] Every commit is signed off (`git commit -s`) — see [CONTRIBUTING.md](../CONTRIBUTING.md)
+- [ ] No AI tool attribution in commit messages (`Co-Authored-By: Claude ...` and similar)
 - [ ] User-facing strings go through `lang/en.json` rather than being hard-coded
 - [ ] Added or updated unit tests for the changed behaviour
 - [ ] Updated the README or in-app help if the change is user-visible
