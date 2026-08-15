@@ -10,8 +10,8 @@ This Foundry VTT module replaces the fiddly, drag-and-drop character setup with 
 
 If you can pick from a menu, you can build a character.
 
-![The Character Creator welcome screen](docs/screenshots/welcome.png)
-*Screenshot: the welcome screen.*
+![The Character Creator's first screen, showing the class grid and the ability-score panel](docs/screenshots/welcome.png)
+*Screenshot: the first screen — pick a class, set your scores.*
 
 ---
 
@@ -89,14 +89,14 @@ If your class can cast spells, this is where you pick your cantrips and starting
 ![Picking spells](docs/screenshots/spells.png)
 *Screenshot: picking spells.*
 
-**6. Feat Spells**
-Some choices (Magic Initiate and friends) grant a little extra magic. When they do, this step lets you pick the spell list, the casting ability, and the spells themselves. No spell-granting feats? This step politely bows out.
-
-**7. Choices**
+**6. Choices**
 Some classes, backgrounds, and species let you make extra decisions: a bonus skill, a tool proficiency, a fighting style. Any remaining choices are gathered here in one tidy list so nothing slips through the cracks.
 
 ![Making your choices](docs/screenshots/choices.png)
 *Screenshot: the choices step.*
+
+**7. Feat Spells**
+Some choices (Magic Initiate and friends) grant a little extra magic. When they do, this step lets you pick the spell list, the casting ability, and the spells themselves. No spell-granting feats? This step politely bows out.
 
 **8. Equipment**
 Kit out your hero with the starting gear your class and background provide. Pick a ready-made bundle of weapons, armour, and tools (swapping individual items where the rules let you) or take a pouch of gold to shop with later. There's always a sensible default, so you can fine-tune your loadout or breeze straight past it.
@@ -151,6 +151,24 @@ Nothing touches your character until you click **Apply Level-Up**, so you can ba
 
 ---
 
+## Running alongside Ember
+
+[Ember](https://foundryvtt.com/packages/ember) brings its own character builder, and the two don't fight over it. With Ember enabled, this module stands down from creation automatically — no setting to change — and does two things instead.
+
+**It answers the questions Ember leaves to the system.** Ember picks your ancestry, culture, path, class, and ability scores, then hands the level-1 decisions — skills, hit points, spells — to the D&D 5e system to ask. Those are exactly the screens this module already builds, so it takes them over: the same guided one-thing-at-a-time flow, plus the starting equipment and store steps Ember's hand-off doesn't cover.
+
+![The Character Creator's steps inside Ember's character creation, wearing Ember's colours](docs/screenshots/ember-handoff.png)
+*Screenshot: the level-1 questions from an Ember build, answered in this module's wizard.*
+
+**It restyles itself to match.** Both windows swap to a skin built to sit beside Ember's own UI, so the join between the two isn't jarring.
+
+![The level-up wizard in Ember's colours](docs/screenshots/ember-levelup.png)
+*Screenshot: the same level-up wizard in an Ember world.*
+
+Everything else works as it does anywhere else — level-ups, multiclassing, and the GM settings below all apply.
+
+---
+
 ## The GM's Guide
 
 The creator works great straight out of the box, but a handful of settings let you tailor it to your table. You'll find them under **Configure Settings, Module Settings**.
@@ -199,7 +217,7 @@ This module is designed to sit quietly alongside the rest of your world. Where a
 
 | Module | Works together? | What happens |
 |---|---|---|
-| [Ember](https://foundryvtt.com/packages/ember) | Yes, automatic | Ember owns character creation, so this module switches itself to **Level-Up only** and restyles its level-up window to match Ember's look. The two feel like one experience. |
+| [Ember](https://foundryvtt.com/packages/ember) | Yes, automatic | Ember owns character creation, so this module switches itself to **Level-Up only**, takes over the level-1 questions Ember hands to the system, and restyles both windows to match Ember's look. See [Running alongside Ember](#running-alongside-ember). |
 | [Hero Mancer](https://foundryvtt.com/packages/hero-mancer) | No, incompatible | Hero Mancer replaces the 5e advancement engine rather than building on it, so the two modules cannot share the creation and level-up space. This is declared as a conflict in the manifest, and Foundry will warn you if both are enabled. Run one or the other. |
 | [D&D Player's Handbook (2024)](https://foundryvtt.com/packages/dnd-players-handbook) | Yes, enhanced | Fully supported as a content source, and its official artwork is used as the backdrop on the class, species, and background screens. |
 | Other official content modules (Artificer, Ravenloft, Forgotten Realms, and similar) | Yes | Their classes, species, backgrounds, spells, and equipment appear in the wizard like any other compendium content. |
@@ -225,6 +243,12 @@ This module is designed to sit quietly alongside the rest of your world. Where a
 - **Foundry VTT** version 14 or later
 - The **D&D Fifth Edition (dnd5e)** game system, version 5.3.3 or later
 - Your character content (classes, species, backgrounds, spells, and equipment) enabled in your compendiums
+
+---
+
+## Contributing
+
+Bug reports, ideas and pull requests are all welcome — see [CONTRIBUTING.md](CONTRIBUTING.md) for how to set up, what to check before opening a pull request, and the project's rules on sign-off and AI-assisted contributions.
 
 ---
 

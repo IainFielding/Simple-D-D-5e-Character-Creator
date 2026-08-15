@@ -28,3 +28,5 @@ test-e2e/config.mjs
 test-e2e/*.log
 test-e2e/*.jsonl
 test-e2e/*.html
+# Dropped by shell.mjs and screenshots.mjs when a run fails — a picture of the broken world.
+test-e2e/failure.png
