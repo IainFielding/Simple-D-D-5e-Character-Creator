@@ -24,15 +24,20 @@ export class Session {
 
   /**
    * Launch a browser, join the active world as {@link GM_USER}, and wait for `game.ready`.
+   * @param {object} [options]
+   * @param {{width: number, height: number}} [options.viewport]  Client size. The default suits the
+   *   equivalence suite, which never looks at the screen; `screenshots.mjs` overrides it.
+   * @param {number} [options.deviceScaleFactor]  Pixel ratio. 2 renders at twice the resolution,
+   *   which is what makes a captured screenshot legible on a high-DPI display.
    * @returns {Promise<Session>}
    */
-  static async open() {
+  static async open({ viewport = { width: 1600, height: 1000 }, deviceScaleFactor = 1 } = {}) {
     const browser = await chromium.launch({
       headless: !HEADED,
       // Foundry leans on WebGL for the canvas; SwiftShader keeps it working headlessly.
       args: ["--use-gl=swiftshader", "--enable-unsafe-swiftshader", "--mute-audio"]
     });
-    const context = await browser.newContext({ viewport: { width: 1600, height: 1000 } });
+    const context = await browser.newContext({ viewport, deviceScaleFactor });
     const page = await context.newPage();
     const session = new Session(browser, page);
 

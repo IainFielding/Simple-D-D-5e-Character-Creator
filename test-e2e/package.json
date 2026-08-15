@@ -10,7 +10,9 @@
     "provision:ember": "node provision.mjs playwright-ember",
     "test": "node run.mjs playwright",
     "test:ember": "node run.mjs playwright-ember",
-    "shell": "node shell.mjs"
+    "shell": "node shell.mjs",
+    "screenshots": "node screenshots.mjs",
+    "screenshots:ember": "node screenshots.mjs --world=playwright-ember"
   },
   "devDependencies": {
     "playwright": "^1.62.1"

@@ -22,9 +22,31 @@ Copy `config.example.mjs` to `config.mjs` and edit the paths before the setup st
 | `provision.mjs` | One-time world setup: modules, adventure import |
 | `run.mjs` | Runs the suite and prints the diff |
 | `shell.mjs` | Diagnostics; `--hold` leaves Playwright's browser open, `--serve` opens none |
+| `screenshots.mjs` | Recaptures the README's `docs/screenshots/` images from a live world |
 | `in-world/*.mjs` | Everything that runs **inside** the world |
 | `in-world/answers.mjs` | The answer book: one decision-answering strategy, both adapters |
 | `in-world/sweep.mjs` | Generates one scenario per subclass in the world |
+| `in-world/shots.mjs` | Opens and drives the real wizard, for `screenshots.mjs` |
+
+## Screenshots
+
+`screenshots.mjs` retakes the README's pictures against a live world, so they can be regenerated
+whenever the UI is restyled instead of being recaptured by hand:
+
+```bash
+npm run screenshots                        # every base-world shot
+node screenshots.mjs --only=review,actor   # just these two
+npm run screenshots:ember                  # the Ember hand-off and level-up
+```
+
+The character is filled by Quick Build with a fixed seed, so re-running produces the same Wizard
+and a single picture can be retaken without the others drifting out of step. `--only` filters what
+is *captured*, not what runs: the shots are one continuous walk through the wizard, so every
+preceding step's setup still executes. Files land in `docs/screenshots/`, overwriting in place —
+check `git diff` before keeping them.
+
+The Ember creation shot renders the hand-off manager staged by `in-world/ember.mjs` rather than one
+Ember's own builder produced; see that file's header for why, and what that does not cover.
 
 Playwright is only the boot loader — it launches a browser, logs in, and calls into
 `in-world/harness.mjs`. There are no selectors for game UI on the Node side.
