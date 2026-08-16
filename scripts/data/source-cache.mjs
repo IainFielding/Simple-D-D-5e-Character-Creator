@@ -7,6 +7,7 @@ import { warmChoices, resetRestrictedCache } from "./choice-resolver.mjs";
 import { resetToolCache } from "./tool-source.mjs";
 import { resetWeaponIcons } from "./weapon-source.mjs";
 import { getEnabledPacks } from "./compendium-util.mjs";
+import { invalidateJournalIndex } from "./journal-source.mjs";
 
 /**
  * Shared, warm-once compendium data for the builder.
@@ -140,4 +141,7 @@ export function invalidateSources() {
   resetRestrictedCache();
   resetToolCache();
   resetWeaponIcons();
+  // The source-book page map is built by scanning journal packs, so a change to which packages are
+  // active can both invalidate a page it found and reveal one it missed.
+  invalidateJournalIndex();
 }

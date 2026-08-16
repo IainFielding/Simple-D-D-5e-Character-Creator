@@ -4,6 +4,7 @@ import {
 } from "./abilities-step.mjs";
 import { spellInfoFor } from "./spells-step.mjs";
 import { resolveChoices } from "../data/choice-resolver.mjs";
+import { hasSourcePage } from "../data/journal-source.mjs";
 import { applyQuickBuild } from "../data/quick-build.mjs";
 import { t, log, levelUpEnabled } from "../config.mjs";
 import { matchesRules } from "../data/source-index.mjs";
@@ -148,6 +149,9 @@ export const classStep = {
       quickBuild: true,
       detail,
       groups,
+      // Offer "Full Details" only when the active content package actually ships a book page for
+      // this class. Without the check the button would open our own description a second time.
+      sourceUuid: (selected && await hasSourcePage(selected)) ? selected : null,
       abilities: abilitiesContext(state),
       targetLevel: targetLevelContext(state)
     };

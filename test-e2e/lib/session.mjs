@@ -24,15 +24,20 @@ export class Session {
 
   /**
    * Launch a browser, join the active world as {@link GM_USER}, and wait for `game.ready`.
+   * @param {object} [options]
+   * @param {{width: number, height: number}} [options.viewport]  Client size. The default suits the
+   *   equivalence suite, which never looks at the screen; `screenshots.mjs` overrides it.
+   * @param {number} [options.deviceScaleFactor]  Pixel ratio. 2 renders at twice the resolution,
+   *   which is what makes a captured screenshot legible on a high-DPI display.
    * @returns {Promise<Session>}
    */
-  static async open() {
+  static async open({ viewport = { width: 1600, height: 1000 }, deviceScaleFactor = 1 } = {}) {
     const browser = await chromium.launch({
       headless: !HEADED,
       // Foundry leans on WebGL for the canvas; SwiftShader keeps it working headlessly.
       args: ["--use-gl=swiftshader", "--enable-unsafe-swiftshader", "--mute-audio"]
     });
-    const context = await browser.newContext({ viewport: { width: 1600, height: 1000 } });
+    const context = await browser.newContext({ viewport, deviceScaleFactor });
     const page = await context.newPage();
     const session = new Session(browser, page);
 
@@ -67,15 +72,31 @@ export class Session {
     }
   }
 
-  /** Load the join page, authenticate as {@link GM_USER}, and wait for the world. */
+  /**
+   * Load the join page, authenticate as {@link GM_USER}, and wait for the world.
+   *
+   * Foundry auto-creates a passwordless "Gamemaster" on a world that has no GM, so joining is just:
+   * name the user, submit. *How* you name them depends on the world's join-screen theme, and both
+   * shapes are live — the classic screen renders a `<select name="userid">` of every user, while the
+   * minimal theme (`body.join-theme-minimal`) renders a free-text `<input name="username">` instead.
+   * Waiting on the select alone timed out against a minimal-themed world with an error that named
+   * only the missing locator, which reads like the world failed to launch when it is up and serving.
+   */
   async join() {
     await this.page.goto(`${BASE_URL}/join`, { waitUntil: "domcontentloaded" });
 
-    // Foundry auto-creates a passwordless "Gamemaster" on a world that has no GM, so the join
-    // form is just: pick the user, submit.
     const select = this.page.locator("select[name=userid]");
-    await select.waitFor({ timeout: 30_000 });
-    await select.selectOption({ label: GM_USER });
+    const username = this.page.locator("input[name=username]");
+    await Promise.race([
+      select.waitFor({ timeout: 30_000 }),
+      username.waitFor({ timeout: 30_000 })
+    ]).catch(() => {
+      throw new Error("The join form never appeared — neither select[name=userid] nor "
+        + `input[name=username]. Page: ${this.page.url()}`);
+    });
+
+    if ( await select.count() ) await select.selectOption({ label: GM_USER });
+    else await username.fill(GM_USER);
     await this.page.locator("button[name=join]").click();
 
     await this.waitForReady();

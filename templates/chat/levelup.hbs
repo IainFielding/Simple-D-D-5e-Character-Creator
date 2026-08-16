@@ -1,0 +1,47 @@
+{{!--
+  The card posted to chat when a level-up is applied, rendered from
+  build/chat-summary.mjs `postLevelUpSummary()`.
+
+  Shares the `sogrom-chat-*` markup and styles with the creation card (see chat/creation.hbs), but
+  reports a *difference* rather than a snapshot: the class levels that moved, the numbers that
+  changed with them, and the features and spells the level brought in.
+
+  Every block below is conditional, because a level-up is allowed to be quiet — a level with no new
+  spells simply drops that list rather than showing an empty heading.
+--}}
+<div class="sogrom-chat-card">
+  <header class="sogrom-chat-head">
+    <img class="sogrom-chat-portrait" src="{{img}}" alt="" />
+    <div class="sogrom-chat-titles">
+      <span class="sogrom-chat-eyebrow">{{heading}}</span>
+      <h3 class="sogrom-chat-name">{{name}}</h3>
+      {{#if subtitle}}<span class="sogrom-chat-sub">{{subtitle}}</span>{{/if}}
+      <span class="sogrom-chat-level">{{levelLine}}</span>
+    </div>
+  </header>
+
+  {{#if rows}}
+  <dl class="sogrom-chat-rows">
+    {{#each rows}}
+    <div class="sogrom-chat-row">
+      <dt>{{label}}</dt>
+      <dd>{{value}}</dd>
+    </div>
+    {{/each}}
+  </dl>
+  {{/if}}
+
+  {{#if features}}
+  <section class="sogrom-chat-list">
+    <h4 class="sogrom-chat-list-title">{{featuresLabel}}</h4>
+    <ul>{{#each features}}<li>{{this}}</li>{{/each}}</ul>
+  </section>
+  {{/if}}
+
+  {{#if spells}}
+  <section class="sogrom-chat-list">
+    <h4 class="sogrom-chat-list-title">{{spellsLabel}}</h4>
+    <ul>{{#each spells}}<li>{{this}}</li>{{/each}}</ul>
+  </section>
+  {{/if}}
+</div>

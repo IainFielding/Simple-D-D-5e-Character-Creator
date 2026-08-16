@@ -23,6 +23,113 @@ export const MODULE_ID = "sogrom-dnd5e-character-creator";
 /** Ability keys in canonical display order. */
 export const ABILITIES = ["str", "dex", "con", "int", "wis", "cha"];
 
+/* -------------------------------------------- */
+/*  Public hook surface                         */
+/* -------------------------------------------- */
+
+/**
+ * The namespace every hook this module emits is prefixed with.
+ *
+ * Deliberately *not* "sogrom": the same author publishes a dozen other `sogrom-*` content
+ * modules, so that namespace would be ambiguous the moment any of them wanted a hook of their
+ * own. This is the camelCase of the module title, which is the convention other Foundry modules
+ * follow (Hero Mancer emits `heroMancer.*`).
+ *
+ * Changing this string is a breaking change for every consumer, so treat it as permanent.
+ */
+export const HOOK_PREFIX = "simpleCharacterCreator";
+
+/**
+ * Every hook this module emits, as `alias -> full hook name`.
+ *
+ * Same rationale as {@link SETTINGS}: one map means the code that *emits* a hook and the code
+ * that documents or re-exports it can never drift. The whole map is published on the module's
+ * public API (`game.modules.get(MODULE_ID).api.HOOKS`) so a consumer can subscribe without
+ * hard-coding strings, and is frozen so nobody can rewrite a name at runtime.
+ *
+ * Two kinds, distinguished by the `pre` prefix and by which helper fires them:
+ *  - **`pre…` hooks are cancellable.** They go through {@link fireCancellableHook}, which uses
+ *    `Hooks.call`; a listener returning `false` aborts the action. This is dnd5e's own house
+ *    style — the same contract we honour for `dnd5e.preAdvancementManagerComplete`.
+ *  - **Everything else is notification-only**, fired with `Hooks.callAll` via {@link fireHook}.
+ *    A listener's return value is ignored.
+ *
+ * Every payload is a single object argument, so a hook can gain a field later without breaking
+ * listeners that destructure the ones they already know about.
+ *
+ * See docs/API.md for the payload of each.
+ */
+export const HOOKS = Object.freeze({
+  /** `{api, version}` — the module is ready and its API is installed. */
+  ready: `${HOOK_PREFIX}.ready`,
+
+  /** `{actor, options}` — **cancellable**; return false to stop the creator opening. */
+  preOpenCreator: `${HOOK_PREFIX}.preOpenCreator`,
+  /** `{app, state}` — the creator is open and its first step is on screen. */
+  creatorOpened: `${HOOK_PREFIX}.creatorOpened`,
+  /** `{app, state, from, to, step}` — the player moved between creation steps. */
+  creationStepChanged: `${HOOK_PREFIX}.creationStepChanged`,
+  /** `{state, actor}` — **cancellable**; return false to veto the build before anything is written. */
+  preCreateCharacter: `${HOOK_PREFIX}.preCreateCharacter`,
+  /** `{actor, state, targetLevel}` — a character is finished. Fires exactly once per build. */
+  characterCreated: `${HOOK_PREFIX}.characterCreated`,
+
+  /** `{manager, actor}` — **cancellable**; return false to decline the takeover and let dnd5e's native wizard run. */
+  preLevelUpTakeover: `${HOOK_PREFIX}.preLevelUpTakeover`,
+  /** `{actor, app, state, driver}` — the level-up wizard is open. */
+  levelUpStarted: `${HOOK_PREFIX}.levelUpStarted`,
+  /** `{app, state, from, to, step}` — the player moved between level-up steps. */
+  levelUpStepChanged: `${HOOK_PREFIX}.levelUpStepChanged`,
+  /** `{actor, state, summary}` — **cancellable**; return false to veto the apply. */
+  preLevelUpApply: `${HOOK_PREFIX}.preLevelUpApply`,
+  /** `{actor, state, fromLevel, toLevel, summary}` — the level-up has been written to the actor. */
+  levelUpApplied: `${HOOK_PREFIX}.levelUpApplied`,
+  /** `{actor, state}` — the player discarded a level-up; the actor was never touched. */
+  levelUpCancelled: `${HOOK_PREFIX}.levelUpCancelled`,
+  /** `{manager, actor}` — we claimed Ember's advancement manager to ask its level-1 questions. */
+  emberHandoff: `${HOOK_PREFIX}.emberHandoff`
+});
+
+/**
+ * Fire a notification-only hook. Never throws: a listener in another module blowing up must not
+ * take a character build down with it, so a bad listener is logged and the flow continues.
+ * @param {string} hook     A value from {@link HOOKS}.
+ * @param {object} payload  The single object argument handed to listeners.
+ */
+export function fireHook(hook, payload) {
+  log(`hook ${hook}`, payload);
+  try {
+    Hooks.callAll(hook, payload);
+  } catch ( err ) {
+    // Foundry already reports a throwing listener; this only stops it unwinding *our* call stack.
+    log(`listener threw on ${hook}`, err);
+  }
+}
+
+/**
+ * Fire a cancellable hook and report whether the action may proceed.
+ *
+ * `Hooks.call` stops at the first listener that returns exactly `false` and hands that back, which
+ * is the contract dnd5e uses for its own `pre…` hooks. A listener that throws is treated as *not*
+ * a veto — silently cancelling a build because somebody else's module has a bug would be a much
+ * worse failure than ignoring them.
+ * @param {string} hook     A value from {@link HOOKS}.
+ * @param {object} payload  The single object argument handed to listeners.
+ * @returns {boolean}       False when a listener vetoed; true to carry on.
+ */
+export function fireCancellableHook(hook, payload) {
+  log(`hook ${hook} (cancellable)`, payload);
+  let allowed = true;
+  try {
+    allowed = Hooks.call(hook, payload) !== false;
+  } catch ( err ) {
+    log(`listener threw on ${hook}; treating as no veto`, err);
+    return true;
+  }
+  if ( !allowed ) log(`${hook} vetoed by a listener`);
+  return allowed;
+}
+
 /**
  * The D&D ability modifier for a score: (score - 10) / 2, rounded down, rendered with an
  * explicit + or - sign (e.g. 16 → "+3", 8 → "-1").
@@ -57,6 +164,8 @@ export const SETTINGS = {
   levelUpButton: "showLevelUpButton",
   levelUpHpMode: "levelUpHpMode",
   levelUpHpRollToChat: "levelUpHpRollToChat",
+  creationSummary: "creationSummary",
+  levelUpSummary: "levelUpSummary",
   multiclass: "allowMulticlass",
   storeEnabled: "storeEnabled",
   storeConfig: "storeConfig",
@@ -73,6 +182,8 @@ export const DEFAULTS = {
   levelUpButton: true,
   levelUpHpMode: "choice",
   levelUpHpRollToChat: true,
+  creationSummary: "public",
+  levelUpSummary: "public",
   multiclass: "off",
   storeEnabled: true,
   storeConfig: {
@@ -116,6 +227,38 @@ export function levelUpHpMode() {
  */
 export function levelUpHpRollToChat() {
   return !!game.settings.get(MODULE_ID, SETTINGS.levelUpHpRollToChat);
+}
+
+/**
+ * The valid values of the two chat-summary settings, from most to least visible:
+ *  - `"public"` — the card goes to the whole table (the default; announcing the character is the
+ *                 point of the feature).
+ *  - `"gm"`     — whispered to Game Masters only, for tables where the GM vets characters, or
+ *                 simply wants the log without the chatter.
+ *  - `"off"`    — never posted.
+ */
+export const SUMMARY_MODES = ["public", "gm", "off"];
+
+/**
+ * Read one of the chat-summary settings, guarding against an unknown stored value. Both settings
+ * share the same three modes, so they share this reader; {@link creationSummaryMode} and
+ * {@link levelUpSummaryMode} are the call sites.
+ * @param {string} key   One of {@link SETTINGS}.creationSummary / .levelUpSummary.
+ * @returns {"public"|"gm"|"off"}
+ */
+function summaryMode(key) {
+  const raw = game.settings.get(MODULE_ID, key);
+  return SUMMARY_MODES.includes(raw) ? raw : DEFAULTS[key];
+}
+
+/** Who sees the card posted when a character is finished. @returns {"public"|"gm"|"off"} */
+export function creationSummaryMode() {
+  return summaryMode(SETTINGS.creationSummary);
+}
+
+/** Who sees the card posted when a level-up is applied. @returns {"public"|"gm"|"off"} */
+export function levelUpSummaryMode() {
+  return summaryMode(SETTINGS.levelUpSummary);
 }
 
 /**

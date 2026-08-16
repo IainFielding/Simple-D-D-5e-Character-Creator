@@ -6,7 +6,7 @@
   "scripts": {
     "test": "vitest run",
     "test:watch": "vitest",
-    "lint": "eslint scripts test",
+    "lint": "eslint scripts test test-e2e",
     "validate:json": "node tools/validate-json.mjs",
     "check": "npm run validate:json && npm run lint && npm run test"
   },

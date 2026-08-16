@@ -91,7 +91,11 @@ export function installFoundryShims() {
       isEmpty: obj => !obj || (Object.keys(obj).length === 0)
     },
     applications: {
-      ux: { TextEditor: { implementation: { enrichHTML: async html => html } } }
+      ux: { TextEditor: { implementation: { enrichHTML: async html => html } } },
+      // The chat cards render a real .hbs file in Foundry. Here the template is never the thing
+      // under test, so this echoes back the path and the context it was handed — enough for a test
+      // to assert *what* the card was told, without a Handlebars runtime.
+      handlebars: { renderTemplate: async (path, context) => JSON.stringify({ path, context }) }
     }
   };
 
@@ -108,7 +112,49 @@ export function installFoundryShims() {
     }
   };
 
-  globalThis.Hooks = { on: () => 1, off: () => {}, once: () => {} };
+  // ChatMessage: the summary cards' only Foundry write. `created` collects every message the code
+  // under test posted, so a test can assert on the payload without a real chat log.
+  globalThis.ChatMessage = class ChatMessage {
+    static created = [];
+    static async create(data) { this.created.push(data); return data; }
+    static getSpeaker({ actor } = {}) { return { actor: actor?.id ?? null, alias: actor?.name ?? null }; }
+    static getWhisperRecipients(name) { return name === "GM" ? [{ id: "gm-user" }] : []; }
+  };
+
+  // Hooks: enough of Foundry's event bus to exercise the module's own public hooks.
+  //
+  // `fired` collects every emission as `{hook, payload}`, the same trick `ChatMessage.created`
+  // uses, so a test can assert "this flow announced that" without a live page. Registered
+  // listeners are honoured too, so the cancellable hooks can actually be vetoed in a test:
+  // `Hooks.call` stops at the first listener returning exactly `false` and hands it back, which
+  // is the real contract the module relies on.
+  const listeners = new Map();
+  globalThis.Hooks = {
+    fired: [],
+    on(hook, fn) {
+      if ( !listeners.has(hook) ) listeners.set(hook, []);
+      listeners.get(hook).push(fn);
+      return listeners.get(hook).length;
+    },
+    once(hook, fn) { return this.on(hook, fn); },
+    off(hook, fn) {
+      const list = listeners.get(hook) ?? [];
+      const index = list.indexOf(fn);
+      if ( index >= 0 ) list.splice(index, 1);
+    },
+    callAll(hook, ...args) {
+      this.fired.push({ hook, payload: args[0] });
+      for ( const fn of listeners.get(hook) ?? [] ) fn(...args);
+      return true;
+    },
+    call(hook, ...args) {
+      this.fired.push({ hook, payload: args[0] });
+      for ( const fn of listeners.get(hook) ?? [] ) {
+        if ( fn(...args) === false ) return false;
+      }
+      return true;
+    }
+  };
   globalThis.fromUuid = async () => null;
   // The document class the Compendium Browser's `fetch` is handed. Never constructed — it is a
   // token identifying which collection to search — so an empty class is enough.

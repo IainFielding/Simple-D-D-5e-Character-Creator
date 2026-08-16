@@ -1,4 +1,5 @@
 import { t } from "../config.mjs";
+import { originGrantedSpellCards } from "./feat-spells-step.mjs";
 
 /**
  * The Spells step: for a spellcasting class, choose the cantrips and level-1 spells
@@ -106,6 +107,14 @@ export const spellsStep = {
     const { cantrips, level1, maxCantrips, maxSpells } = data;
     const picked = new Set([...state.selectedCantrips, ...state.selectedSpells].map(s => s.uuid));
 
+    // Spells the build is going to grant anyway — a 2014 Cleric's domain spells, a species cantrip.
+    // Offering them here produced two documents on the finished character, and because only the
+    // chosen copy counts toward preparation, the pick was silently wasted on a spell they already
+    // always have. A spell already picked stays listed (so it can be un-picked) even if a later
+    // origin change starts granting it; {@link module:build/spell-reconcile} tidies that case up.
+    const grantedCards = await originGrantedSpellCards(state);
+    const granted = new Set(grantedCards.map(card => card.uuid));
+
     // The running tally shown across the top of the step so the player can always
     // see (and read, via tooltip) what they've chosen so far. Kept in two groups —
     // cantrips and level-1 spells — so the player can tell them apart at a glance;
@@ -125,7 +134,7 @@ export const spellsStep = {
     const atLimit = activeBucket.length >= activeMax;
     const pool = tab === "cantrips" ? cantrips : level1;
 
-    const list = pool.map(s => ({
+    const list = pool.filter(s => !granted.has(s.uuid) || picked.has(s.uuid)).map(s => ({
       ...s,
       active: picked.has(s.uuid),
       focused: state.focusedSpellUuid === s.uuid,
@@ -178,6 +187,12 @@ export const spellsStep = {
       selectedCantrips,
       selectedSpells,
       hasSelected: selectedCantrips.length + selectedSpells.length > 0,
+      // Shown alongside the picks, not among them: these arrive automatically (a Cleric's domain
+      // spells, a species cantrip) and are kept out of the pool so they can't be picked twice.
+      // Listing them here is what stops that reading as "my domain spells are missing".
+      grantedCantrips: grantedCards.filter(c => c.level === 0).sort(byName).map(toChip),
+      grantedSpells: grantedCards.filter(c => c.level > 0).sort(byName).map(toChip),
+      hasGranted: grantedCards.length > 0,
       focused
     };
   }

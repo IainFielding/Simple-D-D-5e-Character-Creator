@@ -333,24 +333,86 @@ function classesNamed(html) {
 }
 
 /**
- * The spells an origin grants outright — an ItemGrant of a spell item at level ≤ 1 (e.g. a species
- * that hands out a cantrip). Returned as lightweight cards for the review summary and the "already
- * known" marking on the feat browser. Shared with [review-step.mjs](scripts/steps/review-step.mjs).
+ * The spells an origin grants outright at level ≤ 1 — a species handing out a cantrip, a class
+ * granting a spell, a 2014 subclass's domain spells. Returned as lightweight cards for the review
+ * summary, the "already known" marking on the feat browser, and the Spells step's own pool filter.
+ * Shared with [review-step.mjs](scripts/steps/review-step.mjs).
+ *
+ * The walk recurses, because the grant is often not on the origin itself. A 2014 Cleric picks its
+ * subclass during creation and the domain spells hang off *that*; other grants arrive through a
+ * feature the origin granted first. Walking only the origin's own advancements missed both, which
+ * left the domain spells absent from the Review and — worse — still offered on the Spells step, so
+ * the player could pick a spell they were about to be given.
+ *
+ * `sel` carries the player's recorded picks for this origin (`state.advChoices[source]`), which is
+ * the only way to know *which* subclass was chosen; without it the subclass branch is simply not
+ * taken, and the walk degrades to what it did before.
+ *
  * @param {Item5e|object} doc
+ * @param {object} [sel]   The origin's recorded advancement picks, keyed by advancement id.
  * @returns {Promise<{uuid:string, name:string, img:string, level:number}[]>}
  */
-export async function grantedSpellCards(doc) {
+export async function grantedSpellCards(doc, sel = {}, seen = new Set(), depth = 0) {
   const out = [];
+  if ( !doc || depth > 3 ) return out;
   for ( const adv of advancementArray(doc) ) {
-    if ( (adv.level ?? 0) > 1 || adv.type !== "ItemGrant" ) continue;
-    for ( const ref of Array.from(adv.configuration?.items ?? []) ) {
-      const uuid = typeof ref === "string" ? ref : ref?.uuid;
-      if ( !uuid ) continue;
+    if ( (adv.level ?? 0) > 1 ) continue;
+    let refs = null;
+    if ( adv.type === "ItemGrant" ) {
+      refs = Array.from(adv.configuration?.items ?? []).map(r => typeof r === "string" ? r : r?.uuid);
+    } else if ( adv.type === "Subclass" ) {
+      // 2014-rules Clerics, Sorcerers and Warlocks choose at level 1, so the subclass is part of the
+      // level-≤1 build and its grants are creation grants. 2024 classes take theirs at level 3,
+      // where the guard above has already skipped this.
+      refs = Array.from(sel?.[adv._id] ?? []).map(p => typeof p === "string" ? p : p?.uuid);
+    } else continue;
+
+    for ( const uuid of refs.filter(Boolean) ) {
+      if ( seen.has(uuid) ) continue;
+      seen.add(uuid);
       const d = await fromUuid(uuid).catch(() => null);
-      if ( d?.type === "spell" ) out.push({ uuid, name: d.name, img: d.img || "icons/svg/daze.svg", level: d.system?.level ?? 0 });
+      if ( !d ) continue;
+      if ( d.type === "spell" ) {
+        out.push({ uuid, name: d.name, img: d.img || "icons/svg/daze.svg", level: d.system?.level ?? 0 });
+      } else if ( advancementArray(d).length ) {
+        out.push(...await grantedSpellCards(d, sel, seen, depth + 1));
+      }
     }
   }
   return out;
+}
+
+/** Which `state.advChoices` bucket holds the picks for each origin uuid field. */
+const ORIGIN_FIELDS = [["classUuid", "class"], ["backgroundUuid", "background"], ["speciesUuid", "species"]];
+
+/**
+ * Every spell the character's origins hand out at level ≤ 1 — across class (and its level-1
+ * subclass), background and species — as cards.
+ *
+ * Serves three callers: the feat browser marks these as already known, the Spells step keeps them
+ * out of the pool (picking one produced two documents on the finished character, only one of which
+ * counted toward preparation, so the pick was silently wasted) — and, because hiding them outright
+ * leaves a Cleric wondering where their domain spells went, the Spells step also *lists* them for
+ * reference beside the picks.
+ *
+ * @param {import("../state/creator-state.mjs").CreatorState} state
+ * @returns {Promise<{uuid:string, name:string, img:string, level:number}[]>}
+ */
+export async function originGrantedSpellCards(state) {
+  const cards = [];
+  for ( const [field, source] of ORIGIN_FIELDS ) {
+    const uuid = state[field];
+    if ( !uuid ) continue;
+    const doc = await fromUuid(uuid).catch(() => null);
+    if ( !doc ) continue;
+    cards.push(...await grantedSpellCards(doc, state.advChoices?.[source] ?? {}));
+  }
+  return cards;
+}
+
+/** The same set, by uuid, for callers that only need the membership test. */
+export async function originGrantedSpellUuids(state) {
+  return new Set((await originGrantedSpellCards(state)).map(card => card.uuid));
 }
 
 /**
@@ -359,15 +421,9 @@ export async function grantedSpellCards(doc) {
  * step picks, any origin-granted spells, and the spells chosen for the character's *other* feats.
  */
 async function knownSpellUuids(state, currentGrantKey) {
-  const set = new Set();
+  const set = await originGrantedSpellUuids(state);
   for ( const s of state.selectedCantrips ) set.add(s.uuid);
   for ( const s of state.selectedSpells ) set.add(s.uuid);
-  for ( const field of ["classUuid", "backgroundUuid", "speciesUuid"] ) {
-    const uuid = state[field];
-    if ( !uuid ) continue;
-    const doc = await fromUuid(uuid).catch(() => null);
-    if ( doc ) for ( const sp of await grantedSpellCards(doc) ) set.add(sp.uuid);
-  }
   for ( const [key, b] of Object.entries(state.featSpells) ) {
     if ( key === currentGrantKey ) continue;
     for ( const u of [...(b.cantrips ?? []), ...(b.spells ?? [])] ) set.add(u);

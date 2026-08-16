@@ -28,9 +28,20 @@
   <div class="creator-pick-desc">
     {{#if hasSelection}}
     <article class="creator-detail">
+      {{!-- Deliberately not the shared parts/work-detail.hbs partial: this block shows its
+            sourcebook as a header pill on the level block (blockSource), so rendering the partial
+            would print the same provenance twice inside the article. --}}
       <header class="creator-detail-head">
         <img class="creator-detail-img" src="{{detail.img}}" alt="">
         <h2>{{detail.name}}</h2>
+        {{#if sourceUuid}}
+        <button type="button" class="creator-btn creator-btn-ghost creator-source-details-btn"
+                data-action="openSourceDetails" data-uuid="{{sourceUuid}}"
+                data-tooltip="{{localize "sogrom-dnd5e-character-creator.common.sourceDetails.tooltip"}}">
+          <i class="fa-solid fa-book-open"></i>
+          {{localize "sogrom-dnd5e-character-creator.common.sourceDetails.open"}}
+        </button>
+        {{/if}}
       </header>
       <div class="creator-detail-body">{{{detail.enriched}}}</div>
 

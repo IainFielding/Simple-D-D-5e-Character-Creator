@@ -1,10 +1,13 @@
-import { MODULE_ID, SETTINGS, DEFAULTS, launchWindowOptions, tpl, t, log, levelUpEnabled, creationEnabled, emberActive } from "./config.mjs";
+import {
+  MODULE_ID, SETTINGS, DEFAULTS, HOOKS, tpl, t, log,
+  levelUpEnabled, creationEnabled, emberActive, fireHook
+} from "./config.mjs";
 import { STEPS } from "./steps/registry.mjs";
-import { CreatorShell } from "./app/creator-shell.mjs";
 import { warmSources } from "./data/source-cache.mjs";
 import { registerLevelUp, triggerLevelUp, canLevelUp } from "./levelup/intercept.mjs";
 import { StoreConfigApp } from "./app/store-config.mjs";
 import { watchForeignWindows } from "./app/takeover.mjs";
+import { registerApi, launchCreator } from "./api.mjs";
 
 /*
  * This is the module's entry point — module.json points Foundry here via "esmodules".
@@ -25,6 +28,9 @@ import { watchForeignWindows } from "./app/takeover.mjs";
 // pre-load templates so they're ready by the time anything renders.
 Hooks.once("init", () => {
   registerSettings();
+  // Install the public API here rather than at `ready` so another module's `setup`/`ready`
+  // handler can rely on it existing. Nothing in it touches world data at construction time.
+  registerApi();
   // Let item/actor/journal sheets opened from inside the fullscreen takeover — the Review screen's
   // content links, mostly — actually be visible, by stepping the takeover below Foundry's window
   // layer while one is open. See app/takeover.mjs for why we lower ourselves rather than raise them.
@@ -41,7 +47,8 @@ Hooks.once("init", () => {
     tpl("parts/work-picker.hbs"),
     tpl("parts/work-detail.hbs"),
     tpl("parts/abilities-panel.hbs"),
-    tpl("parts/origin-abilities.hbs")
+    tpl("parts/origin-abilities.hbs"),
+    tpl("parts/source-details.hbs")
   ]);
 
   // The `data-tooltip` payload that triggers a dnd5e *rich* item tooltip. The system's
@@ -137,6 +144,28 @@ function registerSettings() {
     hint: t("settings.levelUpHpRollToChat.hint"),
     scope: "world", config: true, type: Boolean, default: DEFAULTS.levelUpHpRollToChat
   });
+  // The two summary cards. Both share the same three modes, so they read the same to a GM
+  // scanning the settings list; see SUMMARY_MODES in config.mjs.
+  game.settings.register(MODULE_ID, SETTINGS.creationSummary, {
+    name: t("settings.creationSummary.name"),
+    hint: t("settings.creationSummary.hint"),
+    scope: "world", config: true, type: String, default: DEFAULTS.creationSummary,
+    choices: {
+      "public": t("settings.creationSummary.public"),
+      "gm": t("settings.creationSummary.gm"),
+      "off": t("settings.creationSummary.off")
+    }
+  });
+  game.settings.register(MODULE_ID, SETTINGS.levelUpSummary, {
+    name: t("settings.levelUpSummary.name"),
+    hint: t("settings.levelUpSummary.hint"),
+    scope: "world", config: true, type: String, default: DEFAULTS.levelUpSummary,
+    choices: {
+      "public": t("settings.levelUpSummary.public"),
+      "gm": t("settings.levelUpSummary.gm"),
+      "off": t("settings.levelUpSummary.off")
+    }
+  });
   // The starting-gold store: the enabled flag and the GM's stock configuration are both
   // hidden objects, edited only through the config form; a single menu button opens it.
   // The enabled flag lives as its own setting (not inside storeConfig) because it doubles
@@ -194,25 +223,21 @@ Hooks.once("ready", () => {
     if ( typeof requestIdleCallback === "function" ) requestIdleCallback(warm, { timeout: 3000 });
     else window.setTimeout(warm, 1000);
   }
+
+  // Announce the module last, once the takeover is installed and the system guard has passed — so
+  // a listener that reacts to this can assume everything below is live. Fired only in a dnd5e
+  // world: in any other system the module has disabled itself and there is nothing to integrate
+  // with. See docs/API.md.
+  const module = game.modules.get(MODULE_ID);
+  fireHook(HOOKS.ready, { api: module?.api ?? null, version: module?.version ?? "" });
 });
 
 /* -------------------------------------------- */
 /*  Launch entry points                         */
 /* -------------------------------------------- */
 
-/**
- * Open the creator on a fresh draft (or an existing character to resume). A brand-new
- * character is *not* written to the world here — the actor is created only when the player
- * clicks Create (see {@link CreatorShell}), so a cancelled build never litters the directory.
- * @param {Actor} [actor]  Existing actor to resume; null starts a fresh, unsaved draft.
- */
-async function launchCreator(actor) {
-  // Level-up-only mode (always the case under Ember) has no creator to open.
-  if ( !creationEnabled() ) return;
-  // Give the permission feedback up front rather than after the player has filled everything in.
-  if ( !actor && !game.user?.can("ACTOR_CREATE") ) return ui.notifications?.warn(t("notify.noPermission"));
-  new CreatorShell(actor ?? null, launchWindowOptions()).render(true);
-}
+// The creator's entry point lives in api.mjs — it is the module's public front door, and the
+// sidebar button below is simply its first caller. See {@link module:api}.
 
 // Every time the Actors sidebar tab renders, add our "launch" button to its header — but only
 // if the system is dnd5e, the setting is on, and this user is allowed to create actors.

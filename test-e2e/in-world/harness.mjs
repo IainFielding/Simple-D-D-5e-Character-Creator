@@ -19,9 +19,11 @@ const { snapshot, diff } = await import(`./normalize.mjs${BUST}`);
 const { SCENARIOS } = await import(`./scenarios.mjs${BUST}`);
 const { AnswerBook } = await import(`./answers.mjs${BUST}`);
 const { sweepScenarios } = await import(`./sweep.mjs${BUST}`);
+const { checkHooks } = await import(`./hooks.mjs${BUST}`);
 
 // The module under test, imported *without* a buster — the same instance the world already loaded.
 const { SourceIndex } = await import("/modules/sogrom-dnd5e-character-creator/scripts/data/source-index.mjs");
+const { SpellSource } = await import("/modules/sogrom-dnd5e-character-creator/scripts/data/spell-source.mjs");
 
 /**
  * Every actor this harness creates is named with this prefix, and cleanup only ever deletes
@@ -164,6 +166,14 @@ function advancementTypes(docs) {
   }
   return map;
 }
+
+/* -------------------------------------------- */
+
+/**
+ * Assert the public hook and API surface against the real wizards — see `in-world/hooks.mjs`.
+ * Re-exported here so the Node runner reaches it the same way it reaches every other command.
+ */
+export { checkHooks };
 
 /* -------------------------------------------- */
 
@@ -349,6 +359,290 @@ export async function sweepOne({ id, level = 20, incremental = false, keep = fal
   if ( !scenario ) throw new Error(`unknown sweep scenario "${id}"`);
   await cleanup();
   return runScenario(scenario, { keep, render });
+}
+
+/* -------------------------------------------- */
+/*  Granted always-prepared spells               */
+/* -------------------------------------------- */
+
+/**
+ * A feature-granted always-prepared spell must not also exist as a second, separately-chosen copy.
+ *
+ * **Why this is an assertion and not a comparison.** Everything else here diffs two builds, and this
+ * cannot: dnd5e has eight advancement types and none of them is class-spell selection, so there is
+ * no native behaviour to compare against — the creator invents that step. Teaching `native.mjs` to
+ * "pick class spells" would mean the harness writing its own reference and then checking we match
+ * it, which tests the expectation rather than the system. The bug is a property of *one* character
+ * anyway, so that is what gets checked.
+ *
+ * **The bug.** A class or subclass `ItemGrant` declaring `configuration.spell.prepared = 2` hands
+ * out an always-prepared spell — Divine Smite at Paladin 2, a Life Domain's domain spells. Many are
+ * also on the class's own list, so the player could pick the same spell again and end up with two
+ * Items. Only the plain copy counts toward `preparation.value` (`SpellData#countsPrepared` requires
+ * `prepared === 1`), so the duplicate permanently consumed a prepared slot for a spell the character
+ * already always has, and being a plain copy it burned a real spell slot when clicked.
+ *
+ * **The refusal matters more than the merges.** A missed merge is a duplicate the player can delete;
+ * a wrong merge silently destroys an entitlement. Magic Initiate grants a spell *and* a Cleric may
+ * prepare the same spell normally — two different things the character can do — so the last case
+ * asserts those stay separate. It is the assertion most likely to catch a later "simplify the merge".
+ *
+ * Cases are content-driven: the overlapping spell is discovered by walking the class and subclass
+ * documents for always-prepared grants and intersecting with the class's own spell list, rather than
+ * being written down. A hard-coded uuid goes stale the moment a module updates, and a case that can
+ * no longer find an overlap reports that rather than passing on an empty test.
+ * @returns {Promise<object>}
+ */
+export async function checkGrantedSpells() {
+  const failures = [];
+  const cases = [];
+
+  for ( const spec of GRANTED_SPELL_CASES ) {
+    let report;
+    try {
+      report = await runGrantedSpellCase(spec);
+    } catch ( err ) {
+      report = { id: spec.id, label: spec.label, ok: false, error: err.message };
+    }
+    cases.push(report);
+    for ( const f of report.failures ?? [] ) failures.push(`${spec.id}: ${f}`);
+    if ( report.error ) failures.push(`${spec.id}: ${report.error}`);
+  }
+
+  return { ok: !failures.length, failures, cases };
+}
+
+/**
+ * The builds this check runs. Each names a class by identifier rather than uuid, with the packs it
+ * may come from in preference order — the 2014 Cleric specifically, because a 2014 class chooses its
+ * subclass at level 1 and so brings its domain spells into *creation*, which is the path where the
+ * duplicate was first seen.
+ */
+const GRANTED_SPELL_CASES = [
+  {
+    id: "paladin-2",
+    label: "Paladin 2 — Divine Smite granted always-prepared",
+    classIdentifier: "paladin",
+    packs: ["dnd-players-handbook.classes", "dnd5e.classes24"],
+    level: 2
+  },
+  {
+    // 2024 rather than 2014 deliberately. The 2014 Life Domain grants *features* and leaves its
+    // `spell.preparation` empty, so it has no always-prepared spell grant to duplicate — the 2024
+    // one declares `preparation: always`, which migrates to `prepared: 2` on the live model. This is
+    // also the more valuable shape: the spell is picked at creation and granted three levels later,
+    // which is the one case prevention cannot reach and only reconciliation fixes.
+    id: "cleric-life-3",
+    label: "Cleric of Life 3 — a spell picked at 1 that the subclass later grants always-prepared",
+    classIdentifier: "cleric",
+    packs: ["dnd-players-handbook.classes", "dnd5e.classes24"],
+    subclassIdentifier: "life",
+    level: 3
+  },
+  {
+    id: "magic-initiate-overlap",
+    label: "Wizard 1 — a Magic Initiate spell also picked as a class spell stays separate",
+    classIdentifier: "wizard",
+    packs: ["dnd5e.classes24", "dnd-players-handbook.classes"],
+    level: 1,
+    // Sage grants Magic Initiate; both sides pick the same spell deliberately.
+    backgroundUuid: "Compendium.dnd5e.origins24.Item.phbbgSage0000000",
+    featOverlap: {
+      featUuid: "Compendium.dnd5e.feats24.Item.phbftMagicInitia",
+      spellUuid: "Compendium.dnd5e.spells24.Item.phbsplMagicMissi"
+    },
+    expectSeparate: true
+  }
+];
+
+/** Build one case and assert the invariants on the finished actor. */
+async function runGrantedSpellCase(spec) {
+  const classDoc = await resolveByIdentifier("class", spec.classIdentifier, spec.packs);
+  if ( !classDoc ) throw new Error(`no "${spec.classIdentifier}" class in ${spec.packs.join(", ")}`);
+
+  const scenario = {
+    name: `${PREFIX}granted-spells ${spec.id}`,
+    classUuid: classDoc.uuid,
+    speciesUuid: "Compendium.dnd5e.origins24.Item.phbspHuman000000",
+    backgroundUuid: spec.backgroundUuid ?? "Compendium.dnd5e.origins24.Item.phbbgSage0000000",
+    abilities: { str: 15, dex: 13, con: 14, int: 12, wis: 15, cha: 15 },
+    targetLevel: spec.level > 1 ? spec.level : undefined,
+    generate: true,
+    answers: {}
+  };
+
+  // Which spell to pick twice. For the feat case it is stated (the whole point is the collision);
+  // otherwise it is discovered from the content.
+  let overlap = spec.featOverlap?.spellUuid ?? null;
+  let subclassDoc = null;
+
+  if ( spec.subclassIdentifier ) {
+    subclassDoc = await resolveByIdentifier("subclass", spec.subclassIdentifier, null,
+      d => d.system?.classIdentifier === spec.classIdentifier);
+    if ( !subclassDoc ) throw new Error(`no "${spec.subclassIdentifier}" subclass for ${spec.classIdentifier}`);
+    const advId = Object.values(classDoc.advancement?.byId ?? {}).find(a => a.type === "Subclass")?.id;
+    if ( !advId ) throw new Error(`"${classDoc.name}" has no Subclass advancement`);
+    scenario.answers[advId] = subclassDoc.uuid;
+  }
+
+  if ( spec.featOverlap ) {
+    scenario.featSpells = { [spec.featOverlap.featUuid]: { spells: [overlap], cantrips: [] } };
+  } else {
+    const found = await findAlwaysPreparedOverlap(classDoc, subclassDoc, spec.level);
+    overlap = found.uuid;
+    if ( !overlap ) {
+      // Not a pass: the precondition this case exists to exercise is absent from the world. Say
+      // which half is missing — "no grants" and "grants nothing the class also offers" are different
+      // problems, and one of them means the case is pointed at the wrong content.
+      throw new Error("no always-prepared grant overlaps this class's own spell list "
+        + `(${classDoc.name}${subclassDoc ? ` / ${subclassDoc.name}` : ""}: `
+        + `${found.granted.length} always-prepared spell grant(s) at level <= ${spec.level}, `
+        + `class list offered ${found.offered} spell(s)) — the case proves nothing against this content`);
+    }
+  }
+
+  scenario.spells = { level1: [overlap] };
+  const overlapDoc = await fromUuid(overlap);
+  if ( !overlapDoc ) throw new Error(`the spell under test could not be resolved: ${overlap}`);
+
+  const book = new AnswerBook({ overrides: scenario.answers, generate: true });
+  // The same tolerance `runScenario` grants a generating scenario: the resolver's first pass
+  // legitimately offers a narrower pool than the settled one, and without somewhere to put those the
+  // build throws on a pick that is perfectly valid by the time it matters.
+  const actor = await buildCreator(scenario, { book, unofferable: [] });
+  try {
+    return assertGrantedSpells(actor, { spec, overlap, overlapName: overlapDoc.name });
+  } finally {
+    await actor.delete().catch(() => {});
+  }
+}
+
+/**
+ * The invariants. Read off the finished actor, so they hold whatever route produced it.
+ * @param {Actor5e} actor
+ */
+function assertGrantedSpells(actor, { spec, overlap, overlapName }) {
+  const failures = [];
+  const spells = actor.items.filter(i => i.type === "spell");
+  // Counted by **name**, deliberately. Identity by compendium source cannot see a cross-package
+  // merge — the surviving Bless is the pack the *grant* named, not the one the player picked — and
+  // identity by identifier would be asking the module to mark its own homework, since a broken
+  // `spellKey` is precisely one of the things this is here to catch. A character holding two spells
+  // of the same name is wrong whatever the module thinks, which is what makes it a usable oracle.
+  const copies = spells.filter(i => i.name === overlapName);
+
+  if ( spec.expectSeparate ) {
+    // A feat's spell and a class's are different entitlements — the character can do both, and
+    // collapsing them takes one away.
+    if ( copies.length !== 2 ) {
+      failures.push(`"${overlapName}" should remain 2 separate items (feat + class), found ${copies.length}`);
+    }
+  } else {
+    if ( copies.length !== 1 ) {
+      failures.push(`"${overlapName}" appears ${copies.length} time(s); a granted spell also chosen `
+        + `must collapse to exactly 1`);
+    }
+    const survivor = copies[0];
+    if ( survivor && Number(survivor.system?.prepared ?? 0) !== 2 ) {
+      failures.push(`"${overlapName}" survived with prepared=${survivor.system?.prepared} — `
+        + `the granted copy (always prepared) should be the one kept`);
+    }
+  }
+
+  // No spell may appear twice at all — the duplicate's signature, checked across the whole character
+  // rather than only the spell under test, so a build that collapses the tested pair while leaving
+  // another still fails.
+  const byName = new Map();
+  for ( const spell of spells ) byName.set(spell.name, (byName.get(spell.name) ?? 0) + 1);
+  for ( const [name, count] of byName ) {
+    if ( count < 2 ) continue;
+    if ( spec.expectSeparate && (name === overlapName) ) continue;   // the deliberate pair
+    failures.push(`${count} copies of "${name}" on one character`);
+  }
+
+  // `preparation.value` counts only `prepared === 1`. A duplicate inflates it, which is how the bug
+  // stole a prepared slot; assert the system's own count matches what is actually on the sheet.
+  const casting = actor.items.find(i => (i.type === "class") && i.system?.spellcasting?.preparation);
+  const prepared = spells.filter(i => Number(i.system?.prepared ?? 0) === 1
+    && Number(i.system?.level ?? 0) > 0).length;
+  const reported = casting?.system?.spellcasting?.preparation?.value ?? null;
+  if ( (reported !== null) && (reported !== prepared) ) {
+    failures.push(`preparation.value is ${reported} but ${prepared} leveled spell(s) are prepared`);
+  }
+
+  return {
+    id: spec.id, label: spec.label, ok: !failures.length, failures,
+    overlap: `${overlapName} (${overlap})`,
+    copies: copies.length,
+    prepared, reportedPrepared: reported,
+    spells: spells.map(i => `${i.name} prepared=${i.system?.prepared} source=${i.system?.sourceItem ?? "-"}`).sort()
+  };
+}
+
+/** The first item of a type whose identifier matches, honouring a pack preference order. */
+async function resolveByIdentifier(type, identifier, packs = null, extra = null) {
+  const search = packs
+    ? packs.map(c => game.packs.get(c)).filter(Boolean)
+    : game.packs.filter(p => p.documentName === "Item");
+  for ( const pack of search ) {
+    const index = await pack.getIndex({ fields: ["system.identifier", "system.classIdentifier"] });
+    for ( const entry of index ) {
+      if ( (entry.type !== type) || (entry.system?.identifier !== identifier) ) continue;
+      const doc = await fromUuid(entry.uuid);
+      if ( doc && (!extra || extra(doc)) ) return doc;
+    }
+  }
+  return null;
+}
+
+/**
+ * A spell that is both granted always-prepared at or below `level` and offered by the class's own
+ * spell list — the precondition the whole bug depends on.
+ *
+ * Discovered rather than written down: an advancement id and a spell uuid both belong to the content
+ * version that shipped them, and this way the case keeps working when a book updates and covers
+ * content it has never seen.
+ * @returns {Promise<{uuid: string|null, granted: string[], offered: number}>}
+ */
+async function findAlwaysPreparedOverlap(classDoc, subclassDoc, level) {
+  const granted = [];
+  for ( const doc of [classDoc, subclassDoc].filter(Boolean) ) {
+    for ( const adv of Object.values(doc.advancement?.byId ?? {}) ) {
+      if ( adv.type !== "ItemGrant" ) continue;
+      if ( Number(adv.level ?? 0) > level ) continue;
+      if ( Number(adv.configuration?.spell?.prepared ?? 0) !== 2 ) continue;
+      for ( const ref of Array.from(adv.configuration?.items ?? []) ) {
+        const uuid = typeof ref === "string" ? ref : ref?.uuid;
+        const item = uuid ? await fromUuid(uuid).catch(() => null) : null;
+        if ( item?.type === "spell" ) granted.push(uuid);
+      }
+    }
+  }
+  if ( !granted.length ) return { uuid: null, granted, offered: 0 };
+
+  // Intersect with what the class itself offers, so the pick is one a player could really have made.
+  //
+  // By **identifier**, not uuid, and that distinction is the whole reason this case was worth
+  // building. A world with the Player's Handbook module holds two copies of every spell: the grant
+  // names `dnd5e.spells24`'s Cure Wounds while the class list offers the module's, so a uuid
+  // intersection finds nothing even though the spell is plainly the same. That is exactly the
+  // mismatch the module's own identity test had, and matching the other way here would have hidden it.
+  //
+  // The *pool's* uuid is returned rather than the grant's, because that is the copy a player picks —
+  // which makes this case a cross-package duplicate, the shape that actually occurs.
+  const spells = new SpellSource();
+  const pool = await spells.forClassAtLevel(classDoc.uuid, 1, "class", { doc: classDoc })
+    .catch(() => null);
+  const rows = Object.values(pool?.byLevel ?? {}).flat();
+
+  const grantedIdentifiers = new Set();
+  for ( const uuid of granted ) {
+    const doc = await fromUuid(uuid).catch(() => null);
+    const identifier = doc?.system?.identifier;
+    if ( identifier ) grantedIdentifiers.add(identifier);
+  }
+  const match = rows.find(row => grantedIdentifiers.has(row.identifier));
+  return { uuid: match?.uuid ?? null, granted, offered: rows.length };
 }
 
 /* -------------------------------------------- */

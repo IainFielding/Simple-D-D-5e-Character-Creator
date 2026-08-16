@@ -85,9 +85,15 @@ async function reviewFeatSpells(state, source) {
   return bySource;
 }
 
-/** Spells an origin grants outright (e.g. a species that hands out a cantrip), split cantrips/level-1. */
-async function originGrantedSpells(doc) {
-  const cards = await grantedSpellCards(doc);
+/**
+ * Spells an origin grants outright (e.g. a species that hands out a cantrip), split cantrips/level-1.
+ *
+ * `sel` is the origin's recorded advancement picks, which is what lets the walk follow a level-1
+ * subclass. Without it a 2014 Cleric's domain spells were granted to the character but appeared
+ * nowhere on the Review, because they hang off the chosen subclass rather than the class itself.
+ */
+async function originGrantedSpells(doc, sel) {
+  const cards = await grantedSpellCards(doc, sel);
   const byName = (a, b) => a.name.localeCompare(b.name, game.i18n.lang);
   const map = s => ({ name: s.name, img: s.img, uuid: s.uuid });
   const cantrips = cards.filter(s => s.level === 0).sort(byName).map(map);
@@ -153,7 +159,7 @@ async function reviewSections(state, source, equipBySource, spells, featSpellsBy
     const card = uuid ? source.card(uuid) : null;
     const doc = uuid ? await fromUuid(uuid).catch(() => null) : null;
     const rows = doc ? [...await fixedGrants(doc), ...summaryPicks(resolved, key)] : [];
-    const grantedSpells = doc ? await originGrantedSpells(doc) : null;
+    const grantedSpells = doc ? await originGrantedSpells(doc, state.advChoices?.[key] ?? {}) : null;
     out.push({
       key,
       kind: t(labelKey),

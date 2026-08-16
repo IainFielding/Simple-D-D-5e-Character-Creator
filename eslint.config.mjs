@@ -32,7 +32,9 @@ const foundryGlobals = {
 };
 
 export default [
-  { ignores: ["node_modules/**"] },
+  // `**/` matters: `test-e2e/` carries its own node_modules (Playwright), and a root-anchored
+  // pattern would leave every dependency in it to be linted.
+  { ignores: ["**/node_modules/**"] },
   js.configs.recommended,
   {
     files: ["scripts/**/*.mjs", "tools/**/*.mjs"],
@@ -54,6 +56,36 @@ export default [
       ecmaVersion: 2023,
       sourceType: "module",
       globals: { ...globals.node, ...foundryGlobals }
+    }
+  },
+  // The end-to-end harness is two programs in one directory, and they do not share an environment:
+  //
+  //  - the driver (`run.mjs`, `lib/`, `provision.mjs`, …) is Node — it spawns Foundry and steers
+  //    Playwright;
+  //  - `in-world/` is served over HTTP into Foundry's own page and runs in the *browser*, with
+  //    every Foundry global in scope, importing the module under test directly.
+  //
+  // The driver gets the browser and Foundry globals as well, and that is not laziness. It hands
+  // closures to Playwright — `session.eval(() => game.world.id)`, `page.addInitScript(...)` — whose
+  // bodies are serialised and executed *in the page*. ESLint sees an ordinary arrow function in a
+  // Node file and cannot know it will be evaluated somewhere else entirely, so those globals have
+  // to be declared for the file that carries them. The cost is that a genuine typo in Node-side
+  // code could name a Foundry global and go unflagged; the alternative was ~25 inline disables.
+  {
+    files: ["test-e2e/**/*.mjs"],
+    ignores: ["test-e2e/in-world/**"],
+    languageOptions: {
+      ecmaVersion: 2023,
+      sourceType: "module",
+      globals: { ...globals.node, ...globals.browser, ...foundryGlobals }
+    }
+  },
+  {
+    files: ["test-e2e/in-world/**/*.mjs"],
+    languageOptions: {
+      ecmaVersion: 2023,
+      sourceType: "module",
+      globals: { ...globals.browser, ...foundryGlobals }
     }
   }
 ];

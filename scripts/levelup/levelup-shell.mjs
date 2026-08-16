@@ -1,10 +1,12 @@
-import { MODULE_ID, tpl, t, log } from "../config.mjs";
+import { MODULE_ID, HOOKS, tpl, t, log, fireHook, fireCancellableHook } from "../config.mjs";
 import { CreatorShellBase, shellOptions, railStageParts } from "../app/shell-base.mjs";
 import { illuminatePages } from "../app/page-illumination.mjs";
 import { buildSteps } from "./registry.mjs";
 import { getSources, isStale, invalidateSources } from "../data/source-cache.mjs";
 import { forEachLimit, WARM_CONCURRENCY } from "../data/concurrency.mjs";
 import { applyLevelUpSpells, spellChanges } from "./steps/lvl-spells-step.mjs";
+import { reconcileGrantedSpells } from "../build/spell-reconcile.mjs";
+import { captureLevelUpSummary, postLevelUpSummary, postCreationSummary } from "../build/chat-summary.mjs";
 import { stageEmberGear, abandonEmberCreation } from "./ember-creation.mjs";
 
 /**
@@ -183,7 +185,9 @@ export class LevelUpShell extends CreatorShellBase {
       canFinish: this.#steps.every((s, i) => (s.id === "review") || flags[i]),
       // The Ember hand-off is still character creation as far as the player is concerned — nothing
       // is being levelled up — so the primary button says so.
-      finishLabel: t(this.state.emberCreation ? "levelup.nav.emberApply" : "levelup.nav.apply")
+      finishLabel: t(this.state.emberCreation ? "levelup.nav.emberApply" : "levelup.nav.apply"),
+      // The source-book overlay, when one is open — window chrome over the stage, not step data.
+      sourceDetails: this._sourceDetails
     };
   }
 
@@ -214,6 +218,7 @@ export class LevelUpShell extends CreatorShellBase {
     // insurance against a partial render being added later, not a fix for a live fault.
     if ( !this._stageRendered(options) ) return;
     this._wireStepChanges(this.element);
+    this._wireSourceDetails(this.element);
     // Client-side spell-list filters on the spell step — search box plus the level/school
     // dropdowns. All filter in the DOM without a re-render, so the search field keeps focus
     // while typing; their values live on the state so the re-render a spell click causes
@@ -314,6 +319,12 @@ export class LevelUpShell extends CreatorShellBase {
     };
   }
 
+  /** @override Level-up step changes are public — see {@link module:api}. */
+  get _stepChangeHook() { return HOOKS.levelUpStepChanged; }
+
+  /** @override */
+  get _hookState() { return this.state; }
+
   /** Re-entrancy guard: a second Apply click while the first is writing must be a no-op. */
   #applying = false;
 
@@ -346,6 +357,20 @@ export class LevelUpShell extends CreatorShellBase {
       }
     }
 
+    // Freeze the chat summary while it can still be read. It is a diff of the driver's clone
+    // against the real actor, and the commit below is exactly the moment those two stop differing
+    // — capture afterwards and the card comes out empty. Posting happens at the end, once every
+    // write has landed. See {@link module:build/chat-summary}.
+    const summary = captureLevelUpSummary(this.state);
+
+    // Veto point, deliberately after the capture so a listener is handed the same readable diff
+    // the chat card gets — the clone and the actor stop differing the moment we commit. Nothing
+    // has been written yet, so refusing costs only the window staying open.
+    if ( !fireCancellableHook(HOOKS.preLevelUpApply, { actor: this.state.actor, state: this.state, summary }) ) {
+      this.#applying = false;
+      return;
+    }
+
     try {
       await this.state.driver.commit();
     } catch ( err ) {
@@ -372,8 +397,42 @@ export class LevelUpShell extends CreatorShellBase {
       }
     }
 
+    // Collapse any spell this level-up's features granted always-prepared that the character had
+    // already chosen at an earlier level. Runs after the picks are written, on the real actor, so it
+    // sees the finished state; the spells step has already offered the freed selection back.
+    if ( !ember ) {
+      try {
+        await reconcileGrantedSpells(actor);
+      } catch ( err ) {
+        // Non-fatal: the worst case is a duplicate spell the player can delete on the sheet.
+        log("granted-spell reconciliation failed", err);
+      }
+    }
+
     await this.close({ force: true });
     if ( !ember ) actor?.sheet?.render(true);
+
+    // Announce last — after every write above and after the window is out of the way, so the card
+    // describes the finished character (spells included) and never holds the UI up on a round-trip.
+    // A creation climb (the creator handed us a 1 → N jump) posts the *creation* card instead: the
+    // player built one character, and this is the moment it became the level they asked for. Both
+    // are no-ops when the GM has the matching setting off.
+    // The public hooks ride alongside the cards but are not governed by them: a card is the GM's
+    // setting to switch off, a hook is a contract with other modules and fires either way. Which
+    // one fires follows the same rule the cards do — a creation climb finishes a *character*, and
+    // anything else finishes a *level-up*. The Ember hand-off ("none") announces neither here;
+    // Ember owns that moment, as {@link LevelUpState#announce} explains.
+    if ( this.state.announce === "creation" ) {
+      fireHook(HOOKS.characterCreated, {
+        actor, state: this.state.creationState, targetLevel: actor?.system?.details?.level ?? this.state.toLevel
+      });
+      await postCreationSummary(actor);
+    } else if ( this.state.announce === "levelup" ) {
+      fireHook(HOOKS.levelUpApplied, {
+        actor, state: this.state, fromLevel: this.state.fromLevel, toLevel: this.state.toLevel, summary
+      });
+      await postLevelUpSummary(actor, summary);
+    }
   }
 
   /**
@@ -396,9 +455,38 @@ export class LevelUpShell extends CreatorShellBase {
       const key = this.state.emberCreation ? "levelup.emberCancel" : "levelup.cancel";
       if ( !await this._confirmDiscard(`${key}.title`, `${key}.body`) ) return this;
     }
+    // A creation climb abandoned part-way still leaves the level-1 character the creator built and
+    // handed over, so the creation card is still owed — only the climb was discarded. Guarded on
+    // `committed` so the Apply path (which announces for itself, at the right level) never doubles
+    // up. Ember is exempt for the reason given on {@link LevelUpState#announce}.
+    if ( !this.state.committed && (this.state.announce === "creation") ) {
+      // Discharge the duty before awaiting it: a second close (Foundry can re-enter this on an
+      // already-closing application) must not post the same character twice. The hook is announced
+      // under the same latch, so `characterCreated` fires exactly once per build however the build
+      // happens to end.
+      this.state.announce = "none";
+      const creationState = this.state.creationState;
+      fireHook(HOOKS.characterCreated, {
+        actor: this.state.actor,
+        state: creationState,
+        // The climb was abandoned, so the character is at whatever level it actually reached —
+        // report that rather than the level the player originally asked for.
+        targetLevel: this.state.actor?.system?.details?.level ?? this.state.fromLevel
+      });
+      await postCreationSummary(this.state.actor);
+    } else if ( !this.state.committed && !this.#cancelAnnounced ) {
+      // An ordinary level-up thrown away. Worth announcing precisely because nothing happened:
+      // a listener that opened something on `levelUpStarted` needs to know to close it again.
+      // Latched for the same re-entrancy reason as the branch above.
+      this.#cancelAnnounced = true;
+      fireHook(HOOKS.levelUpCancelled, { actor: this.state.actor, state: this.state });
+    }
     if ( abandoning ) await abandonEmberCreation(this.state.driver?.manager);
     return super.close(options);
   }
+
+  /** Latch so a re-entered close announces a discarded level-up only once. */
+  #cancelAnnounced = false;
 
   /**
    * Every exit funnels through here — the Cancel button, the window frame's close, and any

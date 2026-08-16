@@ -35,6 +35,7 @@
 
   <div class="creator-stage-body">
     {{> (lookup step "template") step}}
+    {{#if sourceDetails}}{{> "modules/sogrom-dnd5e-character-creator/templates/parts/source-details.hbs" sourceDetails}}{{/if}}
   </div>
 
   <footer class="creator-stage-foot">

@@ -20,6 +20,7 @@ const MODULE = "/modules/sogrom-dnd5e-character-creator/scripts";
 // the running world already loaded, not fresh copies with their own state.
 
 const { assembleActor } = await import(`${MODULE}/build/actor-assembler.mjs`);
+const { reconcileGrantedSpells } = await import(`${MODULE}/build/spell-reconcile.mjs`);
 const { CreatorState } = await import(`${MODULE}/state/creator-state.mjs`);
 const { SourceIndex } = await import(`${MODULE}/data/source-index.mjs`);
 const { resolveChoices } = await import(`${MODULE}/data/choice-resolver.mjs`);
@@ -293,6 +294,39 @@ async function answerChoices(state, source, book, { consumed = new Set(), diagno
 }
 
 /**
+ * Stage the class spells a scenario picks on the Spells step.
+ *
+ * There is **no native counterpart to this**, and that is the point worth recording. dnd5e ships
+ * eight advancement types and none of them is class-spell selection: for an ordinary caster the
+ * player drags spells out of a compendium onto the sheet, so the AdvancementManager never sees the
+ * decision. Nothing here can therefore be an equivalence test — a scenario that picks class spells
+ * is only ever meaningful to the *creator* side, checked against an invariant rather than against a
+ * reference. See {@link module:in-world/harness.checkGrantedSpells}, which is the one caller.
+ *
+ * `assembleActor` reads only `uuid` off each pick, but the whole card shape the Spells step stores
+ * is built anyway, so state staged here is indistinguishable from state a player produced.
+ *
+ * @param {CreatorState} state
+ * @param {object} scenario   `spells: { cantrips: [uuid], level1: [uuid] }`
+ */
+async function pickClassSpells(state, scenario) {
+  const buckets = [
+    ["selectedCantrips", scenario.spells?.cantrips],
+    ["selectedSpells", scenario.spells?.level1]
+  ];
+  for ( const [bucket, uuids] of buckets ) {
+    for ( const uuid of uuids ?? [] ) {
+      const doc = await fromUuid(uuid);
+      // Loudly, rather than building a character quietly missing the spell under test.
+      if ( !doc ) throw new Error(`scenario spell not found: ${uuid}`);
+      state[bucket].push({
+        uuid, id: doc.id, name: doc.name, img: doc.img, level: doc.system?.level ?? 0
+      });
+    }
+  }
+}
+
+/**
  * Fill in the picks for a Magic Initiate-style feat's spells.
  *
  * These do not go through the advancement machinery on the creator's side at all. The creator
@@ -363,6 +397,8 @@ export async function buildCreator(
   // what the native reference was created with.
   state.abilityMethod = "point-buy";
   state.pointBuy = { ...state.pointBuy, ...scenario.abilities };
+
+  await pickClassSpells(state, scenario);
 
   // An origin's ability increase is applied by its own ASI advancement during the driver pass, from
   // `originDeltas(source)` = the advancement's fixed part + the player's allocation. Which origin
@@ -573,6 +609,14 @@ async function levelUp(actor, scenario, book, consumed, onLevel) {
       .forLevelChange(actor, classItem.id, stride);
     manager._sogromLevelUp = true;
     await resolveWith(manager, book, consumed);
+
+    // What the shell's Apply does after the driver commits, and the driver does not do for itself:
+    // collapse a spell this level granted always-prepared that the character had already chosen.
+    // `LevelUpShell#_finish` owns that step because it has to run after the *staged* spell picks are
+    // written, which is shell state — so a path that drives `LevelUpDriver` without the shell, this
+    // adapter included, has to mirror it or it is testing a level-up the product never performs.
+    await reconcileGrantedSpells(actor);
+
     await settle(actor);
     await onLevel?.(level, actor);
   }

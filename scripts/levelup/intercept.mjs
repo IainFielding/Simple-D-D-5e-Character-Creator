@@ -1,4 +1,7 @@
-import { MODULE_ID, SETTINGS, tpl, t, log, levelUpEnabled, launchWindowOptions, multiclassMode } from "../config.mjs";
+import {
+  MODULE_ID, SETTINGS, HOOKS, tpl, t, log, levelUpEnabled, launchWindowOptions, multiclassMode,
+  fireHook, fireCancellableHook
+} from "../config.mjs";
 import { LevelUpDriver } from "./manager-driver.mjs";
 import { LevelUpState } from "./levelup-state.mjs";
 import { LevelUpShell } from "./levelup-shell.mjs";
@@ -71,6 +74,10 @@ function onPreAdvancementManagerRender(manager) {
       return;
     }
     manager._sogromLevelUp = true;
+    // Notification-only: this hand-off is Ember's flow to finish, so there is nothing safe for a
+    // third party to veto here — declining would strand Ember's builder waiting on a manager
+    // nobody drives. Announced so integrations can tell an Ember build from an ordinary level-up.
+    fireHook(HOOKS.emberHandoff, { manager, actor: manager.actor });
     launchLevelUp(manager, { emberCreation: true });
     return false;
   }
@@ -108,7 +115,12 @@ function shouldTakeOver(manager) {
       return false;
     }
   }
-  return true;
+
+  // The last gate, and the polite one: a listener returning false means we decline this level-up
+  // and the *native* dnd5e wizard renders in our place — the player is never left with nothing.
+  // This is the hook another module should use to carve out level-ups it wants to own, instead of
+  // us declaring a blanket manifest conflict. See docs/API.md.
+  return fireCancellableHook(HOOKS.preLevelUpTakeover, { manager, actor: manager.actor });
 }
 
 /**
@@ -119,14 +131,22 @@ function shouldTakeOver(manager) {
  * @param {object} [options]
  * @param {boolean} [options.emberCreation=false]  This manager is Ember's creation hand-off: the
  *   origin decisions fold onto the level-1 screen and the wizard gains its equipment step.
+ * @param {"levelup"|"creation"|"none"} [options.announce]  Which chat card this session posts when
+ *   it applies; omit for the flow's default (see {@link LevelUpState#announce}).
+ * @param {import("../state/creator-state.mjs").CreatorState} [options.creationState]  The creator
+ *   state, when this session is finishing a character the creator started (see
+ *   {@link launchLevelUpTo}). Carried only so the `characterCreated` hook can be announced with
+ *   the same payload wherever a build happens to finish.
  */
-async function launchLevelUp(manager, { emberCreation = false } = {}) {
+async function launchLevelUp(manager, { emberCreation = false, announce = null, creationState = null } = {}) {
   try {
     const driver = new LevelUpDriver(manager);
     await driver.prepare();
     if ( emberCreation ) foldOriginScreens(driver);
-    const state = new LevelUpState(manager.actor, driver, { emberCreation });
-    new LevelUpShell(state, launchWindowOptions()).render(true);
+    const state = new LevelUpState(manager.actor, driver, { emberCreation, announce, creationState });
+    const app = new LevelUpShell(state, launchWindowOptions());
+    app.render(true);
+    fireHook(HOOKS.levelUpStarted, { actor: manager.actor, app, state, driver });
   } catch ( err ) {
     log("level-up takeover failed; the native advancement flow was suppressed", err);
     ui.notifications?.error(t("levelup.notify.takeoverFailed"));
@@ -313,11 +333,19 @@ export async function triggerLevelUp(actor) {
  * Failure here is deliberately soft: the character already exists and is a valid level-1 one, so a
  * class we can't drive leaves the player with a warning and the sheet's Level Up button rather than
  * a half-built actor.
+ * Because this session is what actually finishes the character, it inherits the *creation* chat
+ * card rather than a level-up one — the player made one character, and the table should hear about
+ * it once, at the level they asked for.
  * @param {Actor5e} actor   The just-created character, at level 1.
  * @param {number} target   The character level to reach (> 1; clamped to the system's cap).
- * @returns {Promise<boolean>}  Whether the wizard opened.
+ * @param {object} [options]
+ * @param {import("../state/creator-state.mjs").CreatorState} [options.creationState]  The state
+ *   the creator built this character from, handed on so the session that *finishes* the character
+ *   can announce it with the same payload the creator would have.
+ * @returns {Promise<boolean>}  Whether the wizard opened. When false the caller still owns the
+ *   creation card, since no session exists to post it.
  */
-export async function launchLevelUpTo(actor, target) {
+export async function launchLevelUpTo(actor, target, { creationState = null } = {}) {
   const classItem = actor.items.find(i => i.type === "class");
   if ( !classItem ) { log("no class to level after creation"); return false; }
 
@@ -338,7 +366,7 @@ export async function launchLevelUpTo(actor, target) {
       ui.notifications?.warn(t("levelup.notify.choicesUnsupported"));
       return false;
     }
-    await launchLevelUp(manager);
+    await launchLevelUp(manager, { announce: "creation", creationState });
     return true;
   } catch ( err ) {
     log("post-creation level-up failed", err);

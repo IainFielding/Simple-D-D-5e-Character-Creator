@@ -1,4 +1,5 @@
 import { atLevel } from "../levelup-state.mjs";
+import { hasSourcePage } from "../../data/journal-source.mjs";
 
 /**
  * Subclass — at the level a class unlocks it, choose the subclass. Presented exactly like the
@@ -37,6 +38,9 @@ export const subclassStep = {
     return {
       index: state.subclassSteps.indexOf(record),
       cards, count: cards.length, hasSelection: !!sub.uuid, detail, groups,
+      // The subclass's own page from the source book — its full progression through level 20, which
+      // this short pane cannot hold. Offered only when the active package ships one.
+      sourceUuid: (sub.uuid && await hasSourcePage(sub.uuid)) ? sub.uuid : null,
       // A defining, one-of pick — the largest tier; the header echoes the chosen subclass.
       density: "hero",
       blockStatus: sub.chosen ? sub.name : null,

@@ -532,6 +532,10 @@ export function buildSpellFromEntry(entry) {
   return {
     // `||` (not `??`) so an empty identifier falls through to a usable unique id.
     id: entry.system?.identifier || entry._id || entry.id || entry.uuid,
+    // The identifier on its own, unfudged — `id` above falls back to a document id, which must never
+    // be mistaken for one. This is what {@link module:data/spell-identity.spellKey} matches a pool
+    // row against the character's own spells by, so the same spell from two packages reads as one.
+    identifier: entry.system?.identifier ?? "",
     uuid: entry.uuid,
     name: entry.name,
     img: entry.img || "icons/svg/daze.svg",
