@@ -304,9 +304,16 @@ async function loadGeneralFeats() {
  */
 async function generateAsiFeat(adv, level) {
   const cfg = adv.configuration ?? {};
-  // A *background* increase offers no feat (the flow renders the ability inputs outright), and a
-  // forced increase has nothing to decide. Both fall through to the points generator.
-  if ( (cfg.points ?? 0) <= 0 ) return generateAsi(adv);
+  // Only a *class* ASI offers a feat. Ask the advancement rather than re-deriving the rule: the
+  // system's own `allowFeat` getter is `(item.type === "class") && <the allowFeats setting> …`,
+  // which also picks up the world's variant settings for free.
+  //
+  // This used to test `points > 0` on the reasoning that a background increase offers no feat. It
+  // does not — a 2024 background's "+2/+1 to distribute" *has* points, so every origin increase
+  // sailed through and was answered with a feat, and the native side then failed with "the ASI
+  // screen … offers no feat browser". Invisible until the axis was first actually wired up
+  // (2026-08-16), because this function had never executed.
+  if ( !adv.allowFeat || ((cfg.points ?? 0) <= 0) ) return generateAsi(adv);
 
   const feats = await loadGeneralFeats();
   const held = new Set(adv.actor?.items?.map(i => i._stats?.compendiumSource ?? i.flags?.dnd5e?.sourceId) ?? []);
@@ -389,6 +396,20 @@ export class AnswerBook {
   /**
    * @type {boolean} Whether a generated ASI takes a feat instead of allocating points. The axis that
    * exists because the subclass sweep never takes a feat at all.
+   *
+   * **This was stored and never read until 2026-08-16, so the axis did nothing.** The flag
+   * travelled correctly as far as here — `sweep.mjs` sets `asiFeats: true`, `harness.mjs` passes it
+   * to the constructor — but the generate call in {@link answer} read
+   * `generate(adv, level, { offered })` without it, so the parameter fell back to its `false`
+   * default and `generateAsiFeat` was unreachable. Every ASI on the background axis allocated
+   * ability points instead of taking a feat, which is exactly the gap the axis was added to close
+   * (see the README's "Feats: never taken"). Found by `no-unused-private-class-members` when the
+   * harness was first brought into the lint scope — the field being unread *was* the bug, so the
+   * rule that flagged it is the one worth keeping enabled here.
+   *
+   * **Consequence for baselines:** every archived `sweep-results-background-*.jsonl` predates the
+   * fix and was recorded without feats, so it is not comparable with a run taken after it. Re-take
+   * the baseline rather than diffing across the change.
    */
   #asiFeats;
 
@@ -451,7 +472,7 @@ export class AnswerBook {
         entry.answer = override;
         entry.source = "override";
       } else if ( this.#generate ) {
-        const result = await generate(adv, level, { offered });
+        const result = await generate(adv, level, { offered, asiFeats: this.#asiFeats });
         entry.answer = result.answer;
         entry.missing = result.missing ?? null;
         entry.note = result.note ?? null;

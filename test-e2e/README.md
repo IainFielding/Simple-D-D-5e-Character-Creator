@@ -27,6 +27,7 @@ Copy `config.example.mjs` to `config.mjs` and edit the paths before the setup st
 | `in-world/answers.mjs` | The answer book: one decision-answering strategy, both adapters |
 | `in-world/sweep.mjs` | Generates one scenario per subclass in the world |
 | `in-world/shots.mjs` | Opens and drives the real wizard, for `screenshots.mjs` |
+| `in-world/hooks.mjs` | Asserts the public hook/API surface against the real wizards |
 
 ## Screenshots
 
@@ -50,6 +51,63 @@ Ember's own builder produced; see that file's header for why, and what that does
 
 Playwright is only the boot loader — it launches a browser, logs in, and calls into
 `in-world/harness.mjs`. There are no selectors for game UI on the Node side.
+
+## Linting
+
+`npm run check` at the repo root lints this directory (`eslint scripts test test-e2e`), so harness
+changes are held to the same standard as the module's.
+
+The flat config declares the two halves separately, because they do not share an environment: the
+driver is Node, and `in-world/` runs in Foundry's page with every Foundry global in scope. The
+driver block is also given the browser and Foundry globals, and that is deliberate rather than
+lazy — files like `shell.mjs` and `lib/session.mjs` hand closures to Playwright
+(`session.eval(() => game.world.id)`, `page.addInitScript(...)`) whose bodies are serialised and
+executed *in the page*. ESLint sees an ordinary arrow function in a Node file and cannot know it
+will run somewhere else, so those globals have to be declared for the file carrying them.
+
+Bringing the harness into scope immediately found one real defect, now fixed — see below.
+
+### The feat axis: two bugs fixed, still not usable
+
+`no-unused-private-class-members` flagged `#asiFeats` in `in-world/answers.mjs` as stored and never
+read, and the field being unread *was* the bug. The flag travelled correctly from `sweep.mjs`
+(`asiFeats: true`) through `harness.mjs` into `AnswerBook`'s constructor, and then stopped: the
+generate call read `generate(adv, level, { offered })` without it, so the parameter fell back to
+its `false` default and `generateAsiFeat` was unreachable.
+
+So **`--sweep --axis background` allocated ability points at every ASI and never took a feat** —
+precisely the gap the axis was added to close (see "Feats: never taken" below). Fixed 2026-08-16 by
+passing `asiFeats: this.#asiFeats` through.
+
+That exposed a **second** bug immediately behind it, in code that had consequently never executed.
+`generateAsiFeat` decided whether an ASI offers a feat by testing `points > 0`, on the reasoning
+that a background increase offers none. It does not — a 2024 background's "+2/+1 to distribute"
+*has* points — so every origin increase was answered with a feat and the native side failed with
+*"the ASI screen … offers no feat browser"*. Now defers to the system's own `advancement.allowFeat`
+(`item.type === "class"` plus the `allowFeats` setting) instead of re-deriving the rule.
+
+> **The axis still does not complete, and should not be trusted yet.** With both fixes in,
+> `--sweep --axis background --shard 1/20 --jump` errors 3/3 with *timed out waiting for step
+> "Potent Dragonmark" to advance* — systematic, not the one-in-ten flake below, since every
+> character takes the first entry of the same uuid-sorted list. That feat passes
+> `loadGeneralFeats`'s filter legitimately (no `prerequisites.items`) but carries **its own
+> advancement**, which `native.mjs`'s generic step driver cannot advance.
+>
+> This is the territory the axis exists to reach — "nothing a feat *brings* is compared" — and the
+> first feat it ever tried brings something the adapter cannot drive. Resolving it means either
+> teaching `fillStep` that advancement type, or excluding such feats from the pool. Until then the
+> axis reports errors rather than results. Start with
+> `node run.mjs --find "Potent Dragonmark"` then `--ids <uuid>`.
+
+> **Baselines taken before this are not comparable.** Every archived
+> `sweep-results-background-*.jsonl` predates the fix and was recorded without feats. Re-take the
+> baseline rather than diffing across the change — the same rule that already applies between
+> incremental and `--jump` runs.
+
+Worth noting what this cost to find: the defect sat in a well-commented file, in a documented
+feature, through several sweep runs whose results looked plausible because "no feat was taken" is
+indistinguishable from "the generator chose points" unless you go looking. A lint rule found it in
+one pass.
 
 The `in-world/` files are served over HTTP from Foundry's own static route
 (`/modules/sogrom-dnd5e-character-creator/test-e2e/in-world/…`), because the repo is
@@ -102,6 +160,7 @@ node run.mjs --find "feat:Actor"      # find items by name (optionally type-pref
 node run.mjs --subclasses wizard      # subclasses for a class identifier
 node run.mjs --sidekicks              # assert Tasha's sidekicks are not offered as classes
 node run.mjs --granted-spells         # assert an always-prepared grant is never duplicated
+node run.mjs --hooks                  # assert the public hook/API surface, through the real wizards
 node run.mjs --sweep                  # every subclass in the world, at level 20 (see below)
 node run.mjs --sweep --axis species   # vary the species instead, on a fixed Wizard/Evoker
 node run.mjs --sweep --axis background  # vary the background, taking a feat at every ASI
@@ -389,6 +448,68 @@ Which resolves the Artificer three ways, deliberately:
 
 The 2014-vs-2024 split is the point of tier 2, and it is not cosmetic: 38 of the 122 scenarios now
 build on `dnd5e.classes` — Tasha's 26 non-Artificer subclasses plus the twelve 2014 SRD ones.
+
+## The public hook and API surface: also an assertion
+
+```bash
+node run.mjs --hooks
+```
+
+The second thing here that is not a difference between two builds. **Hooks have no native
+counterpart** — dnd5e emits nothing comparable to `simpleCharacterCreator.*`, so there is no
+reference side to diff against, and forcing one into that shape would make the test weaker.
+
+It also could not live in `creator.mjs` even if there were. That adapter calls `assembleActor()`
+and `driver.autoResolve()` directly and never constructs a shell, deliberately — and eleven of the
+thirteen hooks are emitted *from* the shells. They are structurally invisible to the equivalence
+suite. So this opens the real `CreatorShell` and the real `LevelUpShell`, the way `shots.mjs` does.
+
+`test/api.test.mjs` already covers the parts that are pure logic: the name registry, `Hooks.call`'s
+veto contract, a throwing listener not counting as a veto. Repeating those here would buy nothing.
+What only a real world can answer is whether each hook fires **at the right place, in the right
+order, exactly once** — so that is all this asserts.
+
+| Case | Asserts |
+| --- | --- |
+| API object shape | Every member `docs/API.md` promises exists and runs; `HOOKS` is frozen and has 13 entries |
+| Creation at level 1 | `preOpenCreator → creatorOpened → creationStepChanged → preCreateCharacter → characterCreated`, in order, with `characterCreated` exactly once |
+| Veto | A `preCreateCharacter` listener returning `false` announces nothing, **leaves no actor behind**, and leaves the window open to retry |
+| Creation climbing above level 1 | `characterCreated` fires **once, from the level-up shell, after the climb applies**, carrying the level reached and the threaded creator state — and `levelUpApplied` does not fire at all |
+| Ordinary level-up | `levelUpStarted → preLevelUpApply → levelUpApplied` with correct `fromLevel`/`toLevel`; `characterCreated` does not fire |
+| Discarded level-up | `levelUpCancelled` fires once and the actor's level is unchanged |
+
+**The climb case is why the file exists.** A build that starts above level 1 is not finished when
+`assembleActor` returns — the creator hands the 1 → N jump to the level-up wizard, so the hook has
+to fire from the *other* wizard, once, with the level actually reached. Three call sites cooperate
+to make that true (`creator-shell#_finish`, `levelup-shell#_finish`, and `levelup-shell#close` for
+an abandoned climb), and no unit test can see any of it.
+
+It climbs to **level 2**, deliberately. What is under test is *which wizard announces the character
+and how many times*; the size of the jump is incidental, and 1 → 2 exercises the whole path. Going
+further drags in a subclass decision, which the generating `AnswerBook` does not invent — subclasses
+are always named explicitly (see [Writing a scenario](#writing-a-scenario)) — so the wizard's
+required steps would never complete and `_finish` would return at its guard. Naming a subclass uuid
+here would date the moment content updates, and subclass resolution is already covered across 122
+subclasses by the sweep. So this does **not** cover a multi-level climb or one carrying a subclass;
+both are the sweep's job.
+
+Two things cost a run each to find, and both are now asserted rather than assumed. **Quick Build
+needs a class first** — it fills from the selected class's profile and returns
+`{ok: false, warnings: ["no-class"]}` without one, so a fill that silently did nothing made
+`_finish` return at its completeness guard, which looks *identical* to a hook that was never
+emitted. `fill()` now picks a Fighter, throws on `!ok`, throws if `gotoStep` cannot reach a step,
+and names any incomplete required step. A failure here should now point at its own cause.
+
+Creation is filled by the real Quick Build with a fixed seed. Level-up decisions are answered by
+the generating `AnswerBook` through the same `autoResolve` the equivalence adapter uses, rather
+than by clicking: what is under test is what `_finish` *emits*, not the screens in front of it.
+
+Opening the creator goes through `api.launchCreator()` rather than constructing the shell — the
+one place in the harness that exercises the public entry point and its `preOpenCreator` gate as a
+consumer would actually reach them.
+
+Every case cleans up after itself and reports independently, so one failure does not cascade into
+six. Actors are named `[e2e] Hooks …`, so the ordinary `cleanup()` reclaims them.
 
 ## Granted always-prepared spells: an assertion, not a comparison
 
