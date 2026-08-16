@@ -6,6 +6,7 @@ import { spellMethodFor } from "../data/spell-source.mjs";
 import { resolveFeatSpells } from "../steps/feat-spells-step.mjs";
 import { LevelUpDriver } from "../levelup/manager-driver.mjs";
 import { buildCreationManager, CreationChoiceProvider } from "./creation-advancement.mjs";
+import { reconcileGrantedSpells } from "./spell-reconcile.mjs";
 
 /**
  * Turns a finished {@link CreatorState} into a real character.
@@ -104,6 +105,16 @@ export async function assembleActor(state, source, equipment) {
   // Add the spells chosen on the Feat-Spells step (Magic Initiate), created directly on the actor —
   // the PHB feat carries no advancement to grant them, so we add them by hand.
   await applyFeatSpells(actor, state, source);
+
+  // A level-1 subclass can grant a spell the class list also offers — a 2014 Cleric of Life is the
+  // common case. Collapse any such pair into the granted copy, so the character isn't left with two
+  // documents and a prepared slot spent on a spell they already always have.
+  try {
+    await reconcileGrantedSpells(actor);
+  } catch ( err ) {
+    // Non-fatal: the worst case is a duplicate spell the player can delete on the sheet.
+    log("granted-spell reconciliation failed", err);
+  }
 
   // Grant the starting equipment and currency chosen on the Choices step.
   if ( equipment ) await grantEquipment(actor, state, source, equipment);

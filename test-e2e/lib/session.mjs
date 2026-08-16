@@ -72,15 +72,31 @@ export class Session {
     }
   }
 
-  /** Load the join page, authenticate as {@link GM_USER}, and wait for the world. */
+  /**
+   * Load the join page, authenticate as {@link GM_USER}, and wait for the world.
+   *
+   * Foundry auto-creates a passwordless "Gamemaster" on a world that has no GM, so joining is just:
+   * name the user, submit. *How* you name them depends on the world's join-screen theme, and both
+   * shapes are live — the classic screen renders a `<select name="userid">` of every user, while the
+   * minimal theme (`body.join-theme-minimal`) renders a free-text `<input name="username">` instead.
+   * Waiting on the select alone timed out against a minimal-themed world with an error that named
+   * only the missing locator, which reads like the world failed to launch when it is up and serving.
+   */
   async join() {
     await this.page.goto(`${BASE_URL}/join`, { waitUntil: "domcontentloaded" });
 
-    // Foundry auto-creates a passwordless "Gamemaster" on a world that has no GM, so the join
-    // form is just: pick the user, submit.
     const select = this.page.locator("select[name=userid]");
-    await select.waitFor({ timeout: 30_000 });
-    await select.selectOption({ label: GM_USER });
+    const username = this.page.locator("input[name=username]");
+    await Promise.race([
+      select.waitFor({ timeout: 30_000 }),
+      username.waitFor({ timeout: 30_000 })
+    ]).catch(() => {
+      throw new Error("The join form never appeared — neither select[name=userid] nor "
+        + `input[name=username]. Page: ${this.page.url()}`);
+    });
+
+    if ( await select.count() ) await select.selectOption({ label: GM_USER });
+    else await username.fill(GM_USER);
     await this.page.locator("button[name=join]").click();
 
     await this.waitForReady();

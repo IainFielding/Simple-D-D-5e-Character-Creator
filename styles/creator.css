@@ -920,7 +920,10 @@ body:has(.sogrom-creator-fullscreen) .application.compendium-browser {
   color: var(--cc-muted);
 }
 
-.creator-stage-body { flex: 1; overflow-y: auto; padding: 1.5rem 2rem; }
+/* `position: relative` so a full-surface overlay (the source-book panel) can size itself to this
+   box with `inset: 0`. Without it the overlay resolved against a distant positioned ancestor and,
+   being inside this scroll container, was clipped part-way down with no way to reach the rest. */
+.creator-stage-body { position: relative; flex: 1; overflow-y: auto; padding: 1.5rem 2rem; }
 
 .creator-stage-foot {
   flex: 0 0 auto;
@@ -2640,8 +2643,10 @@ body:has(.sogrom-creator-fullscreen) .application.compendium-browser {
 
 /* Level-up spell swaps (Phase 4b): a known spell offered as a swap-out candidate reads muted with a
    bookmark; once marked for replacement it strikes through and the arrows glow. */
-.levelup-spells-swaphint { margin: -0.35rem 0 0.75rem; color: var(--cc-muted); font-size: 0.82rem; line-height: 1.35; }
-.levelup-spells-swaphint i { color: var(--cc-accent); margin-right: 0.25rem; }
+.levelup-spells-swaphint,
+.levelup-spells-releasedhint { margin: -0.35rem 0 0.75rem; color: var(--cc-muted); font-size: 0.82rem; line-height: 1.35; }
+.levelup-spells-swaphint i,
+.levelup-spells-releasedhint i { color: var(--cc-accent); margin-right: 0.25rem; }
 .creator-pickrow.is-owned { border-style: dashed; }
 .creator-pickrow.is-owned .creator-pickrow-name { color: var(--cc-muted); }
 .creator-pickrow.is-owned .creator-pickrow-tick { color: var(--cc-muted); }
@@ -2684,6 +2689,20 @@ body:has(.sogrom-creator-fullscreen) .application.compendium-browser {
   color: var(--cc-accent);
 }
 .creator-spell-selected-empty { color: var(--cc-muted); font-size: 0.85rem; }
+/* Spells the build grants outright, listed under the picks for reference. On its own row across the
+   full width, and visibly separated, so it reads as "you also get these" rather than as more of the
+   player's own choices. */
+.creator-spell-granted {
+  flex: 1 0 100%;
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.4rem 0.6rem;
+  padding-top: 0.6rem;
+  border-top: 1px dashed var(--cc-line);
+}
+.creator-spell-granted .creator-spell-group-label { color: var(--cc-muted); }
+.creator-spell-granted .creator-spell-group-label i { margin-right: 0.3rem; }
 /* Picked spells, grouped by level so cantrips and 1st-level spells read apart. */
 .creator-spell-groups { flex: 1 1 auto; display: flex; flex-direction: column; gap: 0.5rem; }
 .creator-spell-group { display: flex; align-items: center; flex-wrap: wrap; gap: 0.4rem 0.6rem; }
@@ -4404,3 +4423,100 @@ body:has(.sogrom-creator-fullscreen) .application.compendium-browser {
 .sogrom-store-inv-empty i { font-size: 1.6rem; }
 .sogrom-store-inv-empty p { margin: 0; }
 .sogrom-store-inv-drophint { margin: 0; }
+
+/* --- The source-book "Full Details" overlay ---
+   A class or subclass's own page from the book, covering the stage body. Absolute and opaque
+   over `.creator-stage-body` for the same reason the picker drawer is: the page wants the whole
+   surface, and a translucent panel would leave the step underneath competing for the same pixels.
+
+   Three nested boxes, and the split between them is the whole trick: this one is the frame, its
+   `-body` child is the only scroll container and carries no foreign class at all, and inside that
+   sits a wrapper holding dnd5e's and the book's classes (see templates/parts/source-details.hbs).
+   Nothing here restyles the book's content — the point is to show it as it looks in Foundry. These
+   rules cover only the frame, and the three things the system's stylesheet cannot know about: that
+   its page is inside a scroll container of ours, that its window-sizing rules must not apply to a
+   page rendered on its own, and that a wide progression table should scroll rather than push the
+   page sideways. */
+.creator-source-details {
+  position: absolute;
+  inset: 0;
+  z-index: 6;
+  display: flex;
+  flex-direction: column;
+  background: var(--cc-bg, var(--cc-sunk));
+}
+.creator-source-details-head {
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  gap: 0.85rem;
+  padding: 0.85rem 1.6rem;
+  border-bottom: 1px solid var(--cc-line);
+}
+.creator-source-details-head img {
+  width: 42px;
+  height: 42px;
+  border: none;
+  border-radius: 4px;
+  object-fit: cover;
+}
+.creator-source-details-title { min-width: 0; }
+.creator-source-details-title h2 { margin: 0; font-size: 1.15rem; line-height: 1.2; }
+.creator-source-details-title p { margin: 0; color: var(--cc-muted); font-size: 0.82rem; }
+.creator-source-details-fallback { font-style: italic; }
+.creator-source-details-close { margin-left: auto; padding: 0.35rem 0.7rem; font-size: 0.85rem; }
+/* Ours alone, and the only scroll container: no dnd5e class goes on this element. dnd5e's own page
+   classes carry sizing of their own — `.journal-entry-page.sheet.class` sets `min-block-size: 600px`
+   — which on a flex scroll container fights the height chain. They live on the child instead, where
+   a minimum height is harmless and this box just scrolls it. */
+.creator-source-details-body {
+  /* `1 1 0` rather than `1 1 auto`: the basis must not come from the content, or a long page sizes
+     this box instead of scrolling inside it. */
+  flex: 1 1 0;
+  min-height: 0;
+  overflow-y: auto;
+}
+/* The classed wrapper is wanted for colour and typography only — never for layout. The classes it
+   carries (`sheet`, `journal-entry-page`, `class`, the book's own) are the ones Foundry and dnd5e
+   use to size and clip a *window*: `.journal-entry-page.sheet.class` alone sets
+   `min-block-size: 600px`. Left alone that made the wrapper a fixed ~600px box that clipped the
+   rest of the page, so the scroll container above had nothing to scroll and the reader hit a dead
+   stop just past the artwork. Neutralise the box model on the way in; everything visual still
+   comes from the system's and the book's own rules. */
+.creator-source-details-body > * {
+  display: block;
+  position: static;
+  flex: none;
+  min-block-size: 0;
+  min-inline-size: 0;
+  block-size: auto;
+  max-block-size: none;
+  inline-size: auto;
+  overflow: visible;
+  margin: 0;
+  padding: 0;
+  border: none;
+  border-radius: 0;
+}
+/* `.journal-entry-content` is deliberate, not decoration: dnd5e opens its page-body rules with
+   `.journal-entry-content, &.journal-entry-page .window-content` — so this class is what brings the
+   heading scale and page styling across. The `.window-content` half of that pair is *not* used,
+   because it also carries the journal window's own layout (a two-column grid with `overflow: hidden`)
+   which has nothing to do with a page rendered on its own. */
+.creator-source-details-body .journal-entry-content {
+  display: block;
+  block-size: auto;
+  max-block-size: none;
+  overflow: visible;
+  padding: 1.25rem 1.6rem 3rem;
+}
+/* The 1–20 progression table is wider than this panel on a narrow window. Scroll it inside its own
+   box so the page body never scrolls sideways. */
+.creator-source-details-body table { display: block; max-width: 100%; overflow-x: auto; }
+.creator-source-details-body img { max-width: 100%; height: auto; }
+/* While the book is open, the step underneath must not scroll behind it — only the overlay does. */
+.creator-stage-body:has(> .creator-source-details) { overflow: hidden; padding: 0; }
+
+/* The control that opens it, sharing the detail header with Quick Build. */
+.creator-source-details-btn { margin-left: auto; padding: 0.35rem 0.7rem; font-size: 0.85rem; }
+.creator-quick-build-btn + .creator-source-details-btn { margin-left: 0.5rem; }

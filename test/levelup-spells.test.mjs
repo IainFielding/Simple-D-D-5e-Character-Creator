@@ -112,6 +112,45 @@ describe("computeSpellPlan", () => {
     expect(plan.addCantrips).toBe(2);
   });
 
+  /**
+   * A feature granting a spell the character already chose at an earlier level is about to be
+   * collapsed into one always-prepared document ({@link module:build/spell-reconcile}). The copy
+   * that disappears is the one still counted in `preparation.value`, so without compensating here
+   * the freed selection would only surface at the *next* level-up, as an unexplained extra pick.
+   */
+  it("hands back the selection a pending granted-spell merge will free", () => {
+    const identified = (level, sourceItem, { origin = null, prepared = 1 } = {}) => ({
+      id: origin ? "granted" : "chosen",
+      type: "spell",
+      _stats: { compendiumSource: "Compendium.dnd5e.spells24.Item.phbsplDivineSmit" },
+      flags: origin ? { dnd5e: { advancementOrigin: origin } } : {},
+      getFlag: (scope, key) => (origin ? { dnd5e: { advancementOrigin: origin } } : {})[scope]?.[key],
+      system: { level, sourceItem, prepared, method: "spell" }
+    });
+    const { actor, cls } = makeWizardActor({
+      classLevel: 4, preparedMax: 7, preparedValue: 5,
+      slots: { spell1: 4, spell2: 3 },
+      items: [
+        identified(1, "class:wizard"),                                    // chosen earlier
+        identified(1, "class:wizard", { origin: "subX.advY", prepared: 2 })  // now granted
+      ]
+    });
+    const plan = computeSpellPlan(actor, cls);
+    expect(plan.releasedSpells).toBe(1);
+    // 7 max − 5 prepared = 2 by capacity, plus the one the merge is about to give back.
+    expect(plan.addSpells).toBe(3);
+  });
+
+  it("frees nothing when a granted spell has no chosen twin", () => {
+    const { actor, cls } = makeWizardActor({
+      classLevel: 4, preparedMax: 7, preparedValue: 5, slots: { spell1: 4, spell2: 3 }
+    });
+    const plan = computeSpellPlan(actor, cls);
+    expect(plan.releasedSpells).toBe(0);
+    expect(plan.releasedCantrips).toBe(0);
+    expect(plan.addSpells).toBe(2);
+  });
+
   it("finds the caster on a spellcasting subclass when the class itself has none", () => {
     // Modelled on the PHB Eldritch Knight: the fighter has progression "none"; the subclass
     // carries progression "third" and its own Cantrips Known scale keyed by *class* level.

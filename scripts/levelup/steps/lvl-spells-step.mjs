@@ -1,5 +1,7 @@
 import { t } from "../../config.mjs";
 import { cantripsKnownAtLevel, buildSpellFromEntry, spellMethodFor } from "../../data/spell-source.mjs";
+import { ownedSpellKeys, spellKey } from "../../data/spell-identity.mjs";
+import { planSpellReconciliation } from "../../build/spell-reconcile.mjs";
 
 /**
  * @typedef {object} SpellPlan
@@ -22,6 +24,8 @@ import { cantripsKnownAtLevel, buildSpellFromEntry, spellMethodFor } from "../..
  * @property {number}  [spellTarget]   Total prepared spells allowed (preparation.max).
  * @property {number}  [spellHave]     Prepared leveled spells already known (preparation.value).
  * @property {number}  [maxSpellLevel] Highest spell level the actor has slots for.
+ * @property {number}  [releasedSpells]   Prepared selections a pending granted-spell merge frees.
+ * @property {number}  [releasedCantrips] Cantrip selections a pending granted-spell merge frees.
  * @property {number}  addCantrips     Cantrips the player may add this level-up (≥ 0).
  * @property {number}  addSpells       Leveled spells the player may add this level-up (≥ 0).
  */
@@ -97,12 +101,22 @@ export function computeSpellPlan(actorLike, classItem) {
   for ( let l = 1; l <= 9; l++ ) if ( (spells[`spell${l}`]?.max ?? 0) > 0 ) maxSpellLevel = l;
   if ( (spells.pact?.max ?? 0) > 0 ) maxSpellLevel = Math.max(maxSpellLevel, spells.pact?.level ?? 0);
 
-  const addCantrips = Math.max(0, cantripTarget - cantripHave);
-  const addSpells = maxSpellLevel > 0 ? Math.max(0, spellTarget - spellHave) : 0;
+  // Selections a pending merge will hand back. A spell chosen at an earlier level that a feature now
+  // grants always-prepared is about to be collapsed into the granted copy ({@link module:build/spell-reconcile}),
+  // and the copy being removed is the one still counted above — as a prepared spell in
+  // `preparation.value`, or as a cantrip under this caster's tag. Adding the released count restores
+  // the capacity the merge is about to free, so the player spends it now rather than discovering an
+  // unexplained extra pick at the next level. Planning only reads, which is what makes it safe to run
+  // against the driver's clone.
+  const { releasedSpells, releasedCantrips } = planSpellReconciliation(actorLike);
+
+  const addCantrips = Math.max(0, cantripTarget - cantripHave) + releasedCantrips;
+  const addSpells = maxSpellLevel > 0 ? Math.max(0, spellTarget - spellHave) + releasedSpells : 0;
 
   return {
     isSpellcaster: true, listId, listType, sourceTag, castUuid, castItem, classLevel, method,
     cantripTarget, cantripHave, spellTarget, spellHave, maxSpellLevel,
+    releasedSpells, releasedCantrips,
     addCantrips, addSpells, hasDelta: (addCantrips > 0) || (addSpells > 0)
   };
 }
@@ -175,7 +189,13 @@ export const lvlSpellsStep = {
 
     const picked = new Set([...state.selectedCantrips, ...state.selectedSpells].map(s => s.uuid));
     const ownedItems = ownedSpells(state.actor, plan.sourceTag, isCantrips);
-    const ownedUuidSet = new Set(ownedItems.map(o => o.uuid));
+    // Two different questions, and answering both from one set was the bug. *Swappable* is narrow —
+    // a regularly-prepared spell under this caster's own tag. *Already owned* is everything the
+    // character has, whatever granted it and whatever its preparation state, read from the clone so
+    // a grant applied by this very level-up counts. Filtering the pool by the narrow set let a
+    // feature-granted spell (always prepared, often tagged to a subclass) be offered a second time —
+    // and the duplicate then ate a prepared slot forever.
+    const ownedKeys = ownedSpellKeys(state.spellSource);
 
     // The pool for the active tab: cantrips (level 0) or every leveled spell up to the slot cap.
     // Already-owned spells are dropped from the *addable* pool — they instead appear as swap-out
@@ -187,6 +207,7 @@ export const lvlSpellsStep = {
     const budget = isCantrips ? effCantrips : effSpells;
     const chosen = isCantrips ? state.selectedCantrips : state.selectedSpells;
     const swapMark = isCantrips ? state.swapCantrip : state.swapSpell;
+    const released = (isCantrips ? plan.releasedCantrips : plan.releasedSpells) ?? 0;
     const atLimit = chosen.length >= budget;
     const decorate = s => ({ ...s, levelLabel: s.level === 0 ? "" : t("levelup.step.spells.levelTag", { level: s.level }) });
 
@@ -199,7 +220,7 @@ export const lvlSpellsStep = {
         }))
       : [];
 
-    const poolRows = raw.filter(s => !ownedUuidSet.has(s.uuid)).map(s => ({
+    const poolRows = raw.filter(s => !ownedKeys.has(spellKey(s))).map(s => ({
       ...decorate(s), owned: false,
       active: picked.has(s.uuid),
       focused: state.focusedSpellUuid === s.uuid,
@@ -235,6 +256,9 @@ export const lvlSpellsStep = {
       isSpellcaster: true,
       intro: t("levelup.step.spells.intro", { class: state.classItem?.name ?? "" }),
       swapHint: ownedRows.length ? t("levelup.step.spells.swapHint") : "",
+      // Why there is an extra pick this level: a spell chosen earlier is about to become always
+      // prepared, so the selection it was occupying comes back.
+      releasedHint: released > 0 ? t("levelup.step.spells.releasedHint", { count: released }) : "",
       hasCantrips: plan.addCantrips > 0,
       hasSpells: plan.addSpells > 0,
       isCantripsTab: isCantrips,

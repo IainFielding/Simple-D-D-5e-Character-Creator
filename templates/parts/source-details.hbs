@@ -1,0 +1,41 @@
+{{!--
+  The "Full Details" overlay: a class or subclass's own page from the source book, rendered over
+  the stage.
+
+  `bodyClasses` is load-bearing, not decoration. `{{{html}}}` is produced by dnd5e's own journal
+  template, and every rule that styles it is scoped to a class our shell does not otherwise provide
+  — dnd5e's own (`.sheet.dnd5e2-journal`), the reader's theme (`.themed.theme-dark.dnd5e2`), and
+  crucially the *content package's* own (the Player's Handbook registers a journal sheet carrying
+  `phb`, and its stylesheet keys every colour off `.theme-dark.phb`). Those classes are read off the
+  live sheets at render time rather than hardcoded, so a third-party book styles its own page here
+  exactly as it does in Foundry — see {@link module:app/source-details}.
+
+  `fallback` means no book page was found and this is the item's own description instead, so the
+  header says as much rather than implying the reader is looking at the book.
+--}}
+<div class="creator-source-details" role="dialog" aria-modal="true" aria-label="{{name}}" tabindex="-1">
+  <header class="creator-source-details-head">
+    <img src="{{img}}" alt="" draggable="false">
+    <div class="creator-source-details-title">
+      <h2>{{name}}</h2>
+      {{#if pageName}}<p>{{pageName}}</p>{{/if}}
+      {{#if fallback}}<p class="creator-source-details-fallback">{{localize "sogrom-dnd5e-character-creator.common.sourceDetails.fallback"}}</p>{{/if}}
+    </div>
+    <button type="button" class="creator-btn creator-btn-ghost creator-source-details-close"
+            data-action="closeSourceDetails">
+      <i class="fa-solid fa-xmark"></i>
+      {{localize "sogrom-dnd5e-character-creator.common.close"}}
+    </button>
+  </header>
+
+  {{!-- Three nested elements, each with one job: ours scrolls, the middle one carries the system's
+        and the book's classes (which bring sizing of their own, so they stay off the scroll
+        container), and `.journal-entry-content` is the hook dnd5e's page-body rules open with. --}}
+  <div class="creator-source-details-body">
+    <div class="{{bodyClasses}}">
+      <div class="journal-entry-content">
+        {{{html}}}
+      </div>
+    </div>
+  </div>
+</div>

@@ -29,6 +29,18 @@
       {{localize "sogrom-dnd5e-character-creator.quickBuild.button"}}
     </button>
     {{/if}}
+    {{!-- The source book's own page for this entry, when the active content package ships one.
+          Set by the step only where such a page can exist (dnd5e authors them for classes and
+          subclasses), so this stays absent on species and background rather than offering a
+          control that would open the description the reader is already looking at. --}}
+    {{#if sourceUuid}}
+    <button type="button" class="creator-btn creator-btn-ghost creator-source-details-btn"
+            data-action="openSourceDetails" data-uuid="{{sourceUuid}}"
+            data-tooltip="{{localize "sogrom-dnd5e-character-creator.common.sourceDetails.tooltip"}}">
+      <i class="fa-solid fa-book-open"></i>
+      {{localize "sogrom-dnd5e-character-creator.common.sourceDetails.open"}}
+    </button>
+    {{/if}}
   </header>
   <div class="creator-detail-body">{{{detail.enriched}}}</div>
 

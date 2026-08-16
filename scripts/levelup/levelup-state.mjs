@@ -267,9 +267,21 @@ export class LevelUpState {
   spellPlan() {
     // No driver yet (the Class step): nothing has changed, so there is nothing to offer.
     if ( !this.driver && !this.committed ) return computeSpellPlan(this.actor, null);
-    const source = this.committed ? this.actor : this.driver.clone;
+    const source = this.spellSource;
     const classItem = this.classItem ? source.items.get(this.classItem.id) : null;
     return computeSpellPlan(source, classItem);
+  }
+
+  /**
+   * The actor-alike whose spells and derived data the spell step should read: the driver's clone
+   * while the level-up is still being decided (its derived data already reflects the gained level,
+   * and it carries anything this level-up's advancements just granted), and the real actor once the
+   * commit has happened. Shared with the step's own "already owned" test so the capacity arithmetic
+   * and the pool can never disagree about which character they are looking at.
+   * @returns {Actor5e}
+   */
+  get spellSource() {
+    return (this.committed || !this.driver) ? this.actor : this.driver.clone;
   }
 
   /**

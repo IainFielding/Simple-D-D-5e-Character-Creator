@@ -15,7 +15,13 @@
       "selectHint": "Choose an option from the list to see its full description.",
       "noResults": "No matches for “{query}”.",
       "noResultsFilters": "No matches — try adjusting the filters.",
-      "close": "Close"
+      "close": "Close",
+      "sourceDetails": {
+        "open": "Full Details",
+        "tooltip": "Read this entry's own page from the source book",
+        "fallback": "No book page for this entry — showing its own description.",
+        "none": "There is nothing more to show for this entry."
+      }
     },
     "loading": {
       "indexing": "Reading the compendiums…",
@@ -190,6 +196,7 @@
           "picked": "{count} chosen",
           "noneNeeded": "No new spells to choose this level.",
           "swapHint": "You may also swap one spell you know — pick a known spell and choose Swap Out to trade it for another.",
+          "releasedHint": "{count} extra pick — a new feature grants a spell you already knew, always prepared, so the selection it was using is yours again.",
           "swapOut": "Swap Out",
           "keep": "Keep",
           "add": "Learn Spell",
@@ -329,6 +336,7 @@
         "level1": "1st-Level Spells",
         "selected": "Your Spells",
         "selectedNone": "None chosen yet — pick from the list below.",
+        "granted": "Always yours",
         "picked": "{count} spells",
         "noCaster": "This class has no spellcasting at level 1 — nothing to choose here.",
         "notYet": "This class learns its first spells at 2nd level — nothing to choose yet. You'll pick them in the level-up wizard.",

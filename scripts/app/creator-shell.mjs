@@ -179,6 +179,8 @@ export class CreatorShell extends CreatorShellBase {
     return {
       loading: this.#loading,
       loadingLabel: this.#loadingLabel ?? t("loading.indexing"),
+      // The source-book overlay, when one is open — window chrome over the stage, not step data.
+      sourceDetails: this._sourceDetails,
       version: game.modules.get(MODULE_ID)?.version ?? "",
       cancelLabel: t("nav.cancel"),
       dossier: this.#dossierContext(lines),
@@ -246,6 +248,7 @@ export class CreatorShell extends CreatorShellBase {
     if ( !this._stageRendered(options) ) return;
     // Selects/inputs don't fire click "actions"; wire their change events to the dispatcher.
     this._wireStepChanges(root);
+    this._wireSourceDetails(root);
     this.#wireDragDrop(root);
     // Client-side filtering — no re-render, so the field keeps focus while typing. The spell steps
     // add level/school dropdowns; when present, search + dropdowns drive the combined spell filter,
@@ -765,8 +768,7 @@ export class CreatorShell extends CreatorShellBase {
     const index = STEPS.findIndex(s => s.id === id);
     if ( index < 0 ) return false;
     const reached = this._reachable(index);
-    this._stepIndex = reached ? index : this.#firstIncompleteIndex();
-    this.render();
+    this._leaveStepFor(reached ? index : this.#firstIncompleteIndex());
     return reached;
   }
 

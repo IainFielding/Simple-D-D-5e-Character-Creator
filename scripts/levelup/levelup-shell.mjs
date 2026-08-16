@@ -5,6 +5,7 @@ import { buildSteps } from "./registry.mjs";
 import { getSources, isStale, invalidateSources } from "../data/source-cache.mjs";
 import { forEachLimit, WARM_CONCURRENCY } from "../data/concurrency.mjs";
 import { applyLevelUpSpells, spellChanges } from "./steps/lvl-spells-step.mjs";
+import { reconcileGrantedSpells } from "../build/spell-reconcile.mjs";
 import { stageEmberGear, abandonEmberCreation } from "./ember-creation.mjs";
 
 /**
@@ -183,7 +184,9 @@ export class LevelUpShell extends CreatorShellBase {
       canFinish: this.#steps.every((s, i) => (s.id === "review") || flags[i]),
       // The Ember hand-off is still character creation as far as the player is concerned — nothing
       // is being levelled up — so the primary button says so.
-      finishLabel: t(this.state.emberCreation ? "levelup.nav.emberApply" : "levelup.nav.apply")
+      finishLabel: t(this.state.emberCreation ? "levelup.nav.emberApply" : "levelup.nav.apply"),
+      // The source-book overlay, when one is open — window chrome over the stage, not step data.
+      sourceDetails: this._sourceDetails
     };
   }
 
@@ -214,6 +217,7 @@ export class LevelUpShell extends CreatorShellBase {
     // insurance against a partial render being added later, not a fix for a live fault.
     if ( !this._stageRendered(options) ) return;
     this._wireStepChanges(this.element);
+    this._wireSourceDetails(this.element);
     // Client-side spell-list filters on the spell step — search box plus the level/school
     // dropdowns. All filter in the DOM without a re-render, so the search field keeps focus
     // while typing; their values live on the state so the re-render a spell click causes
@@ -369,6 +373,18 @@ export class LevelUpShell extends CreatorShellBase {
       } catch ( err ) {
         log("level-up spell grant failed", err);
         ui.notifications?.error(t("levelup.notify.spellsFailed"));
+      }
+    }
+
+    // Collapse any spell this level-up's features granted always-prepared that the character had
+    // already chosen at an earlier level. Runs after the picks are written, on the real actor, so it
+    // sees the finished state; the spells step has already offered the freed selection back.
+    if ( !ember ) {
+      try {
+        await reconcileGrantedSpells(actor);
+      } catch ( err ) {
+        // Non-fatal: the worst case is a duplicate spell the player can delete on the sheet.
+        log("granted-spell reconciliation failed", err);
       }
     }
 

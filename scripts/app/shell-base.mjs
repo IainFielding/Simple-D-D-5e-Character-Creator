@@ -1,4 +1,5 @@
 import { MODULE_ID, t } from "../config.mjs";
+import { sourceDetails } from "./source-details.mjs";
 
 const { ApplicationV2, HandlebarsApplicationMixin, DialogV2 } = foundry.applications.api;
 
@@ -38,7 +39,9 @@ export const SHELL_ACTIONS = {
   navBack() { this._navBack(); },
   stepAction(event, target) { return this._dispatch(target.dataset.stepAction, target); },
   finish(event, target) { return this._finish(target); },
-  cancel() { this.close(); }
+  cancel() { this.close(); },
+  openSourceDetails(event, target) { return this._openSourceDetails(target.dataset.uuid); },
+  closeSourceDetails() { this._closeSourceDetails(); }
 };
 
 /**
@@ -201,27 +204,36 @@ export class CreatorShellBase extends HandlebarsApplicationMixin(ApplicationV2) 
     return this._stepIndex > 0 ? this._stepIndex - 1 : -1;
   }
 
+  /**
+   * Leave the step currently on screen. The book-page overlay belongs to the entry that opened it,
+   * and the footer's Back/Next sit outside the stage body it covers — so without this, paging on
+   * with it open carried the previous step's page over the new one.
+   * @param {number} index
+   */
+  _leaveStepFor(index) {
+    this._sourceDetails = null;
+    this._stepIndex = index;
+    this.render();
+  }
+
   /** Jump to a step by index, if it is currently reachable. */
   _goto(index) {
     if ( !Number.isInteger(index) || !this._reachable(index) ) return;
-    this._stepIndex = index;
-    this.render();
+    this._leaveStepFor(index);
   }
 
   /** Advance, if there is somewhere to go and the current step is finished. */
   _navNext() {
     const next = this._nextIndex();
     if ( next < 0 || !this._activeStep?.isComplete(this.state) || !this._reachable(next) ) return;
-    this._stepIndex = next;
-    this.render();
+    this._leaveStepFor(next);
   }
 
   /** Step back. Always allowed — going backwards can't invalidate anything. */
   _navBack() {
     const prev = this._prevIndex();
     if ( prev < 0 ) return;
-    this._stepIndex = prev;
-    this.render();
+    this._leaveStepFor(prev);
   }
 
   /* -------------------------------------------- */
@@ -254,6 +266,63 @@ export class CreatorShellBase extends HandlebarsApplicationMixin(ApplicationV2) 
    * @param {boolean} filtered  Whether a non-search filter is also narrowing.
    */
   _afterFilter(needle, filtered) {}    // eslint-disable-line no-unused-vars
+
+  /* -------------------------------------------- */
+  /*  Source book details                         */
+  /* -------------------------------------------- */
+
+  /**
+   * The book page currently open over the stage, or null. Read into both shells' contexts, where
+   * `templates/stage.hbs` renders it as a full-surface overlay.
+   * @type {{name: string, img: string, pageName: string, html: string, fallback: boolean}|null}
+   */
+  _sourceDetails = null;
+
+  /**
+   * Open the source book's own page for a class or subclass over the current step — the "Full
+   * Details" control on a detail pane. Both wizards share this: the creator uses it for the class
+   * being chosen, the level-up for a subclass just gained, where the pick pane is far too short to
+   * hold a progression table.
+   *
+   * An item that resolves to nothing leaves the overlay closed rather than opening an empty one;
+   * the control is normally hidden in that case anyway.
+   * @param {string} uuid   Compendium uuid of the class/subclass.
+   */
+  async _openSourceDetails(uuid) {
+    if ( !uuid ) return;
+    const item = await fromUuid(uuid).catch(() => null);
+    const details = item ? await sourceDetails(item) : null;
+    if ( !details ) {
+      ui.notifications?.info(t("common.sourceDetails.none"));
+      return;
+    }
+    this._sourceDetails = details;
+    this.render();
+  }
+
+  /** Close the book-page overlay and return to the step underneath. */
+  _closeSourceDetails() {
+    this._sourceDetails = null;
+    this.render();
+  }
+
+  /**
+   * Wire the overlay's keyboard dismissal. Called from each shell's `_onRender`; Escape is the
+   * expected way out of anything covering the screen, and without it the only exit is the button.
+   * @param {HTMLElement} root
+   */
+  _wireSourceDetails(root) {
+    const overlay = root.querySelector(".creator-source-details");
+    if ( !overlay ) return;
+    overlay.addEventListener("keydown", ev => {
+      if ( ev.key !== "Escape" ) return;
+      ev.preventDefault();
+      ev.stopPropagation();
+      this._closeSourceDetails();
+    });
+    // Take focus so Escape reaches the handler above without the player clicking first.
+    overlay.querySelector(".creator-source-details-close")?.focus();
+  }
 
   /**
    * Ask before a close that would throw away the player's work. Nothing either wizard collects is

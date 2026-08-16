@@ -150,6 +150,27 @@
       {{else}}
       <span class="creator-spell-selected-empty">{{localize "sogrom-dnd5e-character-creator.step.spells.selectedNone"}}</span>
       {{/if}}
+
+      {{!-- Spells the build grants outright — a Cleric's domain spells, a species cantrip. They are
+            kept out of the list above (they can't be picked, and picking one would waste the slot),
+            so they are shown here for reference: the player can see what they are getting without
+            hunting for it on the Review. --}}
+      {{#if hasGranted}}
+      <div class="creator-spell-granted">
+        <span class="creator-spell-group-label">
+          <i class="fa-solid fa-gift" aria-hidden="true"></i>
+          {{localize "sogrom-dnd5e-character-creator.step.spells.granted"}}
+        </span>
+        <ul class="creator-spell-chips">
+          {{#each grantedCantrips}}
+          <li><a class="content-link creator-spell-chip" data-uuid="{{uuid}}" data-link data-tooltip="{{ccItemTooltip uuid}}"><img src="{{img}}" alt="">{{name}}</a></li>
+          {{/each}}
+          {{#each grantedSpells}}
+          <li><a class="content-link creator-spell-chip" data-uuid="{{uuid}}" data-link data-tooltip="{{ccItemTooltip uuid}}"><img src="{{img}}" alt="">{{name}}</a></li>
+          {{/each}}
+        </ul>
+      </div>
+      {{/if}}
     </div>
   </div>
 
