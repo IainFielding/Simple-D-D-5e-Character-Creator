@@ -1,4 +1,4 @@
-import { MODULE_ID, t } from "../config.mjs";
+import { MODULE_ID, t, fireHook } from "../config.mjs";
 import { sourceDetails } from "./source-details.mjs";
 
 const { ApplicationV2, HandlebarsApplicationMixin, DialogV2 } = foundry.applications.api;
@@ -129,6 +129,20 @@ export class CreatorShellBase extends HandlebarsApplicationMixin(ApplicationV2) 
   /** The footer's primary button (Create / Apply). @param {HTMLElement} [target] */
   async _finish(target) {}    // eslint-disable-line no-unused-vars
 
+  /**
+   * The public hook this wizard announces step changes on — `HOOKS.creationStepChanged` for the
+   * creator, `HOOKS.levelUpStepChanged` for the level-up. Null means "don't announce", which is
+   * what a subclass that hasn't opted in gets.
+   *
+   * Both wizards move through steps in exactly one place ({@link CreatorShellBase#_leaveStepFor}),
+   * so naming the hook is all a subclass needs to do to be observable.
+   * @returns {string|null}
+   */
+  get _stepChangeHook() { return null; }
+
+  /** The state object handed to step-change listeners (each subclass calls its own `state`). */
+  get _hookState() { return null; }
+
   /* -------------------------------------------- */
   /*  Dispatch                                    */
   /* -------------------------------------------- */
@@ -208,11 +222,22 @@ export class CreatorShellBase extends HandlebarsApplicationMixin(ApplicationV2) 
    * Leave the step currently on screen. The book-page overlay belongs to the entry that opened it,
    * and the footer's Back/Next sit outside the stage body it covers — so without this, paging on
    * with it open carried the previous step's page over the new one.
+   *
+   * Every navigation path in both wizards funnels through here — Back, Next, a rail click, and the
+   * creator's programmatic `gotoStep` — which makes it the one place a step change can be
+   * announced from. See {@link CreatorShellBase#_stepChangeHook}.
    * @param {number} index
    */
   _leaveStepFor(index) {
+    const from = this._stepIndex;
     this._sourceDetails = null;
     this._stepIndex = index;
+    // Announce after the index has moved but before the render, so a listener reading the shell
+    // sees the step it is being told about rather than the one being left.
+    const hook = this._stepChangeHook;
+    if ( hook && (from !== index) ) {
+      fireHook(hook, { app: this, state: this._hookState, from, to: index, step: this._activeStep });
+    }
     this.render();
   }
 

@@ -189,6 +189,17 @@ export class LevelUpState {
   announce = "levelup";
 
   /**
+   * The creator state this character was built from, when `announce === "creation"` — i.e. when
+   * this session is the tail of a build that started above level 1. Null for an ordinary level-up.
+   *
+   * Carried for one reason: the public `characterCreated` hook can finish in either wizard, and a
+   * payload that sometimes omits the state would be worse to consume than one that threads it
+   * through. Nothing in the level-up itself reads it.
+   * @type {import("../state/creator-state.mjs").CreatorState|null}
+   */
+  creationState = null;
+
+  /**
    * @param {Actor5e} actor
    * @param {import("./manager-driver.mjs").LevelUpDriver|null} [driver]  Prepared driver, or null
    *   to open on the Class step and adopt one later.
@@ -197,13 +208,18 @@ export class LevelUpState {
    * @param {boolean} [options.emberCreation=false]  This session is the Ember hand-off.
    * @param {"levelup"|"creation"|"none"} [options.announce]  Override the chat card this session
    *   posts on Apply; defaults by flow (see {@link announce}).
+   * @param {import("../state/creator-state.mjs").CreatorState} [options.creationState]  See
+   *   {@link creationState}.
    */
-  constructor(actor, driver = null, { chooseClass = false, emberCreation = false, announce = null } = {}) {
+  constructor(actor, driver = null, {
+    chooseClass = false, emberCreation = false, announce = null, creationState = null
+  } = {}) {
     this.actor = actor;
     this.fromLevel = actor.system?.details?.level ?? 0;
     this.toLevel = this.fromLevel + 1;
     this.needsClassChoice = chooseClass;
     this.emberCreation = emberCreation;
+    this.creationState = creationState;
     // The Ember hand-off announces nothing by default: Ember's builder finishes the character
     // *after* our Apply (it owns the final write and the sheet swap), so a card posted here could
     // describe a character that is still a step from done. Ember owns that moment, not us.

@@ -1,4 +1,6 @@
-import { MODULE_ID, tpl, t, log, ABILITIES, formatMod } from "../config.mjs";
+import {
+  MODULE_ID, HOOKS, tpl, t, log, ABILITIES, formatMod, fireHook, fireCancellableHook
+} from "../config.mjs";
 import { CreatorShellBase, shellOptions, dossierStageParts, SHELL_ACTIONS } from "./shell-base.mjs";
 import { illuminatePages } from "./page-illumination.mjs";
 import { CreatorState } from "../state/creator-state.mjs";
@@ -152,6 +154,9 @@ export class CreatorShell extends CreatorShellBase {
     // Resuming an in-progress actor: jump to the first step still needing input.
     this._stepIndex = this.#firstIncompleteIndex();
     if ( this.rendered ) this.render();
+    // The window is now genuinely usable — sources loaded, first step chosen. Announcing at
+    // construction instead would hand listeners a shell still showing its loading screen.
+    fireHook(HOOKS.creatorOpened, { app: this, state: this.state });
   }
 
   /**
@@ -711,6 +716,12 @@ export class CreatorShell extends CreatorShellBase {
     return { state: this.state, source: this.source, spells: this.spells, equipment: this.equipment, store: this.store, app: this };
   }
 
+  /** @override Creation step changes are public — see {@link module:api}. */
+  get _stepChangeHook() { return HOOKS.creationStepChanged; }
+
+  /** @override */
+  get _hookState() { return this.state; }
+
   /** @override Any step interaction counts as progress worth confirming before a discard. */
   _onDispatch(action) {
     this.#dirty = true;
@@ -793,6 +804,15 @@ export class CreatorShell extends CreatorShellBase {
       target.disabled = true;
       target.textContent = t("nav.building");
     }
+
+    // The veto point: every choice is made and validated, but nothing has been written to the
+    // world yet — so a listener refusing here costs nothing to undo. This is the seam a GM
+    // approval queue or a house-rule validator hangs off. Fired before `Actor.create` on purpose;
+    // afterwards there would be an actor to clean up.
+    if ( !fireCancellableHook(HOOKS.preCreateCharacter, { state: this.state, actor: this.state.actor ?? null }) ) {
+      this.#reopenForRetry(target);
+      return;
+    }
     let actor = this.state.actor;
     // Track whether *this* build created the actor. If assembleActor throws after Actor.create
     // succeeded, we delete the half-built actor below so a retry starts from a clean slate instead
@@ -823,12 +843,7 @@ export class CreatorShell extends CreatorShellBase {
         }
         this.state.actor = null;
       }
-      this.#finished = false;
-      // Re-enable the button so the player can retry without reopening the window.
-      if ( target ) {
-        target.disabled = false;
-        target.textContent = t("nav.create");
-      }
+      this.#reopenForRetry(target);
       return;
     }
     await this.close();
@@ -837,12 +852,40 @@ export class CreatorShell extends CreatorShellBase {
     // Class step, hand the rest to the level-up wizard: one manager for the whole 1→target jump, so
     // they get a screen per gained level and a single commit. It opens over the sheet we just
     // rendered — so if they close it, they still have the (valid) level-1 character they built.
+    // The creator state rides along so that wizard can announce the finished character with the
+    // same payload this one would have (see {@link module:levelup/intercept}).
     const targetLevel = this.state.targetLevel ?? 1;
-    const climbing = (actor && targetLevel > 1) ? await launchLevelUpTo(actor, targetLevel) : false;
+    const climbing = (actor && targetLevel > 1)
+      ? await launchLevelUpTo(actor, targetLevel, { creationState: this.state })
+      : false;
     // Announce the finished character — but only when it *is* finished. A climb to a higher
     // starting level isn't done yet, so that wizard owns the card and posts it on Apply (or on
     // abandon, since the level-1 character it leaves behind is still a character). When the climb
     // never opened, nothing downstream will post it and the duty stays here.
-    if ( !climbing ) await postCreationSummary(actor);
+    //
+    // The public hook rides alongside the card rather than inside it, because the two answer to
+    // different masters: the card is the GM's setting to switch off, the hook is a contract with
+    // other modules and fires either way.
+    if ( !climbing ) {
+      fireHook(HOOKS.characterCreated, { actor, state: this.state, targetLevel });
+      await postCreationSummary(actor);
+    }
+  }
+
+  /**
+   * Undo the Create button's "building…" state so the player can try again without reopening the
+   * window: release the re-entrancy latch and put the button back.
+   *
+   * Shared by the two ways a build stops after that state is entered — a listener vetoing
+   * `preCreateCharacter`, and assembly throwing — so the veto path cannot drift from the
+   * long-standing failure path.
+   * @param {HTMLElement} [target]  The Create button, when the click supplied one.
+   */
+  #reopenForRetry(target) {
+    this.#finished = false;
+    if ( target ) {
+      target.disabled = false;
+      target.textContent = t("nav.create");
+    }
   }
 }

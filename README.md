@@ -229,7 +229,8 @@ This module is designed to sit quietly alongside the rest of your world. Where a
 | Module | Works together? | What happens |
 |---|---|---|
 | [Ember](https://foundryvtt.com/packages/ember) | Yes, automatic | Ember owns character creation, so this module switches itself to **Level-Up only**, takes over the level-1 questions Ember hands to the system, and restyles both windows to match Ember's look. See [Running alongside Ember](#running-alongside-ember). |
-| [Hero Mancer](https://foundryvtt.com/packages/hero-mancer) | No, incompatible | Hero Mancer replaces the 5e advancement engine rather than building on it, so the two modules cannot share the creation and level-up space. This is declared as a conflict in the manifest, and Foundry will warn you if both are enabled. Run one or the other. |
+| [Hero Mancer](https://foundryvtt.com/packages/hero-mancer) | No, incompatible | Hero Mancer does the same job this module does: its own wizard in front of character creation and level-up, reached from the same buttons. Two modules can't both own that conversation, so it's declared as a conflict in the manifest and Foundry will warn you if you enable both. Pick whichever suits your table — Hero Mancer builds in one window with a live preview and offers a GM approval queue; this one walks you through a screen at a time. |
+| Modules that want to handle *some* level-ups | Yes | There's a published hook (`preLevelUpTakeover`) another module can use to claim an individual level-up, which makes this one stand aside and hand it back to the native D&D 5e wizard — no blanket conflict needed. See [For module developers](#for-module-developers). |
 | [D&D Player's Handbook (2024)](https://foundryvtt.com/packages/dnd-players-handbook) | Yes, enhanced | Fully supported as a content source, and its official artwork is used as the backdrop on the class, species, and background screens. |
 | Other official content modules (Artificer, Ravenloft, Forgotten Realms, and similar) | Yes | Their classes, species, backgrounds, spells, and equipment appear in the wizard like any other compendium content. |
 | [Tasha's Cauldron of Everything](https://foundryvtt.com/packages/dnd-tashas-cauldron) | Yes | Its subclasses build on the 2014 classes the system still ships. Its **optional class features** are offered on their own level-up screen, and its **replacement features** let you choose between the original and the Tasha's version. |
@@ -249,6 +250,33 @@ This module is designed to sit quietly alongside the rest of your world. Where a
 
 ---
 
+## For module developers
+
+This module publishes named hooks and a small API so other packages can react to — and take part
+in — character creation and level-up.
+
+```js
+const api = game.modules.get("sogrom-dnd5e-character-creator")?.api;
+
+Hooks.on(api.HOOKS.characterCreated, ({ actor, targetLevel }) => {
+  console.log(`${actor.name} finished at level ${targetLevel}`);
+});
+```
+
+- **Thirteen hooks** across both flows — the creator opening, each step change, the character
+  being finished, a level-up starting, applying or being discarded, and the Ember hand-off.
+- **Four of them are cancellable.** Returning `false` from `preCreateCharacter` vetoes a build
+  before anything is written — enough to build a GM approval queue or a house-rule validator on
+  top of this module. Returning `false` from `preLevelUpTakeover` makes this module stand aside
+  for that level-up and lets the native D&D 5e wizard run instead.
+- **A small API object** with `launchCreator`, `triggerLevelUp`, `canLevelUp`,
+  `isCreatorCharacter` and read-only access to the module's effective settings.
+
+📖 **[Full API reference →](https://github.com/IainFielding/Simple-DnD5e-Character-Creator/blob/main/docs/API.md)**
+— every hook, its payload, and worked examples.
+
+---
+
 ## Requirements
 
 - **Foundry VTT** version 14 or later
@@ -260,6 +288,8 @@ This module is designed to sit quietly alongside the rest of your world. Where a
 ## Contributing
 
 Bug reports, ideas and pull requests are all welcome — see [CONTRIBUTING.md](CONTRIBUTING.md) for how to set up, what to check before opening a pull request, and the project's rules on sign-off and AI-assisted contributions.
+
+**Speak another language?** The module is fully translatable and currently ships English only, so a translation is the most useful contribution going — and one that doesn't need any JavaScript. Translations must be written by a person rather than generated; see [Translations](CONTRIBUTING.md#translations) for what's involved. Partial ones are welcome.
 
 ---
 

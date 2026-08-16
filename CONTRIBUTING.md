@@ -17,6 +17,11 @@ To try the module in Foundry, symlink or copy the repository into your
 
 - `npm run check` passes locally.
 - User-facing strings go through `lang/en.json` rather than being hard-coded.
+- The public hook and API surface still matches [docs/API.md](docs/API.md). The hook names in
+  `test/api.test.mjs` are asserted literally on purpose — if that test fails because you renamed
+  one, the test is right and the rename is a breaking change for every module using it. Adding a
+  hook means adding it to `HOOKS` in `scripts/config.mjs`, emitting it through `fireHook()` or
+  `fireCancellableHook()`, extending that assertion, and documenting it.
 - Unit tests cover the changed behaviour where the behaviour is testable outside Foundry.
 - The change has been clicked through in a real world — unit tests don't cover the UI.
   Say which Foundry version, D&D 5e system version, and content modules you tested against.
