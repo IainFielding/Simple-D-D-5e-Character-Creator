@@ -175,19 +175,39 @@ export class LevelUpState {
   swapSpell = null;
 
   /**
+   * Which chat card this session owes the table when it finishes (see
+   * {@link module:build/chat-summary}):
+   *  - `"levelup"`  — the ordinary case: a card describing what the level brought.
+   *  - `"creation"` — this session is the tail of a character build (the player asked to start
+   *                   above level 1, so the creator handed the 1 → N climb straight to us). The
+   *                   character is only finished when *this* commits, so the creation card is
+   *                   ours to post, and no level-up card is posted at all.
+   *  - `"none"`     — announce nothing (the Ember hand-off; see the constructor).
+   * Either way the setting still has the final say — `"off"` posts nothing regardless.
+   * @type {"levelup"|"creation"|"none"}
+   */
+  announce = "levelup";
+
+  /**
    * @param {Actor5e} actor
    * @param {import("./manager-driver.mjs").LevelUpDriver|null} [driver]  Prepared driver, or null
    *   to open on the Class step and adopt one later.
    * @param {object} [options]
    * @param {boolean} [options.chooseClass=false]    Lead with the in-wizard Class step.
    * @param {boolean} [options.emberCreation=false]  This session is the Ember hand-off.
+   * @param {"levelup"|"creation"|"none"} [options.announce]  Override the chat card this session
+   *   posts on Apply; defaults by flow (see {@link announce}).
    */
-  constructor(actor, driver = null, { chooseClass = false, emberCreation = false } = {}) {
+  constructor(actor, driver = null, { chooseClass = false, emberCreation = false, announce = null } = {}) {
     this.actor = actor;
     this.fromLevel = actor.system?.details?.level ?? 0;
     this.toLevel = this.fromLevel + 1;
     this.needsClassChoice = chooseClass;
     this.emberCreation = emberCreation;
+    // The Ember hand-off announces nothing by default: Ember's builder finishes the character
+    // *after* our Apply (it owns the final write and the sheet swap), so a card posted here could
+    // describe a character that is still a step from done. Ember owns that moment, not us.
+    this.announce = announce ?? (emberCreation ? "none" : "levelup");
     if ( driver ) this.adoptDriver(driver);
   }
 

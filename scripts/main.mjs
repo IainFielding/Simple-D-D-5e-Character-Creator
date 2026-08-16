@@ -138,6 +138,28 @@ function registerSettings() {
     hint: t("settings.levelUpHpRollToChat.hint"),
     scope: "world", config: true, type: Boolean, default: DEFAULTS.levelUpHpRollToChat
   });
+  // The two summary cards. Both share the same three modes, so they read the same to a GM
+  // scanning the settings list; see SUMMARY_MODES in config.mjs.
+  game.settings.register(MODULE_ID, SETTINGS.creationSummary, {
+    name: t("settings.creationSummary.name"),
+    hint: t("settings.creationSummary.hint"),
+    scope: "world", config: true, type: String, default: DEFAULTS.creationSummary,
+    choices: {
+      "public": t("settings.creationSummary.public"),
+      "gm": t("settings.creationSummary.gm"),
+      "off": t("settings.creationSummary.off")
+    }
+  });
+  game.settings.register(MODULE_ID, SETTINGS.levelUpSummary, {
+    name: t("settings.levelUpSummary.name"),
+    hint: t("settings.levelUpSummary.hint"),
+    scope: "world", config: true, type: String, default: DEFAULTS.levelUpSummary,
+    choices: {
+      "public": t("settings.levelUpSummary.public"),
+      "gm": t("settings.levelUpSummary.gm"),
+      "off": t("settings.levelUpSummary.off")
+    }
+  });
   // The starting-gold store: the enabled flag and the GM's stock configuration are both
   // hidden objects, edited only through the config form; a single menu button opens it.
   // The enabled flag lives as its own setting (not inside storeConfig) because it doubles

@@ -6,6 +6,7 @@ import { getSources, isStale, invalidateSources } from "../data/source-cache.mjs
 import { forEachLimit, WARM_CONCURRENCY } from "../data/concurrency.mjs";
 import { applyLevelUpSpells, spellChanges } from "./steps/lvl-spells-step.mjs";
 import { reconcileGrantedSpells } from "../build/spell-reconcile.mjs";
+import { captureLevelUpSummary, postLevelUpSummary, postCreationSummary } from "../build/chat-summary.mjs";
 import { stageEmberGear, abandonEmberCreation } from "./ember-creation.mjs";
 
 /**
@@ -350,6 +351,12 @@ export class LevelUpShell extends CreatorShellBase {
       }
     }
 
+    // Freeze the chat summary while it can still be read. It is a diff of the driver's clone
+    // against the real actor, and the commit below is exactly the moment those two stop differing
+    // — capture afterwards and the card comes out empty. Posting happens at the end, once every
+    // write has landed. See {@link module:build/chat-summary}.
+    const summary = captureLevelUpSummary(this.state);
+
     try {
       await this.state.driver.commit();
     } catch ( err ) {
@@ -390,6 +397,14 @@ export class LevelUpShell extends CreatorShellBase {
 
     await this.close({ force: true });
     if ( !ember ) actor?.sheet?.render(true);
+
+    // Announce last — after every write above and after the window is out of the way, so the card
+    // describes the finished character (spells included) and never holds the UI up on a round-trip.
+    // A creation climb (the creator handed us a 1 → N jump) posts the *creation* card instead: the
+    // player built one character, and this is the moment it became the level they asked for. Both
+    // are no-ops when the GM has the matching setting off.
+    if ( this.state.announce === "creation" ) await postCreationSummary(actor);
+    else if ( this.state.announce === "levelup" ) await postLevelUpSummary(actor, summary);
   }
 
   /**
@@ -411,6 +426,16 @@ export class LevelUpShell extends CreatorShellBase {
     if ( !options.force && !this.state.committed && this.state.hasPlayerInput() ) {
       const key = this.state.emberCreation ? "levelup.emberCancel" : "levelup.cancel";
       if ( !await this._confirmDiscard(`${key}.title`, `${key}.body`) ) return this;
+    }
+    // A creation climb abandoned part-way still leaves the level-1 character the creator built and
+    // handed over, so the creation card is still owed — only the climb was discarded. Guarded on
+    // `committed` so the Apply path (which announces for itself, at the right level) never doubles
+    // up. Ember is exempt for the reason given on {@link LevelUpState#announce}.
+    if ( !this.state.committed && (this.state.announce === "creation") ) {
+      // Discharge the duty before awaiting it: a second close (Foundry can re-enter this on an
+      // already-closing application) must not post the same character twice.
+      this.state.announce = "none";
+      await postCreationSummary(this.state.actor);
     }
     if ( abandoning ) await abandonEmberCreation(this.state.driver?.manager);
     return super.close(options);

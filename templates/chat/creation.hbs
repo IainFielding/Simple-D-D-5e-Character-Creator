@@ -1,0 +1,42 @@
+{{!--
+  The card posted to chat when a character is finished, rendered from
+  build/chat-summary.mjs `postCreationSummary()`.
+
+  It lives in the chat log rather than in our window, so every class here is namespaced
+  `sogrom-chat-*` and the styles sit in their own block at the foot of creator.css — nothing in
+  the creator's own `.sogrom-creator` scope reaches this markup.
+
+  Deliberately a snapshot, not a sheet: who the character is, the six scores, and the handful of
+  numbers a table actually asks about. Anything more and it stops being readable in a chat log.
+--}}
+<div class="sogrom-chat-card">
+  <header class="sogrom-chat-head">
+    <img class="sogrom-chat-portrait" src="{{img}}" alt="" />
+    <div class="sogrom-chat-titles">
+      <span class="sogrom-chat-eyebrow">{{heading}}</span>
+      <h3 class="sogrom-chat-name">{{name}}</h3>
+      <span class="sogrom-chat-sub">{{subtitle}}</span>
+    </div>
+  </header>
+
+  <ul class="sogrom-chat-abilities">
+    {{#each abilities}}
+    <li class="sogrom-chat-ability">
+      <span class="sogrom-chat-ability-abbr">{{abbr}}</span>
+      <span class="sogrom-chat-ability-score">{{value}}</span>
+      <span class="sogrom-chat-ability-mod">{{modifier}}</span>
+    </li>
+    {{/each}}
+  </ul>
+
+  {{#if rows}}
+  <dl class="sogrom-chat-rows">
+    {{#each rows}}
+    <div class="sogrom-chat-row">
+      <dt>{{label}}</dt>
+      <dd>{{value}}</dd>
+    </div>
+    {{/each}}
+  </dl>
+  {{/if}}
+</div>

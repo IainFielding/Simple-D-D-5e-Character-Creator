@@ -80,9 +80,12 @@ function byNewThenName(a, b) {
 /**
  * Spell-slot changes this level-up: each leveled slot rank whose maximum moved, plus Pact Magic,
  * diffed between the clone's and the actor's derived spellcasting data.
+ *
+ * Exported because the chat summary reports exactly the same diff (see
+ * {@link module:build/chat-summary}); the review screen is simply its first consumer.
  * @returns {{label: string, change: string}[]}
  */
-function slotChanges(clone, actor) {
+export function slotChanges(clone, actor) {
   const now = clone.system?.spells ?? {};
   const was = actor.system?.spells ?? {};
   const changes = [];

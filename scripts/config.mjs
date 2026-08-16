@@ -57,6 +57,8 @@ export const SETTINGS = {
   levelUpButton: "showLevelUpButton",
   levelUpHpMode: "levelUpHpMode",
   levelUpHpRollToChat: "levelUpHpRollToChat",
+  creationSummary: "creationSummary",
+  levelUpSummary: "levelUpSummary",
   multiclass: "allowMulticlass",
   storeEnabled: "storeEnabled",
   storeConfig: "storeConfig",
@@ -73,6 +75,8 @@ export const DEFAULTS = {
   levelUpButton: true,
   levelUpHpMode: "choice",
   levelUpHpRollToChat: true,
+  creationSummary: "public",
+  levelUpSummary: "public",
   multiclass: "off",
   storeEnabled: true,
   storeConfig: {
@@ -116,6 +120,38 @@ export function levelUpHpMode() {
  */
 export function levelUpHpRollToChat() {
   return !!game.settings.get(MODULE_ID, SETTINGS.levelUpHpRollToChat);
+}
+
+/**
+ * The valid values of the two chat-summary settings, from most to least visible:
+ *  - `"public"` — the card goes to the whole table (the default; announcing the character is the
+ *                 point of the feature).
+ *  - `"gm"`     — whispered to Game Masters only, for tables where the GM vets characters, or
+ *                 simply wants the log without the chatter.
+ *  - `"off"`    — never posted.
+ */
+export const SUMMARY_MODES = ["public", "gm", "off"];
+
+/**
+ * Read one of the chat-summary settings, guarding against an unknown stored value. Both settings
+ * share the same three modes, so they share this reader; {@link creationSummaryMode} and
+ * {@link levelUpSummaryMode} are the call sites.
+ * @param {string} key   One of {@link SETTINGS}.creationSummary / .levelUpSummary.
+ * @returns {"public"|"gm"|"off"}
+ */
+function summaryMode(key) {
+  const raw = game.settings.get(MODULE_ID, key);
+  return SUMMARY_MODES.includes(raw) ? raw : DEFAULTS[key];
+}
+
+/** Who sees the card posted when a character is finished. @returns {"public"|"gm"|"off"} */
+export function creationSummaryMode() {
+  return summaryMode(SETTINGS.creationSummary);
+}
+
+/** Who sees the card posted when a level-up is applied. @returns {"public"|"gm"|"off"} */
+export function levelUpSummaryMode() {
+  return summaryMode(SETTINGS.levelUpSummary);
 }
 
 /**

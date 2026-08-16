@@ -219,6 +219,30 @@
       "indexFailed": "Could not read the compendiums. Check that the dnd5e content packs are enabled.",
       "buildFailed": "Character creation failed. See the console for details."
     },
+    "chat": {
+      "creation": {
+        "heading": "A new hero",
+        "levelLine": "Level {level} · {classes}",
+        "species": "Species",
+        "background": "Background",
+        "subclass": "Subclass",
+        "hitPoints": "Hit Points",
+        "armourClass": "Armour Class"
+      },
+      "levelup": {
+        "heading": "Level up",
+        "levelLine": "Character level {from} → {to}",
+        "classLine": "{name} {from} → {to}",
+        "classNew": "{name} {level} (new class)",
+        "hitPoints": "Hit Points",
+        "hitPointsValue": "+{gain} (now {max})",
+        "profBonus": "Proficiency Bonus",
+        "spellSlots": "Spell Slots",
+        "subclass": "Subclass",
+        "features": "New Features",
+        "spells": "New Spells"
+      }
+    },
     "step": {
       "class": {
         "label": "Class & Abilities",
@@ -559,6 +583,20 @@
       "levelUpHpRollToChat": {
         "name": "Post hit-die rolls to chat",
         "hint": "When a player rolls hit points during a level-up, also post the roll to chat so the whole table can see the result."
+      },
+      "creationSummary": {
+        "name": "Post a character summary to chat",
+        "hint": "When a character is finished, post a card to chat showing who they are — class and level, species, background, ability scores, hit points and armour class. Whisper to the GM keeps it out of the players' chat log.",
+        "public": "Post to everyone",
+        "gm": "Whisper to the GM",
+        "off": "Don't post"
+      },
+      "levelUpSummary": {
+        "name": "Post a level-up summary to chat",
+        "hint": "When a level-up is applied, post a card to chat showing what changed — the class levels gained, hit points, proficiency bonus, spell slots, and any new features and spells. Whisper to the GM keeps it out of the players' chat log.",
+        "public": "Post to everyone",
+        "gm": "Whisper to the GM",
+        "off": "Don't post"
       },
       "storeEnabled": {
         "name": "Enable the starting-gold store",

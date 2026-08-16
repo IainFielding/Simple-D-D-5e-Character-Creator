@@ -4520,3 +4520,178 @@ body:has(.sogrom-creator-fullscreen) .application.compendium-browser {
 /* The control that opens it, sharing the detail header with Quick Build. */
 .creator-source-details-btn { margin-left: auto; padding: 0.35rem 0.7rem; font-size: 0.85rem; }
 .creator-quick-build-btn + .creator-source-details-btn { margin-left: 0.5rem; }
+
+/* ==========================================================================
+   Chat summary cards
+   --------------------------------------------------------------------------
+   The one block in this file that is NOT scoped under .sogrom-creator, because
+   it cannot be: these cards render inside Foundry's chat log, far outside the
+   creator window. `.sogrom-chat-card` is the scope instead — every selector
+   below is a descendant of it, so the rules reach our cards and nothing else.
+
+   The chat log follows the *user's* Foundry theme (light or dark), which the
+   creator's fixed Arcane Midnight palette does not. So this block asserts
+   almost no colour: text inherits, and every tint is a translucent wash of
+   `currentColor` or of the module's brass accent, both of which sit correctly
+   on a light and a dark log. Cinzel and Spectral are already loaded globally
+   via module.json, so the card can carry the module's typography for free.
+   ========================================================================== */
+
+.sogrom-chat-card {
+  --sc-brass: #c9a227;
+  font-family: 'Spectral', var(--font-primary, serif);
+  line-height: 1.45;
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+}
+
+/* --- header: portrait, who they are, what changed ------------------------ */
+
+.sogrom-chat-card .sogrom-chat-head {
+  display: flex;
+  align-items: center;
+  gap: 0.7rem;
+  padding-bottom: 0.55rem;
+  border-bottom: 1px solid rgba(201, 162, 39, 0.35);
+}
+
+.sogrom-chat-card .sogrom-chat-portrait {
+  flex: 0 0 auto;
+  width: 48px;
+  height: 48px;
+  object-fit: cover;
+  border: 1px solid rgba(201, 162, 39, 0.5);
+  border-radius: 3px;
+  background: rgba(127, 127, 127, 0.12);
+}
+
+.sogrom-chat-card .sogrom-chat-titles {
+  display: flex;
+  flex-direction: column;
+  gap: 0.1rem;
+  min-width: 0;
+}
+
+.sogrom-chat-card .sogrom-chat-eyebrow {
+  font-family: 'Cinzel', var(--font-primary, serif);
+  font-size: 0.68rem;
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
+  color: var(--sc-brass);
+}
+
+/* `h3` inside a chat message picks up Foundry's own heading rules, which carry a
+   border and margins this layout does not want — hence the explicit reset. */
+.sogrom-chat-card .sogrom-chat-name {
+  font-family: 'Cinzel', var(--font-primary, serif);
+  font-size: 1.05rem;
+  font-weight: 600;
+  line-height: 1.2;
+  margin: 0;
+  padding: 0;
+  border: none;
+}
+
+.sogrom-chat-card .sogrom-chat-sub,
+.sogrom-chat-card .sogrom-chat-level {
+  font-size: 0.82rem;
+  opacity: 0.8;
+}
+
+/* --- ability strip (creation card only) ---------------------------------- */
+
+.sogrom-chat-card .sogrom-chat-abilities {
+  display: grid;
+  grid-template-columns: repeat(6, 1fr);
+  gap: 0.25rem;
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.sogrom-chat-card .sogrom-chat-ability {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.05rem;
+  padding: 0.3rem 0.1rem;
+  border: 1px solid rgba(127, 127, 127, 0.28);
+  border-radius: 3px;
+  background: rgba(127, 127, 127, 0.08);
+}
+
+.sogrom-chat-card .sogrom-chat-ability-abbr {
+  font-family: 'Cinzel', var(--font-primary, serif);
+  font-size: 0.6rem;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  opacity: 0.72;
+}
+
+.sogrom-chat-card .sogrom-chat-ability-score {
+  font-size: 0.95rem;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+
+.sogrom-chat-card .sogrom-chat-ability-mod {
+  font-size: 0.72rem;
+  font-variant-numeric: tabular-nums;
+  color: var(--sc-brass);
+}
+
+/* --- label/value rows ---------------------------------------------------- */
+
+.sogrom-chat-card .sogrom-chat-rows {
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+  margin: 0;
+}
+
+.sogrom-chat-card .sogrom-chat-row {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 0.6rem;
+  font-size: 0.85rem;
+  padding: 0.12rem 0;
+  border-bottom: 1px dotted rgba(127, 127, 127, 0.3);
+}
+
+.sogrom-chat-card .sogrom-chat-row:last-child { border-bottom: none; }
+
+.sogrom-chat-card .sogrom-chat-row dt {
+  opacity: 0.75;
+  margin: 0;
+  font-weight: 400;
+}
+
+.sogrom-chat-card .sogrom-chat-row dd {
+  margin: 0;
+  text-align: right;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+
+/* --- feature / spell lists (level-up card only) -------------------------- */
+
+.sogrom-chat-card .sogrom-chat-list-title {
+  font-family: 'Cinzel', var(--font-primary, serif);
+  font-size: 0.7rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--sc-brass);
+  margin: 0 0 0.15rem;
+  padding: 0;
+  border: none;
+}
+
+.sogrom-chat-card .sogrom-chat-list ul {
+  margin: 0;
+  padding-left: 1.05rem;
+  font-size: 0.85rem;
+}
+
+.sogrom-chat-card .sogrom-chat-list li { margin: 0; }

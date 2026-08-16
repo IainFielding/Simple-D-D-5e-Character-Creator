@@ -5,6 +5,7 @@ import { CreatorState } from "../state/creator-state.mjs";
 import { STEPS, REQUIRED_STEPS } from "../steps/registry.mjs";
 import { getSources, warmSources, onWarmProgress, isStale, invalidateSources } from "../data/source-cache.mjs";
 import { assembleActor } from "../build/actor-assembler.mjs";
+import { postCreationSummary } from "../build/chat-summary.mjs";
 import { launchLevelUpTo } from "../levelup/intercept.mjs";
 
 /**
@@ -837,6 +838,11 @@ export class CreatorShell extends CreatorShellBase {
     // they get a screen per gained level and a single commit. It opens over the sheet we just
     // rendered — so if they close it, they still have the (valid) level-1 character they built.
     const targetLevel = this.state.targetLevel ?? 1;
-    if ( actor && targetLevel > 1 ) await launchLevelUpTo(actor, targetLevel);
+    const climbing = (actor && targetLevel > 1) ? await launchLevelUpTo(actor, targetLevel) : false;
+    // Announce the finished character — but only when it *is* finished. A climb to a higher
+    // starting level isn't done yet, so that wizard owns the card and posts it on Apply (or on
+    // abandon, since the level-1 character it leaves behind is still a character). When the climb
+    // never opened, nothing downstream will post it and the duty stays here.
+    if ( !climbing ) await postCreationSummary(actor);
   }
 }

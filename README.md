@@ -1,4 +1,4 @@
-![](https://img.shields.io/badge/Foundry-v14.365-informational) 
+![](https://img.shields.io/badge/Foundry-v14.366-informational) 
 ![](https://img.shields.io/badge/D&D-v5.3.3-informational)
 ![Latest Release Download Count](https://img.shields.io/github/downloads/IainFielding/Simple-DnD5e-Character-Creator/latest/module.zip?label=Downloads) [![Ko-fi](https://img.shields.io/badge/Ko--fi-sogrom?logo=ko-fi&logoColor=white)](https://ko-fi.com/sogrom)<br>
 
@@ -192,6 +192,17 @@ The creator works great straight out of the box, but a handful of settings let y
 - **Multiclassing.** Off by default. When enabled, players can add a whole new class from the level-up flow. Choose whether the standard ability prerequisites (13+ in the primary ability of both classes) are enforced or waived.
 - **Level-up hit points.** Decide what HP options players see: **Player's choice** (average, max, roll, or manual), **Average or roll** (matching the written rules), or **Average only** (applied automatically).
 - **Post hit-die rolls to chat.** When a player rolls for HP, share the result with the whole table.
+
+### Chat summaries
+
+Every finished character and every applied level-up can announce itself in chat, so the rest of the table sees what happened without anyone having to say it.
+
+- **Post a character summary to chat.** A card with the character's portrait, class and level, species, background, the six ability scores, hit points and armour class. It appears once the character is genuinely finished — if the player is starting above 1st level, the card waits until they've climbed to the level they asked for, so it shows the hero they actually made.
+- **Post a level-up summary to chat.** A card with what the level brought: the class levels gained, hit points, proficiency bonus, any change to spell slots, a new subclass, and lists of the new features and spells.
+
+Each has three settings: **Post to everyone**, **Whisper to the GM** (handy if you'd rather review characters quietly than broadcast them), or **Don't post**. Both are set to post to everyone by default.
+
+> In an Ember world the creation card isn't posted. Ember finishes the character after this module's part is done, so announcing it here would be jumping the gun — level-up cards work as normal.
 
 ### The Starting-Gold Store
 

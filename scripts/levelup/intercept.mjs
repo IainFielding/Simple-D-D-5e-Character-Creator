@@ -119,13 +119,15 @@ function shouldTakeOver(manager) {
  * @param {object} [options]
  * @param {boolean} [options.emberCreation=false]  This manager is Ember's creation hand-off: the
  *   origin decisions fold onto the level-1 screen and the wizard gains its equipment step.
+ * @param {"levelup"|"creation"|"none"} [options.announce]  Which chat card this session posts when
+ *   it applies; omit for the flow's default (see {@link LevelUpState#announce}).
  */
-async function launchLevelUp(manager, { emberCreation = false } = {}) {
+async function launchLevelUp(manager, { emberCreation = false, announce = null } = {}) {
   try {
     const driver = new LevelUpDriver(manager);
     await driver.prepare();
     if ( emberCreation ) foldOriginScreens(driver);
-    const state = new LevelUpState(manager.actor, driver, { emberCreation });
+    const state = new LevelUpState(manager.actor, driver, { emberCreation, announce });
     new LevelUpShell(state, launchWindowOptions()).render(true);
   } catch ( err ) {
     log("level-up takeover failed; the native advancement flow was suppressed", err);
@@ -313,9 +315,13 @@ export async function triggerLevelUp(actor) {
  * Failure here is deliberately soft: the character already exists and is a valid level-1 one, so a
  * class we can't drive leaves the player with a warning and the sheet's Level Up button rather than
  * a half-built actor.
+ * Because this session is what actually finishes the character, it inherits the *creation* chat
+ * card rather than a level-up one — the player made one character, and the table should hear about
+ * it once, at the level they asked for.
  * @param {Actor5e} actor   The just-created character, at level 1.
  * @param {number} target   The character level to reach (> 1; clamped to the system's cap).
- * @returns {Promise<boolean>}  Whether the wizard opened.
+ * @returns {Promise<boolean>}  Whether the wizard opened. When false the caller still owns the
+ *   creation card, since no session exists to post it.
  */
 export async function launchLevelUpTo(actor, target) {
   const classItem = actor.items.find(i => i.type === "class");
@@ -338,7 +344,7 @@ export async function launchLevelUpTo(actor, target) {
       ui.notifications?.warn(t("levelup.notify.choicesUnsupported"));
       return false;
     }
-    await launchLevelUp(manager);
+    await launchLevelUp(manager, { announce: "creation" });
     return true;
   } catch ( err ) {
     log("post-creation level-up failed", err);

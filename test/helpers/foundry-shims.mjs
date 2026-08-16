@@ -91,7 +91,11 @@ export function installFoundryShims() {
       isEmpty: obj => !obj || (Object.keys(obj).length === 0)
     },
     applications: {
-      ux: { TextEditor: { implementation: { enrichHTML: async html => html } } }
+      ux: { TextEditor: { implementation: { enrichHTML: async html => html } } },
+      // The chat cards render a real .hbs file in Foundry. Here the template is never the thing
+      // under test, so this echoes back the path and the context it was handed — enough for a test
+      // to assert *what* the card was told, without a Handlebars runtime.
+      handlebars: { renderTemplate: async (path, context) => JSON.stringify({ path, context }) }
     }
   };
 
@@ -106,6 +110,15 @@ export function installFoundryShims() {
         mixedChoices: async () => new Set()
       }
     }
+  };
+
+  // ChatMessage: the summary cards' only Foundry write. `created` collects every message the code
+  // under test posted, so a test can assert on the payload without a real chat log.
+  globalThis.ChatMessage = class ChatMessage {
+    static created = [];
+    static async create(data) { this.created.push(data); return data; }
+    static getSpeaker({ actor } = {}) { return { actor: actor?.id ?? null, alias: actor?.name ?? null }; }
+    static getWhisperRecipients(name) { return name === "GM" ? [{ id: "gm-user" }] : []; }
   };
 
   globalThis.Hooks = { on: () => 1, off: () => {}, once: () => {} };
