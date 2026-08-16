@@ -92,3 +92,30 @@ git config core.hooksPath .githooks
 
 The same check runs in CI on every pull request
 (`.github/workflows/no-ai-attribution.yml`), so a stray trailer will fail the build.
+
+## Translations
+
+Translations are wanted. The module is fully keyed — every player-facing string already lives in
+`lang/en.json` — so a new language is a translation job rather than a code change, and it is the
+single most useful contribution someone who doesn't write JavaScript can make.
+
+**Translations must be written by a human.** This is the one place where the allowance above does
+not apply: machine-translated or AI-generated language files are not accepted, in line with
+Foundry's package policy on AI-generated content. Run a draft through a tool to help yourself if you
+like, but what you submit has to be your own work, checked by someone who actually speaks the
+language, and your sign-off says exactly that.
+
+To add one:
+
+1. Copy `lang/en.json` to `lang/<code>.json`, using the same language code Foundry uses (`de`,
+   `fr`, `pt-BR`, and so on).
+2. Translate the values. Leave the keys alone, and keep every `{placeholder}` intact and spelled
+   the same — they are filled in at runtime, and a renamed one renders as literal text.
+3. Add the file to the `languages` array in `module.json`.
+4. Run `npm run check`; `validate:json` will catch a malformed file.
+5. Load a world in your language and click through the creator and the level-up wizard. Long
+   translations are the usual source of layout problems, and only looking will find them.
+
+Partial translations are fine — Foundry falls back to English for any key you leave out — so a
+first pass covering the steps players see most is a welcome pull request on its own. If you are
+picking up a language someone else started, say so in the pull request so the work isn't duplicated.
