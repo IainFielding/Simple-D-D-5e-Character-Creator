@@ -7,9 +7,20 @@
  * (`class:cleric` vs `subclass:life`), yet they are the same spell and must not both sit on the
  * character. Matching on any one of those fields misses the pair; matching on name is too loose.
  *
- * The stable identity is the **compendium source** the document was copied from, which both copies
- * carry, plus the spell level to guard against a pack that reuses an id across editions. Homebrew
- * created directly in a world has no compendium source, so `system.identifier` is the fallback.
+ * The stable identity is **`system.identifier`** — `cure-wounds` — plus the spell level. Not the
+ * compendium source, which looks more precise and is the wrong answer: a world running the Player's
+ * Handbook module alongside the system's own packs holds two copies of every spell, and a subclass
+ * granting `dnd5e.spells24`'s Cure Wounds against a player picking the PHB module's produces two
+ * documents whose sources differ and whose spell is identical. Keying on source silently failed to
+ * match them, which is the common case rather than an edge one. (Found by the e2e harness, whose
+ * Cleric case could not even locate an overlapping spell to test until this was understood.)
+ *
+ * The level rides along so a pack reusing an identifier across editions cannot collapse two spells,
+ * and the compendium source is the fallback for the handful of spells — 11 of 352 in the 2024
+ * pack — that ship without an identifier at all.
+ *
+ * Identity alone never authorises a merge: {@link module:build/spell-reconcile.mergeable} still has
+ * to agree on name, casting method, ability and provenance.
  *
  * @see module:build/spell-reconcile for the merge that consumes this
  */
@@ -26,14 +37,16 @@
 export function spellKey(item) {
   if ( !item ) return null;
   const level = Number(item.system?.level ?? item.level ?? 0);
+  // `item.identifier` is the pool-row spelling (see `buildSpellFromEntry`); `system.identifier` is
+  // a live document's.
+  const identifier = item.system?.identifier ?? item.identifier ?? "";
+  if ( identifier ) return `id:${identifier}|${level}`;
   const source = item._stats?.compendiumSource
     ?? item.getFlag?.("dnd5e", "sourceId")
     ?? item.flags?.dnd5e?.sourceId
     ?? item.uuid
     ?? "";
-  if ( source ) return `${source}|${level}`;
-  const identifier = item.system?.identifier ?? "";
-  return identifier ? `id:${identifier}|${level}` : null;
+  return source ? `${source}|${level}` : null;
 }
 
 /**

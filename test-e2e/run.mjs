@@ -10,6 +10,7 @@
  *   node run.mjs --ids <uuid>             # dump an item's advancement ids (for writing scenarios)
  *   node run.mjs --keep-riders            # don't strip empty rider flags (see normalize.mjs)
  *   node run.mjs --sidekicks              # assert Tasha's sidekick classes are not offered
+ *   node run.mjs --granted-spells         # assert an always-prepared grant is never duplicated
  *   node run.mjs playwright-clean --probe-native "<scenario>/<item>" --level 5
  *                                         # native only, per level, in a world without this module
  *   HEADED=1 node run.mjs                 # watch the native wizard being driven
@@ -106,6 +107,24 @@ try {
     console.log(`\n${r.classesOffered} class(es) offered by the creator:`);
     for ( const c of r.offered ) console.log(`  ${c}`);
     if ( r.ok ) console.log("\nPASS   no sidekick class is offered");
+    else {
+      console.log(`\nFAIL   ${r.failures.length} problem(s)`);
+      for ( const f of r.failures ) console.log(`  ${f}`);
+      exitCode = 1;
+    }
+  } else if ( flag("granted-spells") ) {
+    const r = await harness("checkGrantedSpells");
+    for ( const c of r.cases ) {
+      console.log(`\n${c.ok ? "PASS  " : "FAIL  "} ${c.label}`);
+      if ( c.error ) console.log(`  error: ${c.error}`);
+      else {
+        console.log(`  spell under test: ${c.overlap} — ${c.copies} cop(y|ies) on the character`);
+        console.log(`  prepared: ${c.prepared} leveled, preparation.value = ${c.reportedPrepared ?? "—"}`);
+        for ( const f of c.failures ) console.log(`  ! ${f}`);
+      }
+      for ( const s of c.spells ?? [] ) console.log(`      ${s}`);
+    }
+    if ( r.ok ) console.log("\nPASS   no granted spell is duplicated, and feat spells stay separate");
     else {
       console.log(`\nFAIL   ${r.failures.length} problem(s)`);
       for ( const f of r.failures ) console.log(`  ${f}`);

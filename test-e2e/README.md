@@ -101,6 +101,7 @@ node run.mjs --ids <compendium-uuid>  # dump an item's advancement ids + options
 node run.mjs --find "feat:Actor"      # find items by name (optionally type-prefixed)
 node run.mjs --subclasses wizard      # subclasses for a class identifier
 node run.mjs --sidekicks              # assert Tasha's sidekicks are not offered as classes
+node run.mjs --granted-spells         # assert an always-prepared grant is never duplicated
 node run.mjs --sweep                  # every subclass in the world, at level 20 (see below)
 node run.mjs --sweep --axis species   # vary the species instead, on a fixed Wizard/Evoker
 node run.mjs --sweep --axis background  # vary the background, taking a feat at every ASI
@@ -388,6 +389,78 @@ Which resolves the Artificer three ways, deliberately:
 
 The 2014-vs-2024 split is the point of tier 2, and it is not cosmetic: 38 of the 122 scenarios now
 build on `dnd5e.classes` — Tasha's 26 non-Artificer subclasses plus the twelve 2014 SRD ones.
+
+## Granted always-prepared spells: an assertion, not a comparison
+
+```bash
+node run.mjs --granted-spells
+```
+
+Some things this harness needs to check are not differences between two builds, and forcing them
+into that shape makes them weaker. This is the first of those.
+
+A class or subclass `ItemGrant` declaring `configuration.spell.prepared = 2` hands out an
+always-prepared spell — Divine Smite at Paladin 2, a Life Domain's domain spells at 3 — and many are
+also on the class's own list, so the player could pick the same spell again and end up with two
+Items. Only the plain copy counts toward `preparation.value` (`SpellData#countsPrepared` requires
+`prepared === 1`), so the duplicate permanently consumed a prepared slot for a spell the character
+already always had, and being a plain copy it burned a real spell slot when clicked.
+
+**There is no native reference for this.** dnd5e ships eight advancement types and none of them is
+class-spell selection: for an ordinary caster the player drags spells out of a compendium, so the
+AdvancementManager never sees the decision and the creator invents that step. Teaching `native.mjs`
+to "pick class spells" would mean the harness writing its own reference and then checking we match
+it. The bug is a property of one character anyway, so that is what gets asserted:
+
+| Build | Asserts |
+| --- | --- |
+| Paladin 2 | the granted Divine Smite is the copy kept, `prepared === 2`, exactly one |
+| Cleric of Life 3 | a spell picked at creation that the subclass grants at 3 collapses to one |
+| Wizard 1 + Magic Initiate | the feat's spell and the class pick stay **two** items |
+
+Plus, on every build: no spell name appears twice, and `preparation.value` matches the number of
+`prepared === 1` leveled spells actually on the sheet.
+
+The third case is the one worth having. A missed merge is a duplicate the player can delete; a wrong
+merge silently destroys an entitlement, and Magic Initiate's free casting is a genuinely separate
+thing from preparing the same spell normally. It is the assertion most likely to catch a later
+"simplify the merge".
+
+**Cases are content-driven.** The overlapping spell is discovered by walking the class and subclass
+for always-prepared grants and intersecting with the class's own spell list, rather than written
+down — an advancement id and a spell uuid both belong to the content version that shipped them. A
+case that can no longer find an overlap **fails** rather than passing on an empty test, which is how
+the original 2014 Cleric case was caught: the 2014 Life Domain grants *features* and leaves
+`spell.preparation` empty, so it has no always-prepared grant to duplicate at all.
+
+### What it found
+
+Two things, on its first real run.
+
+**Spell identity was keyed on the compendium source, and that never matches across packages.** A
+world with the Player's Handbook module holds two copies of every spell. A subclass granting
+`dnd5e.spells24`'s Bless against a player picking the module's produces two documents whose sources
+differ and whose spell is identical, so the reconciler could not see the pair — in the *common*
+arrangement, not an edge case. `spellKey` now keys on `system.identifier` (present on 341 of the 352
+spells in the 2024 pack) with the source as fallback, and `mergeable` gained a name check to pay for
+the looser key. The Paladin case failed before this and passed after, which is the evidence the check
+works.
+
+The same trap caught the harness twice more: the overlap search and then the assertion both had to
+stop comparing uuids. The assertion counts **by name**, deliberately — matching on the identifier
+would be asking the module to mark its own homework, since a broken `spellKey` is one of the things
+this exists to catch.
+
+**Reconciliation lives in the shell, so a driver-only path skips it.** `LevelUpShell#_finish` owns
+the call because it has to run after the staged spell picks are written, which is shell state. The
+product always goes through it; this adapter did not, and so built a Paladin with two Divine Smites.
+`creator.mjs`'s `levelUp` now mirrors it. Worth knowing if another non-shell path is ever added.
+
+### What it still does not cover
+
+Prevention. The pool filter that stops the duplicate arising — hiding an already-owned spell from the
+Spells step — lives in the step's `context()`, and this adapter fills `CreatorState` directly rather
+than driving the UI. That stays covered by unit tests and by hand.
 
 ### The sidekicks are not swept, and that is the test
 

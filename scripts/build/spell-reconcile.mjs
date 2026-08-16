@@ -138,6 +138,12 @@ export async function reconcileGrantedSpells(actor) {
  * @returns {boolean}
  */
 function mergeable(granted, chosen) {
+  // Identity matched on `system.identifier`, which is deliberately loose enough to see the same
+  // spell in two packages as one thing. The cost of that looseness is that a homebrew pack reusing
+  // an official identifier for a different spell would match too, so the name has to agree as well.
+  // Cheap, and it keeps the merge as narrow as it was before the key was widened.
+  if ( String(granted.name ?? "") !== String(chosen.name ?? "") ) return false;
+
   // A feat's spell is its own entitlement. Magic Initiate grants Cure Wounds once per long rest
   // *and* a Cleric may prepare it normally; those are two different things the character can do, and
   // collapsing them would silently take one away.

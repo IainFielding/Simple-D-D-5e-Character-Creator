@@ -26,13 +26,13 @@ const CURE_WOUNDS = "Compendium.dnd5e.spells24.Item.phbsplCureWounds";
 /** A spell item stub in the shape the reconciler reads. */
 function spell({
   id, uuid = DIVINE_SMITE, level = 1, prepared = 1, method = "spell", ability = "",
-  sourceItem = "class:paladin", origin = null, name = "Divine Smite"
+  sourceItem = "class:paladin", origin = null, name = "Divine Smite", identifier = "divine-smite"
 } = {}) {
   const flags = origin ? { dnd5e: { advancementOrigin: origin } } : {};
   return {
     id, name, type: "spell", img: "icons/svg/daze.svg", flags,
     _stats: { compendiumSource: uuid },
-    system: { level, prepared, method, ability, sourceItem },
+    system: { level, prepared, method, ability, sourceItem, identifier },
     getFlag: (scope, key) => flags[scope]?.[key]
   };
 }
@@ -79,9 +79,31 @@ describe("spellKey", () => {
     expect(spellKey(spell({ id: "a", level: 1 }))).not.toBe(spellKey(spell({ id: "b", level: 2 })));
   });
 
-  it("falls back to the identifier for world homebrew with no compendium source", () => {
-    const homebrew = { type: "spell", _stats: {}, system: { identifier: "mending-touch", level: 1 } };
-    expect(spellKey(homebrew)).toBe("id:mending-touch|1");
+  /**
+   * The case the e2e harness surfaced, and the reason identity is keyed on the identifier rather
+   * than the compendium source: a world running the Player's Handbook module alongside the system's
+   * own packs holds two copies of every spell. A subclass granting one and the player picking the
+   * other is the *common* arrangement, not an edge case, and matching on source never saw it.
+   */
+  it("matches the same spell shipped by two different packages", () => {
+    const fromSystem = spell({ id: "a", uuid: "Compendium.dnd5e.spells24.Item.phbsplCureWounds",
+      name: "Cure Wounds", identifier: "cure-wounds", origin: "subLife.adv", prepared: 2 });
+    const fromPhb = spell({ id: "b", uuid: "Compendium.dnd-players-handbook.spells.Item.phbsplCureWounds",
+      name: "Cure Wounds", identifier: "cure-wounds" });
+    expect(spellKey(fromSystem)).toBe(spellKey(fromPhb));
+  });
+
+  it("falls back to the compendium source when a spell ships without an identifier", () => {
+    // 11 of the 352 spells in the 2024 pack have none; homebrew often does not either.
+    const a = spell({ id: "a", identifier: "" });
+    const b = spell({ id: "b", identifier: "" });
+    expect(spellKey(a)).toBe(spellKey(b));
+    expect(spellKey(a)).toContain(DIVINE_SMITE);
+  });
+
+  it("reads the identifier off a pool row, which spells it without the system prefix", () => {
+    expect(spellKey({ identifier: "cure-wounds", level: 1 }))
+      .toBe(spellKey(spell({ id: "x", identifier: "cure-wounds", level: 1 })));
   });
 
   it("reports nothing rather than guessing when there is no identity at all", () => {
@@ -90,8 +112,10 @@ describe("spellKey", () => {
   });
 
   it("reads a pool entry's shape as well as a live item's", () => {
-    // The spell steps hold `{ uuid, level }` rows, which must key the same as the created item.
-    expect(spellKey({ uuid: DIVINE_SMITE, level: 1 })).toBe(spellKey(spell({ id: "a", level: 1 })));
+    // The spell steps hold pool rows built by `buildSpellFromEntry`, which must key the same as the
+    // item eventually created from them.
+    const row = { uuid: DIVINE_SMITE, identifier: "divine-smite", level: 1 };
+    expect(spellKey(row)).toBe(spellKey(spell({ id: "a", level: 1 })));
   });
 });
 
@@ -99,7 +123,7 @@ describe("ownedSpellKeys", () => {
   it("counts every spell whatever its preparation state or origin", () => {
     const actor = makeActor([
       spell({ id: "a", prepared: 2, origin: "featX." }),
-      spell({ id: "b", uuid: CURE_WOUNDS, prepared: 0, name: "Cure Wounds" }),
+      spell({ id: "b", uuid: CURE_WOUNDS, prepared: 0, name: "Cure Wounds", identifier: "cure-wounds" }),
       feature("f1", "Divine Smite")
     ]);
     // The old owned-spell filter required `prepared === 1`, which is exactly how granted copies
@@ -166,9 +190,9 @@ describe("reconcileGrantedSpells", () => {
 
   it("merges across a subclass grant and a class pick — the Life Domain case", async () => {
     const actor = makeActor([
-      spell({ id: "granted", uuid: CURE_WOUNDS, name: "Cure Wounds", prepared: 2,
+      spell({ id: "granted", uuid: CURE_WOUNDS, name: "Cure Wounds", identifier: "cure-wounds", prepared: 2,
         sourceItem: "subclass:life", origin: "subLife.advDomain" }),
-      spell({ id: "chosen", uuid: CURE_WOUNDS, name: "Cure Wounds", prepared: 1,
+      spell({ id: "chosen", uuid: CURE_WOUNDS, name: "Cure Wounds", identifier: "cure-wounds", prepared: 1,
         sourceItem: "class:cleric" })
     ]);
     const result = await reconcileGrantedSpells(actor);
@@ -203,9 +227,9 @@ describe("reconcileGrantedSpells", () => {
     // The feat grants one free casting per long rest; a Cleric may *also* prepare it normally.
     // Collapsing them would take one of those away.
     const actor = makeActor([
-      spell({ id: "granted", uuid: CURE_WOUNDS, name: "Cure Wounds", prepared: 2,
+      spell({ id: "granted", uuid: CURE_WOUNDS, name: "Cure Wounds", identifier: "cure-wounds", prepared: 2,
         sourceItem: "feat:magic-initiate", origin: "featMI.adv" }),
-      spell({ id: "chosen", uuid: CURE_WOUNDS, name: "Cure Wounds", prepared: 1,
+      spell({ id: "chosen", uuid: CURE_WOUNDS, name: "Cure Wounds", identifier: "cure-wounds", prepared: 1,
         sourceItem: "class:cleric" })
     ]);
     const result = await reconcileGrantedSpells(actor);
@@ -217,6 +241,32 @@ describe("reconcileGrantedSpells", () => {
     const actor = makeActor([
       spell({ id: "granted", prepared: 2, method: "pact", origin: "clsWarlock.adv" }),
       spell({ id: "chosen", prepared: 1, method: "spell" })
+    ]);
+    expect((await reconcileGrantedSpells(actor)).merged).toEqual([]);
+    expect(actor.seen.deleted).toEqual([]);
+  });
+
+  it("collapses a granted copy and a chosen copy from different packages", async () => {
+    const actor = makeActor([
+      spell({ id: "granted", uuid: "Compendium.dnd5e.spells24.Item.phbsplCureWounds",
+        name: "Cure Wounds", identifier: "cure-wounds", prepared: 2,
+        sourceItem: "subclass:life", origin: "subLife.advDomain" }),
+      spell({ id: "chosen", uuid: "Compendium.dnd-players-handbook.spells.Item.phbsplCureWounds",
+        name: "Cure Wounds", identifier: "cure-wounds", prepared: 1, sourceItem: "class:cleric" })
+    ]);
+    const result = await reconcileGrantedSpells(actor);
+    expect(actor.seen.deleted).toEqual(["chosen"]);
+    expect(result.releasedSpells).toBe(1);
+  });
+
+  it("refuses two different spells that share an identifier — the name has to agree too", async () => {
+    // The cost of keying on the identifier: a homebrew pack reusing an official one would otherwise
+    // match. A wrong merge destroys an entitlement, so the name is checked before collapsing.
+    const actor = makeActor([
+      spell({ id: "granted", uuid: "Compendium.homebrew.spells.Item.x", name: "Cure Wounds (Greater)",
+        identifier: "cure-wounds", prepared: 2, origin: "x.y" }),
+      spell({ id: "chosen", uuid: "Compendium.dnd5e.spells24.Item.phbsplCureWounds",
+        name: "Cure Wounds", identifier: "cure-wounds", prepared: 1 })
     ]);
     expect((await reconcileGrantedSpells(actor)).merged).toEqual([]);
     expect(actor.seen.deleted).toEqual([]);
@@ -241,7 +291,7 @@ describe("reconcileGrantedSpells", () => {
   it("leaves two different spells alone", async () => {
     const actor = makeActor([
       spell({ id: "granted", prepared: 2, origin: "x.y" }),
-      spell({ id: "chosen", uuid: CURE_WOUNDS, name: "Cure Wounds", prepared: 1 })
+      spell({ id: "chosen", uuid: CURE_WOUNDS, name: "Cure Wounds", identifier: "cure-wounds", prepared: 1 })
     ]);
     expect((await reconcileGrantedSpells(actor)).merged).toEqual([]);
   });
