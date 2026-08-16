@@ -1,5 +1,7 @@
-import { MODULE_ID, HOOKS, tpl, t, log, fireHook, fireCancellableHook } from "../config.mjs";
-import { CreatorShellBase, shellOptions, railStageParts } from "../app/shell-base.mjs";
+import {
+  MODULE_ID, HOOKS, tpl, t, log, ABILITIES, formatMod, fireHook, fireCancellableHook
+} from "../config.mjs";
+import { CreatorShellBase, shellOptions, railStageParts, dossierStageParts } from "../app/shell-base.mjs";
 import { illuminatePages } from "../app/page-illumination.mjs";
 import { buildSteps } from "./registry.mjs";
 import { getSources, isStale, invalidateSources } from "../data/source-cache.mjs";
@@ -34,6 +36,36 @@ export class LevelUpShell extends CreatorShellBase {
   // Beyond the shared stage body: the subclass picker's independently scrolling list/detail columns
   // (which reuse the creator's pick layout).
   static PARTS = railStageParts([".creator-picklist", ".creator-pick-desc"]);
+
+  /**
+   * @override
+   * The Ember hand-off wears the *creator's* chrome, not the level-up's.
+   *
+   * A level-up keeps the plain rail for the reason {@link module:app/shell-base} gives: it applies
+   * advancements to a character that already exists, so there is no "character so far" to show. The
+   * Ember hand-off is the case that reasoning doesn't cover. Ember has already assigned the
+   * ancestry, background and class and is waiting behind this window for the level-1 questions —
+   * the player is *creating a character*, and this window already says so in its title and on its
+   * Apply button. Only the chrome disagreed.
+   *
+   * With Ember active `moduleMode()` is pinned to "levelup", so our own creator never opens; without
+   * this override the one flow in an Ember world that really is character creation would be the only
+   * creation flow still wearing the pre-dossier chrome.
+   *
+   * Done per instance rather than by splitting the class in two because *nothing else* differs: the
+   * stage, every step template and the whole dispatch path are shared already. The layout follows
+   * from the parts with no CSS change at all — the creator's grid rule keys on
+   * `:has(.creator-dossier)` rather than on a root class, precisely so this window could opt in.
+   */
+  _configureRenderParts(options) {
+    if ( !this.state.emberCreation ) return super._configureRenderParts(options);
+    // The hand-off's rail carries the creation Store step as well as the subclass picker, so its
+    // shelf and cart keep their scroll positions across the re-render every purchase causes.
+    return dossierStageParts([
+      ".creator-picklist", ".creator-pick-desc",
+      ".creator-store-shelf", ".creator-store-cart-list"
+    ]);
+  }
 
   /** @type {import("./levelup-state.mjs").LevelUpState} */
   state;
@@ -155,12 +187,22 @@ export class LevelUpShell extends CreatorShellBase {
     // enables on the same render that shows the screen.
     const stepContext = await step.context(this._ctx());
     const flags = this._completeFlags();
+    const lines = this.#railContext(flags);
+    // The Ember hand-off renders the creator's top bar and dossier instead of the rail, so it needs
+    // their two view-models; an ordinary level-up leaves both null and renders neither template.
+    const ember = this.state.emberCreation;
 
     return {
       loading: false,
       version: game.modules.get(MODULE_ID)?.version ?? "",
       cancelLabel: t("nav.cancel"),
-      rail: this.#railContext(flags),
+      rail: lines,
+      dossier: ember ? this.#dossierContext(lines) : null,
+      // Outstanding work is derived from `flags` rather than re-running every step's isComplete()
+      // a second time, for the same reason the flags themselves are computed once above.
+      progress: ember
+        ? this._progressContext(lines, this.#steps.filter((s, i) => (s.id !== "review") && !flags[i]))
+        : null,
       step: {
         id: step.id,
         template: tpl(`${step.template}.hbs`),
@@ -192,18 +234,85 @@ export class LevelUpShell extends CreatorShellBase {
   }
 
   #railContext(flags) {
-    return this.#steps.map((s, i) => ({
-      index: i,
-      id: s.id,
-      label: s.label ?? t(s.labelKey),
-      icon: s.icon,
-      ordinal: i + 1,
-      active: i === this._stepIndex,
-      applicable: true,
-      complete: flags[i] && s.id !== "review",
-      reachable: this._reachable(i, flags),
-      summary: s.summary?.(this.state) ?? ""
-    }));
+    return this.#steps.map((s, i) => {
+      const complete = flags[i] && s.id !== "review";
+      const reachable = this._reachable(i, flags);
+      return {
+        index: i,
+        id: s.id,
+        label: s.label ?? t(s.labelKey),
+        icon: s.icon,
+        ordinal: i + 1,
+        active: i === this._stepIndex,
+        applicable: true,
+        complete,
+        reachable,
+        // Read only by the dossier (rail.hbs has no equivalent), and deliberately narrower than
+        // "not complete": a step the player cannot reach yet is not something they have left to do,
+        // it is something they have left to arrive at. Marking those too would paint most of the
+        // roll with the outstanding colour on the first screen and teach the player to ignore it.
+        open: reachable && !complete && s.id !== "review",
+        summary: s.summary?.(this.state) ?? ""
+      };
+    });
+  }
+
+  /**
+   * The dossier's view-model for the Ember hand-off — the character as Ember has already built it,
+   * then the step lines. The counterpart of the creator's own, sourced differently because the
+   * character here is not ours: Ember writes the name, portrait and ability scores to the *real*
+   * actor before it hands the advancements over.
+   *
+   * Read-only by design, exactly as in the creator: every control that sets one of these values
+   * lives on the stage to its right.
+   * @param {object[]} lines   From {@link #railContext}.
+   */
+  #dossierContext(lines) {
+    const clone = this.state.driver?.clone;
+    // Ember stages its class onto the clone only, and its staged items carry no
+    // `_stats.compendiumSource` — so the name has to come off the staged document itself. Anything
+    // that tried to resolve it by UUID would come back empty.
+    const classItem = clone?.items?.find(i => i.type === "class") ?? this.state.classItem;
+    return {
+      // Ember sets a portrait during its own build, so this fallback is defensive rather than the
+      // usual case — but an empty src renders as a broken image, and the mystery-man reads as an
+      // empty frame, which is what the dossier's identity plate is for.
+      portrait: this.state.actor?.img || "icons/svg/mystery-man.svg",
+      name: this.state.actor?.name?.trim() ?? "",
+      className: classItem?.name ?? "",
+      level: this.state.toLevel ?? 1,
+      ...this.#dossierAbilities(),
+      steps: lines
+    };
+  }
+
+  /**
+   * The six ability plates for the Ember hand-off.
+   *
+   * `abilitiesSet` is always true here, unlike the creator, which blanks the plates until its
+   * ability step has produced a full set. Under Ember the scores are decided before the hand-off
+   * exists — they are pure readout, and blanking them would be a lie about a character that already
+   * has them.
+   *
+   * Read off the driver's clone while one exists, so a score an advancement raises during this
+   * session (an origin ability increase folded onto the level-1 screen) shows on the plate the
+   * moment it is chosen. No bonus corner: origin increases under Ember come from its own ancestry,
+   * culture and path and are already baked in, so there is no honest delta to point at.
+   */
+  #dossierAbilities() {
+    const source = this.state.driver?.clone ?? this.state.actor;
+    const abilities = ABILITIES.map(key => {
+      const value = source?.system?.abilities?.[key]?.value ?? 10;
+      return {
+        key,
+        abbr: CONFIG.DND5E?.abilities?.[key]?.abbreviation ?? key.slice(0, 3).toUpperCase(),
+        value,
+        modifier: formatMod(value),
+        bonus: null,
+        bonusTip: null
+      };
+    });
+    return { abilities, abilitiesSet: true };
   }
 
   /** @override */

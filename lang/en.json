@@ -566,6 +566,10 @@
         "name": "Show Level Up button",
         "hint": "Adds a “Level Up” button to the character sheet's header for the character's owner. Levelling through the sheet's own class controls still works either way."
       },
+      "headerMenu": {
+        "name": "Show Level Up in sheet menu",
+        "hint": "Adds a “Level Up” option to the ⋯ menu in a character sheet's header, opening the same level-up flow as the sheet button. Useful alongside sheets that have no room for the button, or instead of it."
+      },
       "allowMulticlass": {
         "name": "Allow multiclassing",
         "hint": "Lets players add a new class when levelling up. With prerequisites shows only classes whose ability requirements (13+ in the primary ability of both the current and the new class) are met; Without prerequisites offers every class.",

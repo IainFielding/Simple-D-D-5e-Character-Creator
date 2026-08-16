@@ -262,6 +262,56 @@ export class CreatorShellBase extends HandlebarsApplicationMixin(ApplicationV2) 
   }
 
   /* -------------------------------------------- */
+  /*  Shared view-model                           */
+  /* -------------------------------------------- */
+
+  /**
+   * The top bar's progress meter, for any window that renders `templates/topbar.hbs`.
+   *
+   * Lives here rather than in the creator because the Ember hand-off renders the same top bar (see
+   * {@link module:levelup/levelup-shell}), and this arithmetic has already been wrong in both
+   * directions — it is exactly the kind of thing that must not exist twice.
+   *
+   * The fill measures *position*: how far along the flow the player is.
+   *
+   * It began as complete-lines over visible-lines, which could never fill, because Review is a
+   * summary rather than a task and is deliberately never marked complete — so the bar sat at eight
+   * ninths on the screen where the character was finished. The fix was to measure settled required
+   * steps instead, which fills exactly when nothing is outstanding — and that produced the opposite
+   * lie: with every required step done and only Review left, the bar reads 100% while the counter
+   * beside it reads "Step 9 of 10". A full bar next to a counter that is not full is a contradiction
+   * the player has to resolve, and the reading they take from it — "I'm finished" — is the wrong one,
+   * because they have not pressed Create.
+   *
+   * Both attempts were trying to make one bar answer two questions. It only has to answer the one
+   * its own neighbour asks. The counter next to it says where you are; the bar is the graphic of
+   * that counter, and the two now cannot disagree — 9 of 10 draws nine tenths, and the bar is full
+   * on Review, which is the last step and where the old bug was.
+   *
+   * Completion is not lost: it is what the teal outstanding chip immediately to the right reports,
+   * and what the ticks down the dossier report per step. Position and completion are genuinely
+   * different questions — a player can go back and leave a finished step behind them unfinished
+   * again — so they get one readout each instead of one readout each other's shape.
+   * @param {object[]} lines     One per visible step, each carrying an `active` flag.
+   * @param {object[]} missing   Required steps not yet complete.
+   * @returns {object}
+   */
+  _progressContext(lines, missing) {
+    const visible = lines.length;
+    const current = Math.max(lines.findIndex(l => l.active) + 1, 1);
+    const outstanding = missing.length;
+    return {
+      // These describe the bar, so they are the position counts the label beside it uses.
+      total: visible,
+      done: current,
+      percent: visible ? Math.round((current / visible) * 100) : 100,
+      position: t("nav.position", { current, total: visible }),
+      outstanding,
+      outstandingLabel: t("dossier.outstanding", { count: outstanding })
+    };
+  }
+
+  /* -------------------------------------------- */
   /*  Shared UI behaviour                         */
   /* -------------------------------------------- */
 

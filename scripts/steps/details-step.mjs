@@ -197,5 +197,6 @@ async function pickImage(state, app, slot) {
 
 /* `yieldTakeoverTo` used to live here, written for these three image buttons. It is shared now —
    see app/takeover.mjs — because the same trap catches every window opened from inside the
-   takeover, including the item sheets the Review screen's content links open. The shared version
-   also counts, so two open windows no longer restore the takeover when the first of them closes. */
+   takeover, including the item sheets the Review screen's content links open. Note it is called
+   above *before* the picker renders: the shared version marks an application it cannot mark the
+   element of yet, and finishes the job on the render hook. */

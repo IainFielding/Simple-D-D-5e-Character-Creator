@@ -190,7 +190,7 @@ export class CreatorShell extends CreatorShellBase {
       version: game.modules.get(MODULE_ID)?.version ?? "",
       cancelLabel: t("nav.cancel"),
       dossier: this.#dossierContext(lines),
-      progress: this.#progressContext(lines, missing),
+      progress: this._progressContext(lines, missing),
       step: {
         id: step.id,
         template: tpl(`${step.template}.hbs`),
@@ -580,54 +580,6 @@ export class CreatorShell extends CreatorShellBase {
     // The class step owns the ability panel, so its completion flag is the one that says whether a
     // full, valid set of scores exists.
     return { abilities, abilitiesSet: STEPS[0].isComplete(this.state) };
-  }
-
-  /**
-   * The top bar's progress meter. Counted over the *visible* steps, so a step that doesn't apply
-   * to this character never makes the bar look short of its own total.
-   *
-   * `outstanding` is the standing answer to "what is left" — required steps still needing input.
-   * It is a separate number from the position because they answer different questions: position
-   * says where you are in the sequence, outstanding says how much work remains regardless of
-   * order (a player can go back and leave a finished step behind them unfinished again).
-   * @param {object[]} lines      From {@link #stepLines}.
-   * @param {object[]} missing    Required steps not yet complete.
-   */
-  #progressContext(lines, missing) {
-    const visible = lines.length;
-    const current = Math.max(lines.findIndex(l => l.active) + 1, 1);
-
-    // The fill measures *position*: how far along the flow the player is.
-    //
-    // This has now been wrong in both directions. It began as complete-lines over visible-lines,
-    // which could never fill, because Review is a summary rather than a task and is deliberately
-    // never marked complete — so the bar sat at eight ninths on the screen where the character was
-    // finished. The fix was to measure settled required steps instead, which fills exactly when
-    // nothing is outstanding — and that produced the opposite lie: with every required step done
-    // and only Review left, the bar reads 100% while the counter beside it reads "Step 9 of 10".
-    // A full bar next to a counter that is not full is a contradiction the player has to resolve,
-    // and the reading they take from it — "I'm finished" — is the wrong one, because they have not
-    // pressed Create.
-    //
-    // Both attempts were trying to make one bar answer two questions. It only has to answer the
-    // one its own neighbour asks. The counter next to it says where you are; the bar is the
-    // graphic of that counter, and the two now cannot disagree — 9 of 10 draws nine tenths, and
-    // the bar is full on Review, which is the last step and where the old bug was.
-    //
-    // Completion is not lost: it is what the teal outstanding chip immediately to the right
-    // reports, and what the ticks down the dossier report per step. Position and completion are
-    // genuinely different questions — a player can go back and leave a finished step behind them
-    // unfinished again — so they get one readout each instead of one readout each other's shape.
-    const outstanding = missing.length;
-    return {
-      // These describe the bar, so they are the position counts the label beside it uses.
-      total: visible,
-      done: current,
-      percent: visible ? Math.round((current / visible) * 100) : 100,
-      position: t("nav.position", { current, total: visible }),
-      outstanding,
-      outstandingLabel: t("dossier.outstanding", { count: outstanding })
-    };
   }
 
   #filterCards(query) {

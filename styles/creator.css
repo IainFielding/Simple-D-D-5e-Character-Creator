@@ -4,17 +4,30 @@
    add new selectors as descendants of .sogrom-creator rather than styling bare
    element or generic class names.
 
-   The screen is laid out top to bottom: a horizontal top-bar stepper (the row of
-   numbered steps) sits above a flexible content stage that fills the remaining
-   height. Note the step elements still use `.creator-rail-*` class names — that's
-   historical, from when the stepper was a vertical rail down the left side.
+   Two window shapes share these rules, and which one you get is decided by the PARTS
+   the application renders (see scripts/app/shell-base.mjs):
 
-   Theme — "Arcane Midnight": the colour and type system used throughout. The UI
-   accent is violet over a near-black background; antique gold is reserved for the
-   "currently selected" state and engraved edges so selection always stands out from
-   ordinary controls. Headings use Cinzel (carved-caps look), body text uses Spectral.
-   All of these values come from the CSS custom properties (--cc-*) defined next, so
-   change a colour there and it updates everywhere.
+     topbar + dossier + stage   character creation, including the Ember hand-off.
+                                A full-width band across the top carrying a progress
+                                meter, a fixed 292px dossier column that is both the
+                                character so far and the step navigation, and the
+                                stage beside it.
+     rail + stage               a level-up. The step list is a horizontal row of
+                                numbered markers in the top band instead, because a
+                                level-up has no "character so far" to show.
+
+   The grid that produces the first shape keys on `:has(.creator-dossier)` rather than
+   on a root class, so a window opts in simply by rendering the dossier part. Note the
+   level-up markers still use `.creator-rail-*` class names — that's historical, from
+   when the stepper was a vertical rail down the left side.
+
+   Theme — "Arcane Midnight": the colour and type system used throughout. Colour
+   carries one meaning and one only — warm (brass, --cc-settled) is a decision the
+   player has already committed, cool (teal, --cc-open) is something still asking for
+   input. Headings use Cinzel (carved-caps look), body text uses Spectral. All of
+   these values come from the CSS custom properties (--cc-*) defined next, so change a
+   colour there and it updates everywhere — which is exactly how styles/ember-skin.css
+   re-themes the whole UI for an Ember world without touching a single rule below.
 
    Cinzel and Spectral are self-hosted — their @font-face rules live in fonts.css,
    loaded ahead of this file via module.json so the creator renders correctly
@@ -134,6 +147,12 @@
   /* Tracks --cc-panel-2 → --cc-panel; kept as literals because a gradient between two
      var()s re-resolves on every paint for no benefit here. */
   --cc-panel-grad: linear-gradient(180deg, #2a2e35, #1c1f24);
+
+  /* The window's chrome bands — the top bar. A token rather than a literal on the rule
+     because the Ember skin repaints it: overriding a hard-coded gradient meant the same
+     surface was declared in two files, and the second one had to know it was fighting
+     the first. */
+  --cc-chrome-grad: linear-gradient(180deg, #1b1d22, #101116);
 
   /* Legacy leaf names. The bound-spread metaphor is gone with the third
      column (see the work-surface section), but these are still referenced by
@@ -291,20 +310,26 @@ body:has(.sogrom-creator-fullscreen) #dice-box-canvas {
   z-index: var(--z-index-tooltip, 9999) !important;
 }
 
-/* While a window opened from inside the takeover is on screen, the takeover steps below Foundry's
-   window layer so that window is visible. Set by `yieldTakeoverTo()` (app/takeover.mjs) — for the
-   Details step's file picker, and for any document sheet a content link opens, which is how the
-   Review screen's features, spells and gear become clickable at all. Still fixed and still covering
-   the viewport, so nothing behind it is revealed; only floating app windows come over it, which is
-   the entire point. 90 sits just under Foundry's `--z-index-window` (100).
+/* A window opened from inside the takeover — the Details step's file picker, and any document
+   sheet a content link opens, which is how the Review screen's features, spells and gear become
+   clickable at all. Put on that window's own element by `yieldTakeoverTo()` (app/takeover.mjs),
+   which can do that because the render hook hands it the application.
 
-   The class is reference-counted on the element (`data-yield-count`), because more than one such
-   window can be open at once and restoring on the first close would bury the rest.
+   This used to work the other way round: `.sogrom-creator-fullscreen.is-yielding { z-index: 90 }`
+   dropped the takeover below Foundry's window layer instead. That was the wrong lever. Lowering
+   ourselves does not reveal *the* window that was opened, it reveals *every* window — including
+   the actor sheet the fullscreen rule above is explicitly sized to hide. Clicking one item on the
+   Review screen brought up the item sheet and the character sheet behind it.
 
-   This is the inverse of the two rules below, and the more reliable shape: it changes our own
-   element rather than trying to out-specify an inline z-index that Foundry rewrites on every
-   render of a window whose class names we don't control. */
-.sogrom-creator-fullscreen.is-yielding { z-index: 90; }
+   Same shape, same scope and the same z-index as the dice-box and Compendium Browser rules either
+   side of it, for the same reasons: !important beats the inline z-index Foundry rewrites on render
+   and focus, and gating on the takeover being present means the class goes inert the moment the
+   wizard closes. Without that gate a sheet opened from the Review screen would outlive the window
+   it was opened from and sit over everything else for the rest of the session — the class is on
+   someone else's element, so there is nothing of ours left to take it off. */
+body:has(.sogrom-creator-fullscreen) .sogrom-above-takeover {
+  z-index: var(--z-index-tooltip, 9999) !important;
+}
 
 /* Same trap for the dnd5e Compendium Browser opened from inside the creator (e.g. the
    feat picker on an ASI level-up, CompendiumBrowser.selectOne). It renders as its own
@@ -433,14 +458,15 @@ body:has(.sogrom-creator-fullscreen) .application.compendium-browser {
 
    The band across the top of both windows: brand at the left, Cancel at the right,
    and between them whatever that window uses to show where you are — a progress
-   meter in the creator (topbar.hbs), the step pills in the level-up (rail.hbs). */
+   meter where a character is being created (topbar.hbs, which the Ember hand-off
+   renders too), the step markers in a level-up (rail.hbs). */
 .creator-topbar {
   flex: 0 0 auto;
   display: flex;
   align-items: center;
   gap: 1.5rem;
   padding: 0.35rem 1.25rem;
-  background: linear-gradient(180deg, #1b1d22, #101116);
+  background: var(--cc-chrome-grad);
   border-bottom: 1px solid var(--cc-line-2);
 }
 
@@ -459,9 +485,28 @@ body:has(.sogrom-creator-fullscreen) .application.compendium-browser {
   text-transform: uppercase;
   text-shadow: 0 1px 0 rgba(0, 0, 0, 0.6);
 }
-/* No rule for a brand icon: topbar.hbs renders the wordmark and the version only.
-   One lived here for an <i> that was dropped when the stepper became the progress
-   meter, which is exactly the kind of rule that survives a redesign unnoticed. */
+/* The brand mark, drawn as a ::before rather than as markup: topbar.hbs and rail.hbs
+   render a wordmark and a version only, and neither wants an <i> whose only job is to
+   carry a background. (One used to exist for exactly that, and outlived the stepper it
+   was drawn for — which is how this ended up a pseudo-element.)
+
+   The mark is the dnd5e system's own gold ampersand, referenced out of the system
+   directory and never copied into this repo. That is deliberate and it is the same rule
+   the Ember skin follows: `systems/dnd5e/ui/official/` ships a LICENSE restricting its
+   artwork to "running the dnd5e game system within Foundry Virtual Tabletop", and the
+   dragon ampersand is a registered trademark of Wizards of the Coast. Referencing a file
+   from the user's own installed system, rendered only inside Foundry, is use within that
+   sentence; shipping a copy of it would not be. Do not vendor it, and do not point this
+   at a file we host.
+
+   The Ember skin overrides the image (not the box) with Ember's own mark. */
+.creator-topbar-brand::before {
+  content: "";
+  flex: 0 0 auto;
+  width: 1.5rem;
+  height: 1.5rem;
+  background: url("../../../systems/dnd5e/ui/official/ampersand-gold.svg") no-repeat center / contain;
+}
 
 .creator-topbar-version {
   align-self: flex-end;

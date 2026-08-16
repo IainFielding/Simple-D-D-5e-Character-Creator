@@ -162,6 +162,7 @@ export const SETTINGS = {
   displayMode: "displayMode",
   mode: "mode",
   levelUpButton: "showLevelUpButton",
+  headerMenu: "showLevelUpHeaderMenu",
   levelUpHpMode: "levelUpHpMode",
   levelUpHpRollToChat: "levelUpHpRollToChat",
   creationSummary: "creationSummary",
@@ -180,6 +181,10 @@ export const DEFAULTS = {
   displayMode: "fullscreen",
   mode: "creation-levelup",
   levelUpButton: true,
+  // Off by default, unlike the sheet button. This is a *second* front door onto a flow that
+  // already has one, and a default of true would silently add an entry to every character
+  // sheet's menu on update — a GM who wants it can say so.
+  headerMenu: false,
   levelUpHpMode: "choice",
   levelUpHpRollToChat: true,
   creationSummary: "public",

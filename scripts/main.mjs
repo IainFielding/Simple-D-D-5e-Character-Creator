@@ -71,6 +71,15 @@ function registerSettings() {
   // With Ember active the module cedes character creation to Ember's own creator, so the
   // only mode on offer is Level-Up only (and config.mjs's moduleMode() pins the effective
   // mode there even if an older value is still stored). Without Ember, all three modes show.
+  //
+  // That cession takes a handful of settings with it. Everything reached only through our own
+  // creator — which never opens in an Ember world — is registered with `config: !ember`, so it
+  // is hidden from Configure Settings there rather than listed as a control that cannot change
+  // anything. A dead control is worse than an absent one: it invites a GM to set it and then
+  // conclude the module is broken when nothing happens. Each one below says why it is dead.
+  //
+  // They stay *registered* either way, because `game.settings.get` on an unregistered setting
+  // throws, and several are read on paths that still run in an Ember world.
   const ember = emberActive();
   game.settings.register(MODULE_ID, SETTINGS.mode, {
     name: t("settings.mode.name"),
@@ -94,30 +103,41 @@ function registerSettings() {
       windowed: t("settings.displayMode.windowed")
     }
   });
+  // Dead under Ember: the button is gated on creationEnabled(), false there. Still read on every
+  // Actors-sidebar render, which is why it must stay registered rather than be skipped.
   game.settings.register(MODULE_ID, SETTINGS.launchButton, {
     name: t("settings.launchButton.name"),
     hint: t("settings.launchButton.hint"),
-    scope: "world", config: true, type: Boolean, default: true
+    scope: "world", config: !ember, type: Boolean, default: true
   });
   game.settings.register(MODULE_ID, SETTINGS.levelUpButton, {
     name: t("settings.levelUpButton.name"),
     hint: t("settings.levelUpButton.hint"),
     scope: "world", config: true, type: Boolean, default: DEFAULTS.levelUpButton
   });
+  // Level-up entry points are live in an Ember world too — Ember owns creation, not levelling.
+  game.settings.register(MODULE_ID, SETTINGS.headerMenu, {
+    name: t("settings.headerMenu.name"),
+    hint: t("settings.headerMenu.hint"),
+    scope: "world", config: true, type: Boolean, default: DEFAULTS.headerMenu
+  });
   game.settings.register(MODULE_ID, SETTINGS.contextMenu, {
     name: t("settings.contextMenu.name"),
     hint: t("settings.contextMenu.hint"),
     scope: "world", config: true, type: Boolean, default: true
   });
+  // Both dead under Ember: they are read only by the creator's Abilities step, and Ember decides
+  // ability scores in its own builder before the hand-off ever reaches us. The hand-off's rail has
+  // no Abilities step to spend a budget or roll a formula on (see levelup/registry.mjs).
   game.settings.register(MODULE_ID, SETTINGS.pointBuyBudget, {
     name: t("settings.pointBuyBudget.name"),
     hint: t("settings.pointBuyBudget.hint"),
-    scope: "world", config: true, type: Number, default: DEFAULTS.pointBuyBudget
+    scope: "world", config: !ember, type: Number, default: DEFAULTS.pointBuyBudget
   });
   game.settings.register(MODULE_ID, SETTINGS.rollFormula, {
     name: t("settings.rollFormula.name"),
     hint: t("settings.rollFormula.hint"),
-    scope: "world", config: true, type: String, default: DEFAULTS.rollFormula
+    scope: "world", config: !ember, type: String, default: DEFAULTS.rollFormula
   });
   game.settings.register(MODULE_ID, SETTINGS.multiclass, {
     name: t("settings.allowMulticlass.name"),
@@ -146,10 +166,16 @@ function registerSettings() {
   });
   // The two summary cards. Both share the same three modes, so they read the same to a GM
   // scanning the settings list; see SUMMARY_MODES in config.mjs.
+  //
+  // The creation card is dead under Ember, and the level-up card is not. LevelUpState.announce
+  // defaults to "none" for the hand-off — Ember finishes the character after our Apply, so a card
+  // posted by us would describe one that is still a step from done — and postCreationSummary is
+  // only ever called behind `announce === "creation"`. The level-up card is unaffected: an Ember
+  // world levels characters up exactly like any other.
   game.settings.register(MODULE_ID, SETTINGS.creationSummary, {
     name: t("settings.creationSummary.name"),
     hint: t("settings.creationSummary.hint"),
-    scope: "world", config: true, type: String, default: DEFAULTS.creationSummary,
+    scope: "world", config: !ember, type: String, default: DEFAULTS.creationSummary,
     choices: {
       "public": t("settings.creationSummary.public"),
       "gm": t("settings.creationSummary.gm"),

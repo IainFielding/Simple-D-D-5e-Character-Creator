@@ -20,7 +20,33 @@
    The theme itself works by re-pointing the `--cc-*` design tokens creator.css is
    built on; the handful of extra rules below the token block cover the few places
    creator.css hard-codes Arcane Midnight colours (ambience gradients, the top bar,
-   the primary button). */
+   the primary button) plus the borrowed-art section at the end.
+
+   ---------------------------------------------- Ember asset manifest
+
+   Every file this sheet names in Ember's own directory, in one list. Ember is a
+   protected module we do not control: an art file renamed in one of its releases
+   breaks a rule here silently (a missing background paints nothing, a missing
+   border-image falls back to the `border` shorthand's colour). Keeping the whole
+   surface area in one place makes that a single audit rather than a hunt, so add to
+   this list whenever you add a URL below.
+
+     ui/elements/codex-background-dark.webp      window ground, fullscreen + windowed
+     ui/elements/cosmos-design-weathered.webp    fullscreen watermark
+     ui/elements/logo-inner.svg                  top-bar brand mark (replacing the
+                                                 dnd5e ampersand creator.css draws)
+     ui/borders/BlockActorRing.webp              dossier portrait ring
+     ui/borders/H2BorderMiddle.webp              centre ornament on page heads
+     ui/borders/H2BorderLeft.webp                left rule on page heads
+     ui/borders/H2BorderRight.webp               right rule on page heads
+     ui/backgrounds/PageBackgroundEmber.webp     reading ground behind page prose
+
+   Assets considered and deliberately not used, so they are not re-proposed: the
+   BoxBorder 9-slice (it lands on the most-repeated element in the UI, and reads as
+   busy at that volume), the button plates (the primary button already carries
+   Ember's red gradient and the plate only muddies it), the divider SVGs (they
+   replaced the gold hairline that closes a page head, and the hairline is better at
+   the job), and ApplicationFrameBorder (windowed mode only, which is the rare one). */
 
 /* ---------------------------------------------- Design tokens
 
@@ -119,6 +145,12 @@
 
   --cc-panel-grad: linear-gradient(180deg, rgba(29, 24, 38, 0.85), rgba(18, 14, 25, 0.85));
 
+  /* The top bar. Translucent for the same reason the panels are — Ember's paper reads
+     through its chrome. This used to be a rule overriding `.creator-topbar`'s
+     hard-coded gradient; creator.css now holds it as a token, so the two files no
+     longer declare the same surface. */
+  --cc-chrome-grad: linear-gradient(180deg, rgba(11, 10, 19, 0.55), rgba(11, 10, 19, 0.55));
+
   /* --- Shape ---------------------------------------------------------
      Arcane Midnight is square by decision — manuscript leaves have square corners.
      Ember is not: its options are 12px pills and its crests are circles. Since the
@@ -181,9 +213,6 @@
    Ember lays translucent near-black panels over its paper texture (its options use
    cool-5 at 50–75% alpha) rather than solid plates, so the texture reads through. */
 
-.sogrom-ember .creator-topbar {
-  background: rgba(11, 10, 19, 0.55);
-}
 .sogrom-ember .creator-stage-foot {
   background: rgba(11, 10, 19, 0.55);
 }
@@ -209,4 +238,124 @@
 .sogrom-ember :is(h1, h2, h3, h4) {
   font-weight: 400;
   letter-spacing: 0.02em;
+}
+
+/* ---------------------------------------------- Ember's own art
+
+   The four places this skin goes past colour and borrows Ember's drawn assets. Each
+   was reviewed rendered and kept; four more were reviewed and cut (see the manifest
+   at the top of this file — do not re-propose them without new reasoning).
+
+   Where an asset is used, the slice and sizing values are Ember's own, lifted from
+   its LESS sources so the art is composed the way it was drawn to be. Where a value
+   here differs from Ember's, it is because our element is a different size, and the
+   comment says so. */
+
+/* --- The brand mark ------------------------------------------------
+   creator.css draws the dnd5e system's gold ampersand here. In an Ember world the window
+   is meant to read as a continuation of Ember's own, so it wears Ember's mark instead.
+
+   Only the *image* is swapped — the box, its size and its place in the brand's flex row
+   are creator.css's, and stay shared. Overriding the whole `background` shorthand would
+   fork the geometry of a mark that is the same shape in both themes. */
+.sogrom-ember .creator-topbar-brand::before {
+  background-image: url("../../ember/ui/elements/logo-inner.svg");
+}
+
+/* --- The portrait ring ---------------------------------------------
+   Ember rings actor portraits with this border-image; the dossier's identity plate is
+   the same object in our UI, so it wears the same ring.
+
+   Ember's own numbers are `36 / 36px / outset 4px` on a portrait several times this
+   size. The slice stays 36 (that is a property of the image, not of the box), but the
+   painted width is scaled down to suit a 56px plate — at Ember's 36px the ring would
+   consume the whole portrait. The plate's `overflow: hidden` plus the radius here is
+   what clips the image itself to the circle, so no rule on the <img> is needed. */
+.sogrom-ember .creator-dossier-plate {
+  border: 4px solid transparent;
+  border-image: url("../../ember/ui/borders/BlockActorRing.webp") 36;
+  border-image-width: 16px;
+  border-image-outset: 3px;
+  border-radius: 50%;
+}
+
+/* --- Page heads --------------------------------------------------
+   Ember closes a heading with a three-piece rule: a centre ornament with a hairline
+   running out to each side. It replaces the gold rubric hairline creator.css draws,
+   and it is the one borrowing here that changes a *layout* rather than a surface —
+   Ember's treatment is symmetrical, so the head has to centre.
+
+   The three lengths below are the tuning knobs, and they are related: the centre
+   ornament is 66x90, so at a given height its width is height x 0.733, and each side
+   rule runs from the edge to half that width off centre (plus a pixel of overlap,
+   which is Ember's own trick for not leaving a hairline gap at the join). */
+.sogrom-ember :is(.creator-pick-desc, .creator-work-page) .creator-detail-head {
+  --ember-head-ornament-h: 2.4rem;
+  --ember-head-ornament-w: 1.76rem;
+  justify-content: center;
+  text-align: center;
+  background: url("../../ember/ui/borders/H2BorderMiddle.webp")
+    no-repeat center bottom / auto var(--ember-head-ornament-h);
+}
+.sogrom-ember :is(.creator-pick-desc, .creator-work-page) .creator-detail-head::before,
+.sogrom-ember :is(.creator-pick-desc, .creator-work-page) .creator-detail-head::after {
+  content: "";
+  position: absolute;
+  bottom: 0;
+  height: 4px;
+  width: calc(50% - (var(--ember-head-ornament-w) / 2) + 1px);
+}
+/* `left`/`right` are both set on each, because the rule this overrides spans the full
+   measure — leaving either at its inherited value would stretch these across it. */
+.sogrom-ember :is(.creator-pick-desc, .creator-work-page) .creator-detail-head::before {
+  left: 0;
+  right: auto;
+  background: url("../../ember/ui/borders/H2BorderLeft.webp") no-repeat right center / 100% 4px;
+}
+.sogrom-ember :is(.creator-pick-desc, .creator-work-page) .creator-detail-head::after {
+  left: auto;
+  right: 0;
+  height: 4px;
+  background: url("../../ember/ui/borders/H2BorderRight.webp") no-repeat left center / 100% 4px;
+}
+
+/* The dossier's "The Roll" label gets the side rules but not the centre ornament: it
+   is a 0.6rem uppercase label, and the knot is drawn for a real heading — at this size
+   it would be taller than the text it decorates. */
+.sogrom-ember .creator-dossier-heading {
+  position: relative;
+  text-align: center;
+}
+.sogrom-ember .creator-dossier-heading::before,
+.sogrom-ember .creator-dossier-heading::after {
+  content: "";
+  position: absolute;
+  bottom: 0.15rem;
+  width: 22%;
+  height: 4px;
+}
+.sogrom-ember .creator-dossier-heading::before {
+  left: 0.9rem;
+  background: url("../../ember/ui/borders/H2BorderLeft.webp") no-repeat right center / 100% 4px;
+}
+.sogrom-ember .creator-dossier-heading::after {
+  right: 0.9rem;
+  background: url("../../ember/ui/borders/H2BorderRight.webp") no-repeat left center / 100% 4px;
+}
+
+/* --- The reading ground --------------------------------------------
+   Ember's journal page texture behind the prose surfaces, so a class description
+   reads on a page rather than on a flat plate.
+
+   The art never sits directly under text. It is the lower of two background layers,
+   with a near-opaque wash of the ground colour over it — that wash is what keeps body
+   copy at its measured contrast, which is the whole reason this could be kept at all.
+   Lower the wash's alpha and the AA figures in this file stop being true. */
+.sogrom-ember :is(.creator-pick-desc, .creator-work-page) {
+  background-image:
+    linear-gradient(rgba(11, 10, 19, 0.74), rgba(11, 10, 19, 0.74)),
+    url("../../ember/ui/backgrounds/PageBackgroundEmber.webp");
+  background-repeat: no-repeat;
+  background-position: center;
+  background-size: cover;
 }
