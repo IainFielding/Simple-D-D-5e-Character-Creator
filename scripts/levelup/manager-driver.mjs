@@ -3,6 +3,48 @@ import { withItemSegment } from "../data/advancement-util.mjs";
 import { phbWeaponIcon } from "../data/weapon-source.mjs";
 import { bg3TraitIcon } from "../data/bg3-icons.mjs";
 
+/** The level from which the 2024 rules make an ability-score improvement an Epic Boon instead. */
+const EPIC_BOON_LEVEL = 19;
+
+/**
+ * The compendium-browser filters for the feat an ASI can take.
+ *
+ * The browser used to be handed a category filter and a level prerequisite and nothing else, which
+ * let three kinds of feat through that an ASI may never take. The level filter looks like it should
+ * have caught them and does not, because the data does not say so: **origin** feats (a background's
+ * gift) and **fighting style** feats (a class feature's) both carry no level prerequisite at all, so
+ * they passed straight through and were offered at every ASI. Filtering by subtype is what actually
+ * expresses the rule.
+ *
+ * What is *not* excluded matters as much:
+ *
+ *   - **Epic boons** are what a level-19 improvement is for, so they are excluded only below that.
+ *     They cannot be left to the level prerequisite either — some of them ship without one.
+ *   - **Feats declaring no subtype at all** stay visible. The subtype split arrived with the 2024
+ *     rules; 2014 feats and most homebrew have an empty `system.type.subtype`, and an allow-list of
+ *     `{general: 1}` would empty the browser in those worlds. Excluding the three wrong kinds rather
+ *     than admitting the one right kind keeps them, and follows the same rule `matchesRules` states
+ *     for editions in data/source-index.mjs: content that declares nothing belongs everywhere.
+ *
+ * In a pure 2024 world the two are the same list — every feat there is typed — so this reads as
+ * "general feats only" exactly as intended, and degrades to "every feat" where nothing is typed.
+ *
+ * @param {number} level   The character's level on the clone.
+ * @returns {object}       A `filters` object for `CompendiumBrowser.selectOne`.
+ */
+export function asiFeatFilters(level) {
+  // -1 is the browser's "exclude"; it builds a NOT..in query, so an untyped feat matches none of
+  // these and survives. A positive value would build an in..list and drop it.
+  const subtype = { origin: -1, fightingStyle: -1 };
+  if ( level < EPIC_BOON_LEVEL ) subtype.epicBoon = -1;
+
+  return { locked: {
+    additional: { category: { feat: 1 }, subtype },
+    arbitrary: [{ k: "system.prerequisites.level", o: "lte", v: level }],
+    types: new Set(["feat"])
+  } };
+}
+
 /**
  * Drives a native dnd5e {@link AdvancementManager} from the outside.
  *
@@ -1148,11 +1190,7 @@ export class LevelUpDriver {
     const browser = dnd5e.applications?.CompendiumBrowser;
     if ( !browser ) return false;
     const level = this.clone.system.details.level ?? 0;
-    const filters = { locked: {
-      additional: { category: { feat: 1 } },
-      arbitrary: [{ k: "system.prerequisites.level", o: "lte", v: level }],
-      types: new Set(["feat"])
-    } };
+    const filters = asiFeatFilters(level);
 
     const uuid = await browser.selectOne({ filters, tab: "feats" }).catch(() => null);
     if ( !uuid ) return false;
