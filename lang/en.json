@@ -222,7 +222,7 @@
     "chat": {
       "creation": {
         "heading": "A new hero",
-        "levelLine": "Level {level} · {classes}",
+        "levelOnly": "Level {level}",
         "species": "Species",
         "background": "Background",
         "subclass": "Subclass",

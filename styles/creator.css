@@ -4740,3 +4740,38 @@ body:has(.sogrom-creator-fullscreen) .application.compendium-browser {
 }
 
 .sogrom-chat-card .sogrom-chat-list li { margin: 0; }
+
+/* --- links --------------------------------------------------------------
+   Everything the card names that has a compendium entry behind it is a content
+   link (see templates/chat/value.hbs). Foundry's global styling for those is a
+   boxed chip — its own background, border, padding and radius — sized for a link
+   sitting in a paragraph of journal prose. A card that is mostly a list of names
+   turns into a wall of chips under it, so the box comes off and what is left is
+   text that happens to be clickable.
+
+   Only what actually applies. These anchors are written by our own template, not
+   produced by Foundry's enricher, so they carry no `<i>` glyph to hide and are
+   never given the `.broken` class — rules for either would be dead the day they
+   were written.
+
+   No fixed colours: the chat log follows the *user's* Foundry theme, so the
+   resting state inherits and only the hover asserts the card's own brass, which
+   reads on a light and a dark log alike. */
+.sogrom-chat-card .content-link {
+  background: none;
+  border: none;
+  padding: 0;
+  color: inherit;
+  font-family: inherit;
+  font-size: inherit;
+  text-decoration: underline;
+  /* Faint enough to read as texture rather than as a row of blue links, which is
+     what a card with a dozen of them would otherwise look like. */
+  text-decoration-color: color-mix(in srgb, currentColor 35%, transparent);
+  text-underline-offset: 0.15em;
+  cursor: pointer;
+}
+.sogrom-chat-card .content-link:hover {
+  color: var(--sc-brass);
+  text-decoration-color: var(--sc-brass);
+}

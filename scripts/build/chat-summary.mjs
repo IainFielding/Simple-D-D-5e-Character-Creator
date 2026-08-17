@@ -1,5 +1,5 @@
 import {
-  ABILITIES, MODULE_ID, formatMod, t, tpl, log,
+  ABILITIES, MODULE_ID, formatMod, sourceUuid, t, tpl, log,
   creationSummaryMode, levelUpSummaryMode
 } from "../config.mjs";
 import { slotChanges } from "../levelup/steps/lvl-review-step.mjs";
@@ -74,12 +74,33 @@ function abilityPlates(actor) {
   });
 }
 
-/** "Wizard 5" / "Wizard 5 · Fighter 2" — every class the character holds, in sheet order. */
-function classLine(actor) {
+/**
+ * Every class the character holds, in sheet order, as linkable segments: `[{label, uuid}]` reading
+ * "Wizard 5", "Fighter 2". A list rather than one joined string because each segment is its own
+ * link — joining them first would leave the template a sentence it cannot put anchors inside.
+ * @param {Actor5e} actor
+ */
+function classSegments(actor) {
   return actor.items
     .filter(i => i.type === "class")
-    .map(c => `${c.name} ${c.system?.levels ?? 1}`)
-    .join(" · ");
+    .map(c => ({ label: `${c.name} ${c.system?.levels ?? 1}`, uuid: sourceUuid(c) }));
+}
+
+/**
+ * Collapse a list of `{name, uuid}` to one entry per thing, in display order.
+ *
+ * Keyed on the uuid where there is one so two grants of the same feature collapse even if one
+ * arrived without a name match, and on the name otherwise — which is what the plain `new Set` of
+ * names did before these carried uuids at all.
+ * @param {{name: string, uuid: string}[]} entries
+ */
+function dedupe(entries) {
+  const byKey = new Map();
+  for ( const entry of entries ) {
+    const key = entry.uuid || entry.name;
+    if ( !byKey.has(key) ) byKey.set(key, entry);
+  }
+  return [...byKey.values()].sort((a, b) => a.name.localeCompare(b.name, game.i18n.lang));
 }
 
 /* -------------------------------------------- */
@@ -103,17 +124,25 @@ export async function postCreationSummary(actor) {
     if ( mode === "off" ) return;
 
     const sys = actor.system ?? {};
-    const subclasses = actor.items.filter(i => i.type === "subclass").map(i => i.name);
+    const subclasses = actor.items
+      .filter(i => i.type === "subclass")
+      .map(i => ({ name: i.name, uuid: sourceUuid(i) }));
 
+    // A row's value is either plain text (`value`) or a list of linkable things (`items`); the
+    // template picks. Hit points and armour class are numbers and stay text — there is nothing
+    // behind them to open.
     const rows = [];
     const species = actor.items.find(i => i.type === "race");
     const background = actor.items.find(i => i.type === "background");
-    if ( species ) rows.push({ label: t("chat.creation.species"), value: species.name });
-    if ( background ) rows.push({ label: t("chat.creation.background"), value: background.name });
-    if ( subclasses.length ) rows.push({
-      label: t("chat.creation.subclass"),
-      value: subclasses.join(", ")
+    if ( species ) rows.push({
+      label: t("chat.creation.species"),
+      items: [{ name: species.name, uuid: sourceUuid(species) }]
     });
+    if ( background ) rows.push({
+      label: t("chat.creation.background"),
+      items: [{ name: background.name, uuid: sourceUuid(background) }]
+    });
+    if ( subclasses.length ) rows.push({ label: t("chat.creation.subclass"), items: subclasses });
     rows.push({ label: t("chat.creation.hitPoints"), value: String(sys.attributes?.hp?.max ?? 0) });
     const ac = sys.attributes?.ac?.value;
     if ( ac ) rows.push({ label: t("chat.creation.armourClass"), value: String(ac) });
@@ -122,10 +151,10 @@ export async function postCreationSummary(actor) {
       heading: t("chat.creation.heading"),
       name: actor.name,
       img: actor.img || "icons/svg/mystery-man.svg",
-      subtitle: t("chat.creation.levelLine", {
-        level: sys.details?.level ?? 1,
-        classes: classLine(actor)
-      }),
+      // The level and the classes are two pieces rather than one sentence, because each class is
+      // its own link and a formatted string has nowhere to put an anchor.
+      levelLabel: t("chat.creation.levelOnly", { level: sys.details?.level ?? 1 }),
+      classes: classSegments(actor),
       abilities: abilityPlates(actor),
       rows
     });
@@ -162,9 +191,9 @@ export function captureLevelUpSummary(state) {
     let subclass = null;
     for ( const item of clone.items ) {
       if ( actor.items.get(item.id) ) continue;
-      if ( item.type === "subclass" ) { subclass = item.name; continue; }
+      if ( item.type === "subclass" ) { subclass = { name: item.name, uuid: sourceUuid(item) }; continue; }
       if ( ["class", "race", "background"].includes(item.type) ) continue;
-      (item.type === "spell" ? spells : features).push(item.name);
+      (item.type === "spell" ? spells : features).push({ name: item.name, uuid: sourceUuid(item) });
     }
 
     // Classes whose level moved — usually one, but a multiclass level adds a brand-new class with
@@ -175,7 +204,7 @@ export function captureLevelUpSummary(state) {
       const from = existing?.system?.levels ?? 0;
       const to = cls.system?.levels ?? from;
       if ( to === from ) continue;
-      classes.push({ name: cls.name, from, to, isNew: !existing });
+      classes.push({ name: cls.name, from, to, isNew: !existing, uuid: sourceUuid(cls) });
     }
 
     // Spells chosen on the pre-review spell step. They live on the state (not the clone) until the
@@ -183,7 +212,12 @@ export function captureLevelUpSummary(state) {
     try {
       const plan = state.spellPlan();
       if ( plan.isSpellcaster ) {
-        for ( const s of [...state.selectedCantrips, ...state.selectedSpells] ) spells.push(s.name);
+        // These already carry a compendium uuid — the spell step stored one when it built the pick
+        // (see lvl-spells-step.mjs) — so take it rather than deriving one from a document that
+        // does not exist on the clone yet.
+        for ( const s of [...state.selectedCantrips, ...state.selectedSpells] ) {
+          spells.push({ name: s.name, uuid: s.uuid ?? "" });
+        }
       }
     } catch ( err ) {
       // A non-caster, or a state without a spell step at all: the rest of the card is still good.
@@ -203,8 +237,8 @@ export function captureLevelUpSummary(state) {
       profWas: actor.system?.attributes?.prof ?? 0,
       profNow: clone.system?.attributes?.prof ?? 0,
       slots: slotChanges(clone, actor),
-      features: [...new Set(features)].sort((a, b) => a.localeCompare(b, game.i18n.lang)),
-      spells: [...new Set(spells)].sort((a, b) => a.localeCompare(b, game.i18n.lang))
+      features: dedupe(features),
+      spells: dedupe(spells)
     };
   } catch ( err ) {
     log("level-up chat summary capture failed", err);
@@ -230,7 +264,10 @@ export async function postLevelUpSummary(actor, snapshot) {
       label: t("chat.levelup.hitPoints"),
       value: t("chat.levelup.hitPointsValue", { gain: snapshot.hpGain, max: snapshot.hpMax })
     });
-    if ( snapshot.subclass ) rows.push({ label: t("chat.levelup.subclass"), value: snapshot.subclass });
+    if ( snapshot.subclass ) rows.push({
+      label: t("chat.levelup.subclass"),
+      items: [snapshot.subclass]
+    });
     if ( snapshot.profNow !== snapshot.profWas ) rows.push({
       label: t("chat.levelup.profBonus"),
       value: `+${snapshot.profWas} → +${snapshot.profNow}`
@@ -244,15 +281,20 @@ export async function postLevelUpSummary(actor, snapshot) {
     // card — bail rather than posting an empty one.
     if ( !rows.length && !snapshot.features.length && !snapshot.spells.length && !snapshot.classes.length ) return;
 
-    const classLines = snapshot.classes.map(c => c.isNew
-      ? t("chat.levelup.classNew", { name: c.name, level: c.to })
-      : t("chat.levelup.classLine", { name: c.name, from: c.from, to: c.to }));
+    // One formatted string per class ("Fighter 4 → 5"), so each is a whole label an anchor can wrap
+    // — which is why linking these needs no change to the i18n strings themselves.
+    const classes = snapshot.classes.map(c => ({
+      label: c.isNew
+        ? t("chat.levelup.classNew", { name: c.name, level: c.to })
+        : t("chat.levelup.classLine", { name: c.name, from: c.from, to: c.to }),
+      uuid: c.uuid ?? ""
+    }));
 
     await postCard(actor, "levelup", mode, {
       heading: t("chat.levelup.heading"),
       name: actor.name,
       img: actor.img || "icons/svg/mystery-man.svg",
-      subtitle: classLines.join(" · "),
+      classes,
       levelLine: t("chat.levelup.levelLine", { from: snapshot.fromLevel, to: snapshot.toLevel }),
       rows,
       features: snapshot.features,

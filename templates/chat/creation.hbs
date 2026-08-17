@@ -15,7 +15,9 @@
     <div class="sogrom-chat-titles">
       <span class="sogrom-chat-eyebrow">{{heading}}</span>
       <h3 class="sogrom-chat-name">{{name}}</h3>
-      <span class="sogrom-chat-sub">{{subtitle}}</span>
+      {{!-- The level and each class are separate pieces, not one formatted sentence: every class
+            is its own link, and a finished string has nowhere to put an anchor. --}}
+      <span class="sogrom-chat-sub">{{levelLabel}}{{#each classes}} · {{> "modules/sogrom-dnd5e-character-creator/templates/chat/value.hbs"}}{{/each}}</span>
     </div>
   </header>
 
@@ -31,10 +33,14 @@
 
   {{#if rows}}
   <dl class="sogrom-chat-rows">
+    {{!-- A row carries either plain text (`value`) or things worth opening (`items`). --}}
     {{#each rows}}
     <div class="sogrom-chat-row">
       <dt>{{label}}</dt>
-      <dd>{{value}}</dd>
+      <dd>
+        {{#if items}}{{#each items}}{{#unless @first}}, {{/unless}}{{> "modules/sogrom-dnd5e-character-creator/templates/chat/value.hbs"}}{{/each}}
+        {{else}}{{value}}{{/if}}
+      </dd>
     </div>
     {{/each}}
   </dl>

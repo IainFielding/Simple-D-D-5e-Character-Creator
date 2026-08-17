@@ -48,7 +48,11 @@ Hooks.once("init", () => {
     tpl("parts/work-detail.hbs"),
     tpl("parts/abilities-panel.hbs"),
     tpl("parts/origin-abilities.hbs"),
-    tpl("parts/source-details.hbs")
+    tpl("parts/source-details.hbs"),
+    // The chat cards themselves are rendered on demand rather than loaded as PARTS, but the
+    // partial they include still has to be registered up front — a partial is resolved at render
+    // time from the registry, not fetched.
+    tpl("chat/value.hbs")
   ]);
 
   // The `data-tooltip` payload that triggers a dnd5e *rich* item tooltip. The system's
