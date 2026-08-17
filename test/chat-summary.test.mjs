@@ -71,12 +71,22 @@ beforeEach(() => {
 /* -------------------------------------------- */
 
 describe("creation summary", () => {
+  /** An item as it sits on a built actor: copied from a compendium, which stamped the source. */
+  const fromPack = (id, type, name, system = {}) => ({
+    id, type, name, system,
+    uuid: `Actor.actor0000000000.Item.${id}`,
+    _stats: { compendiumSource: `Compendium.dnd5e.pack.Item.${id}` }
+  });
+
   const items = [
-    { id: "c1", type: "class", name: "Wizard", system: { identifier: "wizard", levels: 3 } },
-    { id: "s1", type: "subclass", name: "Evocation", system: { classIdentifier: "wizard" } },
-    { id: "r1", type: "race", name: "Wood Elf", system: {} },
-    { id: "b1", type: "background", name: "Sage", system: {} }
+    { ...fromPack("c1", "class", "Wizard", { identifier: "wizard", levels: 3 }) },
+    { ...fromPack("s1", "subclass", "Evocation", { classIdentifier: "wizard" }) },
+    { ...fromPack("r1", "race", "Wood Elf") },
+    { ...fromPack("b1", "background", "Sage") }
   ];
+
+  /** Every name the card offers as a link, flattened out of its rows. */
+  const rowItems = ctx => ctx.rows.flatMap(r => r.items ?? []);
 
   it("posts a card carrying the character's identity, scores and headline numbers", async () => {
     await postCreationSummary(makeActor(items, { level: 3, hpMax: 20, ac: 12 }));
@@ -86,28 +96,59 @@ describe("creation summary", () => {
 
     const ctx = postedContext();
     expect(ctx.name).toBe("Vex");
-    // The subtitle interpolates level + every class the character holds.
-    expect(ctx.subtitle).toContain("\"classes\":\"Wizard 3\"");
-    expect(ctx.subtitle).toContain("\"level\":3");
+    // The level and the classes are separate pieces, so each class can be its own link.
+    expect(ctx.levelLabel).toContain("\"level\":3");
+    expect(ctx.classes).toEqual([
+      { label: "Wizard 3", uuid: "Compendium.dnd5e.pack.Item.c1" }
+    ]);
     expect(ctx.abilities).toHaveLength(6);
     expect(ctx.abilities[0]).toMatchObject({ key: "str", value: 10, modifier: "+0" });
     expect(ctx.abilities[2]).toMatchObject({ key: "con", value: 12, modifier: "+1" });
 
+    // Species, background and subclass are linkable; the two numbers are not.
+    expect(rowItems(ctx)).toEqual([
+      { name: "Wood Elf", uuid: "Compendium.dnd5e.pack.Item.r1" },
+      { name: "Sage", uuid: "Compendium.dnd5e.pack.Item.b1" },
+      { name: "Evocation", uuid: "Compendium.dnd5e.pack.Item.s1" }
+    ]);
     const values = ctx.rows.map(r => r.value);
-    expect(values).toContain("Wood Elf");
-    expect(values).toContain("Sage");
-    expect(values).toContain("Evocation");
     expect(values).toContain("20");   // hit points
     expect(values).toContain("12");   // armour class
   });
 
-  it("joins a multiclass character's classes into one line", async () => {
+  it("gives every class of a multiclass character its own link", async () => {
     await postCreationSummary(makeActor([
-      { id: "c1", type: "class", name: "Fighter", system: { identifier: "fighter", levels: 2 } },
-      { id: "c2", type: "class", name: "Rogue", system: { identifier: "rogue", levels: 1 } }
+      { ...fromPack("c1", "class", "Fighter", { identifier: "fighter", levels: 2 }) },
+      { ...fromPack("c2", "class", "Rogue", { identifier: "rogue", levels: 1 }) }
     ], { level: 3 }));
 
-    expect(postedContext().subtitle).toContain("Fighter 2 · Rogue 1");
+    expect(postedContext().classes).toEqual([
+      { label: "Fighter 2", uuid: "Compendium.dnd5e.pack.Item.c1" },
+      { label: "Rogue 1", uuid: "Compendium.dnd5e.pack.Item.c2" }
+    ]);
+  });
+
+  it("links the compendium entry rather than the character's own copy", async () => {
+    // The cards are public by default, and `Actor.x.Item.y` resolves only for a reader who can see
+    // that actor — so it would be a dead link for most of the table. The compendium uuid is not.
+    await postCreationSummary(makeActor(items));
+    for ( const item of rowItems(postedContext()) ) {
+      expect(item.uuid.startsWith("Compendium.")).toBe(true);
+    }
+  });
+
+  it("falls back to the actor's item, then to nothing at all", async () => {
+    await postCreationSummary(makeActor([
+      { id: "r1", type: "race", name: "Homebrew Elf", system: {}, uuid: "Actor.a.Item.r1" },
+      { id: "b1", type: "background", name: "Invented", system: {} }
+    ]));
+
+    // No compendium source: the character's own item is better than no link at all. No uuid of any
+    // kind: "" is the signal for the template to render plain text instead of a link to nowhere.
+    expect(rowItems(postedContext())).toEqual([
+      { name: "Homebrew Elf", uuid: "Actor.a.Item.r1" },
+      { name: "Invented", uuid: "" }
+    ]);
   });
 
   it("whispers to the GM in gm mode, and posts to everyone in public mode", async () => {
@@ -143,15 +184,16 @@ describe("level-up summary capture", () => {
 
   /** actor at Wizard 4, clone at Wizard 5 having gained a feature and a spell. */
   function pair() {
+    const src = id => ({ _stats: { compendiumSource: `Compendium.dnd5e.pack.Item.${id}` } });
     const actorItems = [
-      { id: CLS, type: "class", name: "Wizard", system: { identifier: "wizard", levels: 4 } },
-      { id: "old1", type: "feat", name: "Arcane Recovery", system: {} }
+      { id: CLS, type: "class", name: "Wizard", system: { identifier: "wizard", levels: 4 }, ...src(CLS) },
+      { id: "old1", type: "feat", name: "Arcane Recovery", system: {}, ...src("old1") }
     ];
     const cloneItems = [
-      { id: CLS, type: "class", name: "Wizard", system: { identifier: "wizard", levels: 5 } },
-      { id: "old1", type: "feat", name: "Arcane Recovery", system: {} },
-      { id: "new1", type: "feat", name: "Potent Cantrip", system: {} },
-      { id: "new2", type: "spell", name: "Fireball", system: {} }
+      { id: CLS, type: "class", name: "Wizard", system: { identifier: "wizard", levels: 5 }, ...src(CLS) },
+      { id: "old1", type: "feat", name: "Arcane Recovery", system: {}, ...src("old1") },
+      { id: "new1", type: "feat", name: "Potent Cantrip", system: {}, ...src("new1") },
+      { id: "new2", type: "spell", name: "Fireball", system: {}, ...src("new2") }
     ];
     const actor = makeActor(actorItems, { level: 4, hpMax: 22, prof: 2 });
     const clone = makeActor(cloneItems, { level: 5, hpMax: 26, prof: 3 });
@@ -166,26 +208,50 @@ describe("level-up summary capture", () => {
 
     expect(snap.fromLevel).toBe(4);
     expect(snap.toLevel).toBe(5);
-    expect(snap.classes).toEqual([{ name: "Wizard", from: 4, to: 5, isNew: false }]);
+    expect(snap.classes).toEqual([
+      { name: "Wizard", from: 4, to: 5, isNew: false, uuid: `Compendium.dnd5e.pack.Item.${CLS}` }
+    ]);
     expect(snap.hpGain).toBe(4);
     expect(snap.hpMax).toBe(26);
     expect(snap.profWas).toBe(2);
     expect(snap.profNow).toBe(3);
-    // Only the items the actor lacks — the pre-existing feat must not be reported as new.
-    expect(snap.features).toEqual(["Potent Cantrip"]);
-    expect(snap.spells).toEqual(["Fireball"]);
+    // Only the items the actor lacks — the pre-existing feat must not be reported as new. Each
+    // carries the uuid the card links it by.
+    expect(snap.features).toEqual([
+      { name: "Potent Cantrip", uuid: "Compendium.dnd5e.pack.Item.new1" }
+    ]);
+    expect(snap.spells).toEqual([
+      { name: "Fireball", uuid: "Compendium.dnd5e.pack.Item.new2" }
+    ]);
     expect(snap.slots).toHaveLength(1);
   });
 
   it("folds in the spells staged on the state, which are not on the clone yet", () => {
     const { actor, clone } = pair();
+    // Staged picks already carry a compendium uuid from the spell step, so the capture takes it
+    // rather than deriving one from a document that isn't on the clone yet.
     const snap = captureLevelUpSummary(makeState(actor, clone, {
       spellcaster: true,
-      cantrips: [{ name: "Mind Sliver" }],
-      spells: [{ name: "Counterspell" }]
+      cantrips: [{ name: "Mind Sliver", uuid: "Compendium.dnd5e.spells.Item.mind" }],
+      spells: [{ name: "Counterspell", uuid: "Compendium.dnd5e.spells.Item.ctr" }]
     }));
 
-    expect(snap.spells).toEqual(["Counterspell", "Fireball", "Mind Sliver"]);
+    expect(snap.spells.map(s => s.name)).toEqual(["Counterspell", "Fireball", "Mind Sliver"]);
+    expect(snap.spells[0].uuid).toBe("Compendium.dnd5e.spells.Item.ctr");
+  });
+
+  it("collapses a feature granted twice into one entry", () => {
+    const { actor, clone } = pair();
+    // Two grants of the same thing — a subclass and a feat both handing over the same feature —
+    // are one line on the card, matched on the uuid rather than on the name.
+    clone.items = makeItems([...clone.items, {
+      id: "dup", type: "feat", name: "Potent Cantrip", system: {},
+      _stats: { compendiumSource: "Compendium.dnd5e.pack.Item.new1" }
+    }]);
+
+    expect(captureLevelUpSummary(makeState(actor, clone)).features).toEqual([
+      { name: "Potent Cantrip", uuid: "Compendium.dnd5e.pack.Item.new1" }
+    ]);
   });
 
   it("reports a multiclass level as a new class rather than a 0 → 1 jump", () => {
@@ -199,9 +265,9 @@ describe("level-up summary capture", () => {
     ], { level: 5 });
 
     const snap = captureLevelUpSummary(makeState(actor, clone));
-    expect(snap.classes).toEqual([{ name: "Fighter", from: 0, to: 1, isNew: true }]);
+    expect(snap.classes).toEqual([{ name: "Fighter", from: 0, to: 1, isNew: true, uuid: "" }]);
     // A gained subclass is its own field, not a "feature".
-    expect(snap.subclass).toBe("Champion");
+    expect(snap.subclass).toEqual({ name: "Champion", uuid: "" });
     expect(snap.features).toEqual([]);
   });
 
@@ -216,7 +282,7 @@ describe("level-up summary capture", () => {
     state.spellPlan = () => { throw new Error("no spell step"); };
 
     const snap = captureLevelUpSummary(state);
-    expect(snap.features).toEqual(["Potent Cantrip"]);
+    expect(snap.features.map(f => f.name)).toEqual(["Potent Cantrip"]);
     expect(snap.hpGain).toBe(4);
   });
 });
@@ -226,13 +292,13 @@ describe("level-up summary capture", () => {
 describe("level-up summary posting", () => {
   const snapshot = {
     fromLevel: 4, toLevel: 5,
-    classes: [{ name: "Wizard", from: 4, to: 5, isNew: false }],
+    classes: [{ name: "Wizard", from: 4, to: 5, isNew: false, uuid: "Compendium.p.Item.wiz" }],
     subclass: null,
     hpGain: 4, hpMax: 26,
     profWas: 2, profNow: 3,
     slots: [{ label: "3rd", change: "0 → 2" }],
-    features: ["Potent Cantrip"],
-    spells: ["Fireball"]
+    features: [{ name: "Potent Cantrip", uuid: "Compendium.p.Item.pc" }],
+    spells: [{ name: "Fireball", uuid: "Compendium.p.Item.fb" }]
   };
 
   it("posts a card listing what changed", async () => {
@@ -242,8 +308,11 @@ describe("level-up summary posting", () => {
     expect(postedKind()).toContain("chat/levelup.hbs");
 
     const ctx = postedContext();
-    expect(ctx.features).toEqual(["Potent Cantrip"]);
-    expect(ctx.spells).toEqual(["Fireball"]);
+    expect(ctx.features).toEqual([{ name: "Potent Cantrip", uuid: "Compendium.p.Item.pc" }]);
+    expect(ctx.spells).toEqual([{ name: "Fireball", uuid: "Compendium.p.Item.fb" }]);
+    // Each class is one formatted label carrying its own link, so the i18n string is untouched.
+    expect(ctx.classes).toHaveLength(1);
+    expect(ctx.classes[0].uuid).toBe("Compendium.p.Item.wiz");
     // The shim's i18n echoes the key back, module namespace and all (see foundry-shims).
     const labels = ctx.rows.map(r => r.label);
     expect(labels).toContain("sogrom-dnd5e-character-creator.chat.levelup.hitPoints");

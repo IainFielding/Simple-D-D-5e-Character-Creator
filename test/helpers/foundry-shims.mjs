@@ -91,6 +91,24 @@ export function installFoundryShims() {
       isEmpty: obj => !obj || (Object.keys(obj).length === 0)
     },
     applications: {
+      // Just enough of the application framework for the two wizard shells to be *imported*.
+      // Nothing renders in Node, and nothing here tries to: the shells are `extends
+      // HandlebarsApplicationMixin(ApplicationV2)`, which is evaluated at import time, so without
+      // these three names a test cannot so much as reference a shell's class.
+      //
+      // Methods that are pure view-model arithmetic can then be exercised by borrowing them off the
+      // prototype with an object standing in for `this` — see test/ember-creation.test.mjs — which
+      // keeps them testable without a fake render loop nobody would trust.
+      api: {
+        ApplicationV2: class ApplicationV2 {
+          constructor(options = {}) { this.options = options; }
+        },
+        HandlebarsApplicationMixin: Base => class HandlebarsApplication extends Base {
+          /** Foundry's own default: the class's static PARTS, cloned so a caller can mutate it. */
+          _configureRenderParts() { return structuredClone(this.constructor.PARTS ?? {}); }
+        },
+        DialogV2: { confirm: async () => false }
+      },
       ux: { TextEditor: { implementation: { enrichHTML: async html => html } } },
       // The chat cards render a real .hbs file in Foundry. Here the template is never the thing
       // under test, so this echoes back the path and the context it was handed — enough for a test

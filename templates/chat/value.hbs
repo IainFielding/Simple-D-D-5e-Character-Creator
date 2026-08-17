@@ -1,0 +1,19 @@
+{{!--
+  One named thing on a chat card, as a link where there is something to open and as plain text
+  where there isn't. Used for every item a card names: features, spells, the subclass, the species
+  and background, and each class segment in the subtitle.
+
+  Called with `{name, uuid}` — or `{label, uuid}` where the visible text is a formatted line rather
+  than a bare name ("Fighter 4 → 5"), which is why both are checked.
+
+  The anchor is written out rather than left to Foundry's `@UUID[…]` enrichment. Both work in chat —
+  ChatMessage#renderHTML enriches content per viewer — but this is the same markup the module's own
+  Review screens emit, and Foundry's click handling is a delegated `a[data-link]` listener on
+  document.body, so it reaches our cards wherever they are rendered.
+
+  `uuid` is a *compendium* uuid wherever one exists (see sourceUuid in config.mjs). That matters
+  here more than anywhere else in the module: these cards are public by default, and an
+  `Actor.x.Item.y` link is dead for every reader who cannot see that actor.
+--}}
+{{#if uuid}}<a class="content-link" data-uuid="{{uuid}}" data-link
+   data-tooltip="{{ccItemTooltip uuid}}">{{#if label}}{{label}}{{else}}{{name}}{{/if}}</a>{{else}}{{#if label}}{{label}}{{else}}{{name}}{{/if}}{{/if}}

@@ -15,17 +15,25 @@
     <div class="sogrom-chat-titles">
       <span class="sogrom-chat-eyebrow">{{heading}}</span>
       <h3 class="sogrom-chat-name">{{name}}</h3>
-      {{#if subtitle}}<span class="sogrom-chat-sub">{{subtitle}}</span>{{/if}}
+      {{#if classes}}
+      <span class="sogrom-chat-sub">
+        {{#each classes}}{{#unless @first}} · {{/unless}}{{> "modules/sogrom-dnd5e-character-creator/templates/chat/value.hbs"}}{{/each}}
+      </span>
+      {{/if}}
       <span class="sogrom-chat-level">{{levelLine}}</span>
     </div>
   </header>
 
   {{#if rows}}
   <dl class="sogrom-chat-rows">
+    {{!-- A row carries either plain text (`value`) or things worth opening (`items`). --}}
     {{#each rows}}
     <div class="sogrom-chat-row">
       <dt>{{label}}</dt>
-      <dd>{{value}}</dd>
+      <dd>
+        {{#if items}}{{#each items}}{{#unless @first}}, {{/unless}}{{> "modules/sogrom-dnd5e-character-creator/templates/chat/value.hbs"}}{{/each}}
+        {{else}}{{value}}{{/if}}
+      </dd>
     </div>
     {{/each}}
   </dl>
@@ -34,14 +42,14 @@
   {{#if features}}
   <section class="sogrom-chat-list">
     <h4 class="sogrom-chat-list-title">{{featuresLabel}}</h4>
-    <ul>{{#each features}}<li>{{this}}</li>{{/each}}</ul>
+    <ul>{{#each features}}<li>{{> "modules/sogrom-dnd5e-character-creator/templates/chat/value.hbs"}}</li>{{/each}}</ul>
   </section>
   {{/if}}
 
   {{#if spells}}
   <section class="sogrom-chat-list">
     <h4 class="sogrom-chat-list-title">{{spellsLabel}}</h4>
-    <ul>{{#each spells}}<li>{{this}}</li>{{/each}}</ul>
+    <ul>{{#each spells}}<li>{{> "modules/sogrom-dnd5e-character-creator/templates/chat/value.hbs"}}</li>{{/each}}</ul>
   </section>
   {{/if}}
 </div>

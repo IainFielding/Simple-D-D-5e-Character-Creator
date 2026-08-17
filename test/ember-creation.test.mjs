@@ -3,6 +3,9 @@ import {
   isEmberCreationManager, foldOriginScreens, emberEquipmentStep, abandonEmberCreation
 } from "../scripts/levelup/ember-creation.mjs";
 import { LevelUpDriver } from "../scripts/levelup/manager-driver.mjs";
+import { LevelUpShell } from "../scripts/levelup/levelup-shell.mjs";
+import { CreatorShellBase } from "../scripts/app/shell-base.mjs";
+import { illuminatePages } from "../scripts/app/page-illumination.mjs";
 
 /**
  * The Ember hand-off: Ember's character builder assigns the ancestry, background and class, then
@@ -322,5 +325,97 @@ describe("abandonEmberCreation", () => {
     await expect(abandonEmberCreation(null)).resolves.toBeUndefined();
     const throwing = { close() { throw new Error("no element"); }, dispatchEvent() {} };
     await expect(abandonEmberCreation(throwing)).resolves.toBeUndefined();
+  });
+});
+
+/* -------------------------------------------- */
+/*  Window chrome                               */
+/* -------------------------------------------- */
+
+/**
+ * The hand-off wears the creator's chrome, not the level-up's, because from the player's point of
+ * view it *is* character creation — Ember has already assigned the ancestry, background and class
+ * and is waiting behind this window. With Ember active our own creator never opens (`moduleMode()`
+ * is pinned to "levelup"), so without this the one flow in an Ember world that really is creation
+ * would be the only one still wearing the pre-dossier chrome.
+ *
+ * Both methods below are pure view-model arithmetic, so they are borrowed off the prototype with a
+ * stand-in `this` rather than by constructing a shell — a real one would need a prepared driver, the
+ * compendium caches and a render loop, none of which say anything about the question being asked.
+ */
+describe("hand-off window chrome", () => {
+
+  /** The shell's own view of itself, reduced to the two fields the parts decision reads. */
+  const shellLike = emberCreation => ({ state: { emberCreation }, constructor: LevelUpShell });
+
+  const partsFor = emberCreation =>
+    Object.keys(LevelUpShell.prototype._configureRenderParts.call(shellLike(emberCreation), {}));
+
+  it("renders the dossier chrome for the Ember hand-off", () => {
+    expect(partsFor(true)).toEqual(["topbar", "dossier", "stage"]);
+  });
+
+  it("leaves an ordinary level-up on the rail", () => {
+    // The guard rail on the whole change: a level-up applies advancements to a character that
+    // already exists, so it has no "character so far" and keeps the plain step markers.
+    expect(partsFor(false)).toEqual(["rail", "stage"]);
+  });
+
+  it("keeps the Store step's shelf and cart scrolled where the player left them", () => {
+    // The hand-off's rail carries the creation Store step, whose every purchase re-renders the
+    // stage; without these the shelf would snap back to the top on each one.
+    const parts = LevelUpShell.prototype._configureRenderParts.call(shellLike(true), {});
+    expect(parts.stage.scrollable).toContain(".creator-store-shelf");
+    expect(parts.stage.scrollable).toContain(".creator-store-cart-list");
+  });
+});
+
+describe("progress meter", () => {
+
+  const progress = (lines, missing) =>
+    CreatorShellBase.prototype._progressContext.call({}, lines, missing);
+
+  /** `active` is the only field the meter reads; the rest of a step line is irrelevant here. */
+  const lines = activeIndex => [0, 1, 2, 3, 4].map(i => ({ active: i === activeIndex }));
+
+  it("draws the bar as the graphic of the counter beside it", () => {
+    const meter = progress(lines(3), [{}]);
+    expect(meter.done).toBe(4);
+    expect(meter.total).toBe(5);
+    expect(meter.percent).toBe(80);
+  });
+
+  it("fills only on the last step, never while a step remains to arrive at", () => {
+    // The bug this pins ran both ways: measuring completion drew a full bar next to "Step 4 of 5",
+    // and measuring completed lines could never fill at all, because Review is never marked done.
+    expect(progress(lines(4), []).percent).toBe(100);
+    expect(progress(lines(0), [{}, {}]).percent).toBe(20);
+  });
+
+  it("reports outstanding work separately from position", () => {
+    // Two different questions: where you are, and how much is left regardless of order.
+    const meter = progress(lines(4), [{}, {}]);
+    expect(meter.percent).toBe(100);
+    expect(meter.outstanding).toBe(2);
+  });
+});
+
+describe("the Review sigil", () => {
+
+  /** A root that fails loudly if anything looks for a portrait frame to draw into. */
+  const root = ember => ({
+    classList: { contains: name => ember && (name === "sogrom-ember") },
+    querySelectorAll() { throw new Error("looked for a portrait frame"); }
+  });
+
+  it("draws nothing in an Ember world", () => {
+    // Ember's fullscreen ground already carries the weathered cosmos design — a large concentric
+    // figure in the same place at the same weight. A second one reads as a collision, and the
+    // canvas is skipped outright rather than hidden, so nothing is painted for no one to see.
+    expect(() => illuminatePages(root(true))).not.toThrow();
+  });
+
+  it("still illuminates everywhere else", () => {
+    expect(() => illuminatePages(root(false))).toThrow("looked for a portrait frame");
   });
 });

@@ -49,6 +49,7 @@ export function registerLevelUp() {
   Hooks.on("dnd5e.preAdvancementManagerRender", onPreAdvancementManagerRender);
   Hooks.on("renderActorSheet", onRenderActorSheet);
   Hooks.on("renderActorSheetV2", onRenderActorSheet);
+  Hooks.on("getHeaderControlsApplicationV2", onGetHeaderControls);
 }
 
 /* -------------------------------------------- */
@@ -152,6 +153,63 @@ async function launchLevelUp(manager, { emberCreation = false, announce = null, 
     ui.notifications?.error(t("levelup.notify.takeoverFailed"));
   }
 }
+
+/* -------------------------------------------- */
+/*  Sheet header menu                           */
+/* -------------------------------------------- */
+
+/**
+ * Add "Level Up" to the ⋯ menu in a character sheet's header — the third front door onto the same
+ * flow, beside the sheet button and the sidebar's right-click entry, and off by default because
+ * the other two already exist.
+ *
+ * `getHeaderControlsApplicationV2` is Foundry's own seam for this: `_headerControlButtons()` hands
+ * the array straight to the hook and then builds the menu from whatever comes back, so an entry
+ * pushed here is indistinguishable from one the sheet declared itself. That is worth having over
+ * injecting DOM — the menu is rebuilt from this array on every render, so there is no stale entry
+ * to clean up the way the sheet button needs on a Tidy sheet.
+ *
+ * Listening on the *base* class name is deliberate. Foundry fires this hook once per class in the
+ * application's inheritance chain (`getHeaderControlsCharacterActorSheet`, then its parents, down
+ * to `getHeaderControlsApplicationV2`), so the base name fires exactly once for every sheet
+ * whatever its class — which is what makes this work for dnd5e's sheets and Tidy's alike without
+ * naming either.
+ *
+ * The cost of that reach is that it fires for every ApplicationV2 in the world, so the guards
+ * below carry the whole decision.
+ *
+ * @param {foundry.applications.api.ApplicationV2} application
+ * @param {object[]} controls   The header control entries, mutated in place.
+ */
+export function onGetHeaderControls(application, controls) {
+  try {
+    if ( !levelUpEnabled() ) return;
+    if ( !game.settings.get(MODULE_ID, SETTINGS.headerMenu) ) return;
+    // `actor` is present on document sheets for actors and absent on everything else, which is the
+    // whole of the "is this a character sheet" test; canLevelUp does the rest (a class to level,
+    // ownership, and not already at the cap).
+    const actor = application?.actor;
+    if ( !canLevelUp(actor) ) return;
+    // A re-render rebuilds the array, but a sheet that somehow reuses one must not stack entries.
+    if ( controls.some(c => c.action === HEADER_CONTROL) ) return;
+
+    controls.push({
+      action: HEADER_CONTROL,
+      icon: "fa-solid fa-trophy-star",
+      label: t("levelup.button"),
+      // Supplied directly rather than via the sheet's `actions` map: the action name is ours and
+      // the sheet has never heard of it, so there is nothing for Foundry to look up. It prefers
+      // `onClick` when one is given (see ApplicationV2#_headerControlContextEntries).
+      onClick: () => triggerLevelUp(actor)
+    });
+  } catch ( err ) {
+    // This runs for every application in the world; it must never be what stops one rendering.
+    log("could not add the Level Up header control", err);
+  }
+}
+
+/** Our header-control action name, namespaced so it cannot collide with a sheet's own. */
+const HEADER_CONTROL = "sogromLevelUp";
 
 /* -------------------------------------------- */
 /*  Sheet button                                */

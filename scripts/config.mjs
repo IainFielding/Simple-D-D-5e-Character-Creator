@@ -151,6 +151,24 @@ export function formatMod(score) {
   return mod >= 0 ? `+${mod}` : `${mod}`;
 }
 
+/**
+ * The uuid to *link* an item by: the compendium entry it came from, falling back to the item's own
+ * uuid on the actor.
+ *
+ * The order matters, and it is about who can follow the link rather than which is more accurate.
+ * An `Actor.x.Item.y` uuid resolves only for a client that can see that actor, so it is a dead link
+ * for anyone else — which is most of the table when the target is a chat card the whole world reads.
+ * A compendium uuid resolves for everyone. When an item has no compendium source at all (something
+ * synthesised, or hand-made on the sheet) the actor's own uuid is better than nothing, and "" is the
+ * signal to a template that there is nothing to link and it should render plain text.
+ *
+ * @param {Item5e|object} item
+ * @returns {string}  A uuid, or "" when the item can't be linked.
+ */
+export function sourceUuid(item) {
+  return item?._stats?.compendiumSource ?? item?.uuid ?? "";
+}
+
 // The string keys for every world setting this module registers with Foundry.
 // Centralising them here means the code that *registers* a setting and the code that
 // *reads* it always use the exact same key — no risk of a typo silently reading `undefined`.
@@ -162,6 +180,7 @@ export const SETTINGS = {
   displayMode: "displayMode",
   mode: "mode",
   levelUpButton: "showLevelUpButton",
+  headerMenu: "showLevelUpHeaderMenu",
   levelUpHpMode: "levelUpHpMode",
   levelUpHpRollToChat: "levelUpHpRollToChat",
   creationSummary: "creationSummary",
@@ -180,6 +199,10 @@ export const DEFAULTS = {
   displayMode: "fullscreen",
   mode: "creation-levelup",
   levelUpButton: true,
+  // Off by default, unlike the sheet button. This is a *second* front door onto a flow that
+  // already has one, and a default of true would silently add an entry to every character
+  // sheet's menu on update — a GM who wants it can say so.
+  headerMenu: false,
   levelUpHpMode: "choice",
   levelUpHpRollToChat: true,
   creationSummary: "public",

@@ -123,9 +123,21 @@ function drawSigil(cv) {
 /**
  * Put the sigil behind the Review portrait. Safe to call on every render: it
  * clears the previous pass first, so repeated renders never stack figures.
+ *
+ * Draws nothing in an Ember world. The sigil works because it is the only figure
+ * on the leaf — the note at the top of this file is the whole design. Ember's
+ * ground already carries one: its fullscreen view lays the weathered cosmos
+ * design behind everything, which is a large concentric figure in the same
+ * place, at the same weight, doing the same job. Two of them do not read as a
+ * frontispiece and a background, they read as a collision.
+ *
+ * Suppressed here rather than hidden from ember-skin.css so the canvas is never
+ * built or painted: a `display: none` would leave us drawing a figure nobody
+ * sees on every Review render, and would hide the fault if this stopped working.
  * @param {HTMLElement} root  The application's root element.
  */
 export function illuminatePages(root) {
+  if ( root.classList.contains("sogrom-ember") ) return;
   for ( const frame of root.querySelectorAll(".creator-review-portrait") ) {
     for ( const old of frame.querySelectorAll(".creator-page-sigil") ) old.remove();
 
