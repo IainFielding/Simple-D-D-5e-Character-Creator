@@ -1,5 +1,5 @@
 import { log } from "../config.mjs";
-import { SourceIndex } from "./source-index.mjs";
+import { SourceIndex, resetPackageTypes } from "./source-index.mjs";
 import { SpellSource, MAGIC_INITIATE_LISTS } from "./spell-source.mjs";
 import { EquipmentSource } from "./equipment-source.mjs";
 import { StoreSource } from "./store-source.mjs";
@@ -8,6 +8,7 @@ import { resetToolCache } from "./tool-source.mjs";
 import { resetWeaponIcons } from "./weapon-source.mjs";
 import { getEnabledPacks } from "./compendium-util.mjs";
 import { invalidateJournalIndex } from "./journal-source.mjs";
+import { invalidateRulesPages } from "./rules-source.mjs";
 
 /**
  * Shared, warm-once compendium data for the builder.
@@ -127,11 +128,12 @@ export function isStale() {
 /**
  * Drop the shared cache so the next {@link warmSources} rebuilds from scratch.
  *
- * The four data sources hang off `cache` and go with it, but three memos live at module scope in
- * their own files and would otherwise outlive the world they describe. All three are built by
- * scanning the *enabled* packs — the `allowDrops` restriction scan, the tool-category expansion, and
- * the PHB weapon-icon map — which is exactly the configuration whose change brought us here, so they
- * are cleared on the same beat rather than serving pre-change content for the rest of the session.
+ * The four data sources hang off `cache` and go with it, but several memos live at module scope in
+ * their own files and would otherwise outlive the world they describe. Every one is built by
+ * scanning the *enabled* packs — the `allowDrops` restriction scan, the tool-category expansion, the
+ * PHB weapon-icon map, the package-type ranking behind duplicate collapsing, and the two journal
+ * lookups — which is exactly the configuration whose change brought us here, so they are cleared on
+ * the same beat rather than serving pre-change content for the rest of the session.
  */
 export function invalidateSources() {
   cache = null;
@@ -141,7 +143,12 @@ export function invalidateSources() {
   resetRestrictedCache();
   resetToolCache();
   resetWeaponIcons();
+  // Which package owns a pack decides which copy of duplicated content the grids keep, and that
+  // map is read straight off the enabled packs — so enabling a book has to re-rank, not just re-list.
+  resetPackageTypes();
   // The source-book page map is built by scanning journal packs, so a change to which packages are
-  // active can both invalidate a page it found and reveal one it missed.
+  // active can both invalidate a page it found and reveal one it missed. The rules-page memo is
+  // resolved from the same packs and answers to the same change.
   invalidateJournalIndex();
+  invalidateRulesPages();
 }

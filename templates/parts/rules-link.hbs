@@ -1,0 +1,17 @@
+{{!--
+  The "Read the Rules" control: opens the rulebook's own page for whatever the current step is
+  asking about, into the same overlay the "Full Details" button uses (see app/source-details.mjs).
+
+  Rendered only when `rulesTopic` is set — each step's context resolves that to null unless the
+  world actually has a book covering the topic, so this is never a button that opens nothing.
+  Included as a partial rather than repeated per step because four steps show it and they lay their
+  headers out differently; the styling hangs off the class, not the surrounding markup.
+--}}
+{{#if rulesTopic}}
+<button type="button" class="creator-btn creator-btn-ghost creator-rules-link-btn"
+        data-action="openRulesDetails" data-topic="{{rulesTopic}}" data-edition="{{rulesEdition}}"
+        data-tooltip="{{localize "sogrom-dnd5e-character-creator.common.rulesDetails.tooltip"}}">
+  <i class="fa-solid fa-scroll"></i>
+  {{localize "sogrom-dnd5e-character-creator.common.rulesDetails.open"}}
+</button>
+{{/if}}

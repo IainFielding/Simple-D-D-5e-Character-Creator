@@ -1,6 +1,7 @@
 import { log } from "../config.mjs";
-import { advancementArray } from "./advancement-util.mjs";
+import { advancementArray, appliesToClass } from "./advancement-util.mjs";
 import { forEachLimit, WARM_CONCURRENCY } from "./concurrency.mjs";
+import { dedupeCards as dedupe } from "./dedupe.mjs";
 
 /**
  * Reads the available origin items (classes, species, backgrounds) out of the
@@ -51,52 +52,35 @@ export function matchesRules(cardRules, want) {
 }
 
 /**
- * The content module a compendium uuid belongs to: `Compendium.<packageId>.<pack>.Item.<id>`.
+ * Package id -> `"system"` | `"module"` | `"world"`, built once from the live compendium list.
+ *
+ * {@link module:data/dedupe.rankPackage} asks this for every duplicate it weighs, and `dedupeCards`
+ * runs over every card in the index, so the walk over `game.packs` is memoised rather than repeated
+ * per comparison. Cleared by `invalidateSources()` alongside the other enabled-pack memos, since
+ * enabling or disabling a module changes the answer.
+ * @type {Map<string, string>|null}
  */
-function packageOf(uuid) {
-  return String(uuid).split(".")[1] ?? "";
-}
+let packageTypes = null;
 
-/**
- * The publisher whose copy wins when the same content ships twice.
- *
- * The system's own SRD packs and the Player's Handbook module carry the same 2024 classes, species,
- * backgrounds and subclasses, so a world with both shows every one of them twice — two identical
- * "Barbarian" cards with nothing to tell them apart. The Player's Handbook copy is the one to keep:
- * a GM who installed it wants its version, and it is the one carrying the official artwork the
- * class, species and background screens already use as their backdrops.
- */
-const PREFERRED_PACKAGE = "dnd-players-handbook";
-
-/**
- * Collapse cards that are the same content republished, keeping {@link PREFERRED_PACKAGE}'s copy.
- *
- * Deliberately strict about what counts as "the same": identifier, name **and** rules edition must
- * all agree. Matching on the identifier alone would collapse genuinely different content that shares
- * one — the Forge Artificer and Tasha's Artificer are both `artificer`, and are different classes
- * with different features at different levels. Anything that is not an exact match is left alone,
- * which errs towards showing a duplicate rather than hiding someone's content.
- *
- * Insertion order is preserved, so a grid's existing ordering survives.
- * @param {object[]} cards
- * @returns {object[]}
- */
-function dedupeCards(cards) {
-  const byKey = new Map();
-  for ( const card of cards ) {
-    const key = [card.classIdentifier ?? "", card.identifier ?? "", card.name, card.rules ?? ""].join("|");
-    const seen = byKey.get(key);
-    if ( !seen ) {
-      byKey.set(key, card);
-      continue;
-    }
-    // First one found wins unless the preferred publisher turns up later.
-    if ( (packageOf(card.uuid) === PREFERRED_PACKAGE) && (packageOf(seen.uuid) !== PREFERRED_PACKAGE) ) {
-      byKey.set(key, card);
+/** The injected lookup {@link module:data/dedupe} needs; null for a package no enabled pack claims. */
+function packageTypeOf(packageId) {
+  if ( !packageTypes ) {
+    packageTypes = new Map();
+    for ( const pack of game.packs ?? [] ) {
+      const name = pack.metadata?.packageName ?? pack.collection?.split(".")[0];
+      if ( name && !packageTypes.has(name) ) packageTypes.set(name, pack.metadata?.packageType ?? null);
     }
   }
-  return [...byKey.values()];
+  return packageTypes.get(packageId) ?? null;
 }
+
+/** Forget the memoised package types — see {@link packageTypes}. */
+export function resetPackageTypes() {
+  packageTypes = null;
+}
+
+/** {@link module:data/dedupe.dedupeCards} bound to this world's package types. */
+const dedupeCards = cards => dedupe(cards, packageTypeOf);
 
 export class SourceIndex {
 
@@ -422,7 +406,7 @@ export class SourceIndex {
       // The class summary table already lists higher-level proficiency grants; only the
       // level-1 traits describe what the class opens with. Skip multiclass-only entries.
       if ( type === "Trait" ) {
-        if ( level > 1 || adv.classRestriction === "secondary" ) continue;
+        if ( level > 1 || !appliesToClass(adv, doc) ) continue;
         traits.tags.push(...traitTags(adv));
         continue;
       }

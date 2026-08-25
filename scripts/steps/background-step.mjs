@@ -1,5 +1,6 @@
 import { ABILITIES, t } from "../config.mjs";
 import { resolveChoices } from "../data/choice-resolver.mjs";
+import { hasRulesPage } from "../data/rules-source.mjs";
 import {
   ASI_ACTIONS, asiComplete, asiContext, asiHandle, asiHint, asiSummary, increasedAbilities
 } from "./origin-abilities-panel.mjs";
@@ -86,6 +87,10 @@ export const backgroundStep = {
       pickAction: "pick-origin",
       detail,
       groups,
+      // Null unless the world actually has a book covering this step, so the control is hidden
+      // rather than offered as a button that opens nothing.
+      rulesTopic: (await hasRulesPage("background", source.rulesOf(state.classUuid))) ? "background" : null,
+      rulesEdition: source.rulesOf(state.classUuid) ?? null,
       abilityOptions: ABILITIES.map(key => ({ value: key, label: abilityLabel(key) })),
       // Null when the chosen background grants no increase (every 2014 one) — the work surface
       // simply renders nothing in that case.

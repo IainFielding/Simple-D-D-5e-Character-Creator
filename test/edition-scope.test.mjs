@@ -1,4 +1,5 @@
 import { describe, it, expect, beforeEach } from "vitest";
+import { dedupeCards } from "../scripts/data/dedupe.mjs";
 
 /**
  * Subclass pickers are scoped to the *edition* of the class being advanced.
@@ -165,28 +166,22 @@ describe("switching class edition drops incompatible origins", () => {
 /**
  * The same content ships from more than one publisher.
  *
- * The system's SRD 5.2 packs and the Player's Handbook module both carry the 2024 classes, species,
- * backgrounds and subclasses, so a world with both showed every one of them twice — two identical
- * "Barbarian" cards, and three "Champion"s once the 2014 SRD is counted. `dedupeCards` keeps the
- * Player's Handbook copy.
+ * The system's SRD packs, the Player's Handbook module, and books like Forge of the Artificer all
+ * carry overlapping classes, species, backgrounds and subclasses, so a world with several enabled
+ * showed every one of them twice or three times. `dedupeCards` keeps one copy, preferring the
+ * Player's Handbook (whose artwork the grids use), then any real installed book, then the SRD.
  *
- * The rule reproduced here is the whole of `dedupeCards`; the surrounding class is compendium
- * plumbing that cannot load outside Foundry.
+ * Unlike the edition-scope rule above, this imports the real implementation: `dedupe.mjs` holds the
+ * policy on its own precisely so it can be tested without Foundry, with the one fact it needs about
+ * the world (is this package the system?) injected.
  */
-describe("duplicate content collapses to the Player's Handbook copy", () => {
+describe("duplicate content collapses to the best-ranked copy", () => {
   const PREFERRED = "dnd-players-handbook";
   const pkg = uuid => String(uuid).split(".")[1] ?? "";
 
-  const dedupe = cards => {
-    const byKey = new Map();
-    for ( const card of cards ) {
-      const key = [card.classIdentifier ?? "", card.identifier ?? "", card.name, card.rules ?? ""].join("|");
-      const seen = byKey.get(key);
-      if ( !seen ) { byKey.set(key, card); continue; }
-      if ( (pkg(card.uuid) === PREFERRED) && (pkg(seen.uuid) !== PREFERRED) ) byKey.set(key, card);
-    }
-    return [...byKey.values()];
-  };
+  // Stands in for the real `game.packs` walk: only the system ships under the `dnd5e` id.
+  const packageTypeOf = id => (id === "dnd5e" ? "system" : "module");
+  const dedupe = cards => dedupeCards(cards, packageTypeOf);
 
   const card = (uuid, name, extra = {}) => ({ uuid, name, identifier: name.toLowerCase(), rules: "2024", ...extra });
 
@@ -249,5 +244,59 @@ describe("duplicate content collapses to the Player's Handbook copy", () => {
       card("Compendium.dnd-players-handbook.classes.Item.c", "Barbarian")
     ]);
     expect(out.map(c => c.name)).toEqual(["Barbarian", "Bard"]);
+  });
+
+  /**
+   * The reason the tie-break stopped naming one module. Preferring only the Player's Handbook left
+   * every *other* real book losing to whichever copy was indexed first, which is arbitrary — a GM
+   * who installed Forge of the Artificer wants its Artificer, not the SRD's.
+   */
+  it("prefers any real installed book over the system's bundled SRD", () => {
+    const srdFirst = dedupe([
+      card("Compendium.dnd5e.classes24.Item.a", "Artificer"),
+      card("Compendium.dnd-forge-artificer.options.Item.b", "Artificer")
+    ]);
+    const bookFirst = dedupe([
+      card("Compendium.dnd-forge-artificer.options.Item.b", "Artificer"),
+      card("Compendium.dnd5e.classes24.Item.a", "Artificer")
+    ]);
+    expect(pkg(srdFirst[0].uuid)).toBe("dnd-forge-artificer");
+    expect(pkg(bookFirst[0].uuid)).toBe("dnd-forge-artificer");
+  });
+
+  it("still prefers the Player's Handbook over another book, for its artwork", () => {
+    const out = dedupe([
+      card("Compendium.dnd-adventures-faerun.origins.Item.a", "Human"),
+      card("Compendium.dnd-players-handbook.origins.Item.b", "Human")
+    ]);
+    expect(out).toHaveLength(1);
+    expect(pkg(out[0].uuid)).toBe(PREFERRED);
+  });
+
+  it("keeps the first copy when two real books tie, so the grid never reshuffles", () => {
+    const out = dedupe([
+      card("Compendium.dnd-adventures-faerun.origins.Item.a", "Human"),
+      card("Compendium.dnd-ravenloft-horrors-within.origins.Item.b", "Human")
+    ]);
+    expect(out).toHaveLength(1);
+    expect(pkg(out[0].uuid)).toBe("dnd-adventures-faerun");
+  });
+
+  it("leaves SRD-only content alone when nothing else covers it", () => {
+    const out = dedupe([
+      card("Compendium.dnd5e.classes24.Item.a", "Barbarian"),
+      card("Compendium.dnd5e.classes24.Item.b", "Bard")
+    ]);
+    expect(out.map(c => c.name)).toEqual(["Barbarian", "Bard"]);
+  });
+
+  // An id no enabled pack claims must not be mistaken for system content and ranked below the SRD.
+  it("treats an unknown package as a real one rather than as the system", () => {
+    const out = dedupeCards([
+      card("Compendium.dnd5e.classes24.Item.a", "Barbarian"),
+      card("Compendium.some-homebrew.classes.Item.b", "Barbarian")
+    ], id => (id === "dnd5e" ? "system" : null));
+    expect(out).toHaveLength(1);
+    expect(pkg(out[0].uuid)).toBe("some-homebrew");
   });
 });

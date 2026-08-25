@@ -25,6 +25,7 @@ export const STEPS = [
     instructionKey: "step.species.instruction",
     field: "speciesUuid",
     hintKey: "step.species.hint",
+    rulesTopic: "species",
     // A 2014 species carries the ability-score increase its edition's backgrounds don't; the panel
     // renders only when the chosen species actually grants one, so 2024 species are unaffected.
     asiSource: "species",

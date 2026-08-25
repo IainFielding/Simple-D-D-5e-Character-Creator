@@ -2609,7 +2609,7 @@ body:has(.sogrom-creator-fullscreen) .application.compendium-browser {
   letter-spacing: 0.06em;
   color: var(--cc-muted);
 }
-.creator-details :is(input, textarea) {
+.creator-details :is(input, select, textarea) {
   width: 100%;
   padding: 0.5rem 0.6rem;
   background: var(--cc-panel-2);
@@ -2619,8 +2619,21 @@ body:has(.sogrom-creator-fullscreen) .application.compendium-browser {
   font-family: inherit;
   font-size: 0.9rem;
 }
-.creator-details :is(input, textarea):focus { border-color: var(--cc-gold); outline: none; }
+.creator-details :is(input, select, textarea):focus { border-color: var(--cc-gold); outline: none; }
 .creator-details textarea { resize: vertical; }
+/* Foundry core pins every `input` and `select` to `height: var(--input-height)` (2rem), and gives
+   the select a matching `line-height`. Module CSS sits outside Foundry's cascade layers, so the
+   padding above wins over its `padding: 0 0.5rem` — but the height does not. On a select that left
+   a 2rem line rendering inside a content box the padding had shrunk to ~14px, clipping the text to
+   about half a line.
+   The fix drops only the vertical padding, keeping Foundry's 2rem height: releasing the height
+   instead would size the select from the padding and make it visibly taller than every text input
+   beside it, which are all still pinned at 2rem. Horizontal padding stays, so the text still lines
+   up with its neighbours. */
+.creator-details select { line-height: normal; padding-block: 0; }
+/* The free-text box the alignment list reveals for "Other" — sits directly under its select,
+   sharing the field's own 0.3rem stack gap, so the pair reads as one control rather than two. */
+.creator-detail-alignment-other { margin-top: 0.1rem; }
 
 @media (max-width: 760px) {
   .creator-detail-grid { grid-template-columns: repeat(2, 1fr); }
@@ -4424,6 +4437,78 @@ body:has(.sogrom-creator-fullscreen) .application.compendium-browser {
   border-radius: var(--cc-radius);
 }
 
+/* Both settings windows share one sizing problem and one fix.
+   They open at `height: "auto"`, which sizes an ApplicationV2 to its content with no regard for the
+   viewport — and Level-Up Options carries seven controls with hints across three groups, so on a
+   shorter screen the window grew past the bottom and took the footer's Save button with it, with no
+   scrollbar to reach it. Capping the frame and scrolling the *fields* (never the whole content)
+   keeps Save pinned and visible, while short content still sizes to fit as before. */
+.sogrom-house-rules.application,
+.sogrom-levelup-options.application { max-height: 90vh; }
+
+.sogrom-house-rules .window-content,
+.sogrom-levelup-options .window-content {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.sogrom-house-rules-fields,
+.sogrom-levelup-options-fields {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  /* Room for the scrollbar so it never sits on top of a checkbox at the right-hand edge. */
+  padding-right: 0.25rem;
+}
+
+/* Foundry's generic form-footer part, kept out of the scroll region above. */
+.sogrom-house-rules .form-footer,
+.sogrom-levelup-options .form-footer { flex: 0 0 auto; margin-top: 0.5rem; }
+
+/* The GM's Level-Up Options window. Shares the House Rules window's plain, Foundry-chrome styling
+   below — both are settings screens, not part of the themed wizard. */
+.sogrom-levelup-options-fields { display: flex; flex-direction: column; gap: 0.75rem; }
+.sogrom-levelup-options-intro { margin: 0; font-size: 0.9rem; opacity: 0.8; }
+.sogrom-levelup-options-fields fieldset { border-radius: var(--cc-radius); }
+.sogrom-levelup-options-fields legend { font-weight: 700; padding: 0 0.4rem; }
+
+/* The GM's House Rules window. Like the store window it renders in Foundry's default app chrome
+   rather than the creator theme, so the colors here come from Foundry's own variables. The
+   alignment grid is 3 columns on purpose: it reproduces the familiar lawful/neutral/chaotic by
+   good/neutral/evil square, which a single stacked list of nine loses. */
+.sogrom-house-rules-fields { display: flex; flex-direction: column; gap: 0.75rem; }
+.sogrom-house-rules-intro { margin: 0; font-size: 0.9rem; opacity: 0.8; }
+.sogrom-house-rules-fields fieldset { border-radius: var(--cc-radius); }
+.sogrom-house-rules-fields legend { font-weight: 700; padding: 0 0.4rem; }
+
+.sogrom-house-rules-alignments {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 0.4rem;
+  margin-top: 0.5rem;
+}
+.sogrom-house-rules-alignment {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.3rem 0.45rem;
+  border: 1px solid var(--color-border-light-tertiary, #7a7971);
+  border-radius: var(--cc-radius);
+  font-size: 0.85rem;
+  cursor: pointer;
+}
+.sogrom-house-rules-alignment input { flex: 0 0 auto; margin: 0; }
+/* A ticked box means "banned", which is the opposite of the usual "ticked = on" reading — the
+   strikethrough is what stops the grid being misread as a list of *allowed* alignments. */
+.sogrom-house-rules-alignment.is-banned { opacity: 0.6; }
+.sogrom-house-rules-alignment.is-banned span { text-decoration: line-through; }
+
+@media (max-width: 560px) {
+  .sogrom-house-rules-alignments { grid-template-columns: repeat(2, 1fr); }
+}
+
 .sogrom-store-inv-toolbar { display: flex; align-items: center; gap: 0.5rem; }
 .sogrom-store-inv-search { flex: 1 1 auto; display: flex; align-items: center; gap: 0.4rem; min-width: 0; }
 .sogrom-store-inv-search input { flex: 1 1 auto; min-width: 0; }
@@ -4590,6 +4675,34 @@ body:has(.sogrom-creator-fullscreen) .application.compendium-browser {
   flex-direction: column;
   gap: 0.6rem;
 }
+
+/* The "Read the Rules" control. Shares the ghost-button look with "Full Details" — to a player they
+   are the same affordance, differing only in which page they open — but sits in the work bar rather
+   than a detail header, so it needs its own margin rather than inheriting that header's gap. */
+.creator-rules-link-btn { margin-left: auto; flex: 0 0 auto; }
+.creator-details-form .creator-rules-link-btn { margin: 0 0 0.6rem; align-self: flex-start; }
+
+/* The XP-ready card is a prompt, not a report: its header carries no bottom rule, since there is no
+   body below it for the rule to separate — just the button. */
+.sogrom-chat-card--prompt .sogrom-chat-head { border-bottom: none; padding-bottom: 0; }
+
+.sogrom-chat-levelup-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.4rem;
+  width: 100%;
+  padding: 0.4rem 0.6rem;
+  border: 1px solid rgba(201, 162, 39, 0.5);
+  border-radius: 3px;
+  background: rgba(201, 162, 39, 0.12);
+  color: inherit;
+  font-family: inherit;
+  font-size: 0.95rem;
+  cursor: pointer;
+}
+.sogrom-chat-levelup-btn:hover { background: rgba(201, 162, 39, 0.22); border-color: var(--sc-brass); }
+.sogrom-chat-levelup-btn i { color: var(--sc-brass); }
 
 /* --- header: portrait, who they are, what changed ------------------------ */
 

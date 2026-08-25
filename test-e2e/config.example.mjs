@@ -56,7 +56,7 @@ export const BASE_MODULES = [
 /** The system the test worlds run, and the version this harness was written against. */
 export const SYSTEM = "dnd5e";
 export const SYSTEM_VERSION = "5.3.3";
-export const CORE_VERSION = "14.365";
+export const CORE_VERSION = "14.367";
 
 /**
  * The two test worlds. `id` doubles as the directory name under `Data/worlds`.

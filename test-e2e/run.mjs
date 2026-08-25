@@ -25,6 +25,7 @@
  *   node run.mjs --sweep --axis background  # vary the background, taking a feat at every ASI
  *   node run.mjs --sweep --shard 1/20     # one twentieth of it, for a smoke test
  *   node run.mjs --sweep --resume         # skip scenarios already in sweep-results.jsonl
+ *   node run.mjs --sweep --fresh          # start a new results file over an unarchived one
  *   node run.mjs --sweep --plan           # list what it would run, and what it skips
  *
  * Node's only jobs are booting Foundry, joining as GM, and printing results. The comparison
@@ -35,6 +36,7 @@ import { WORLDS } from "./config.mjs";
 import { startFoundry } from "./lib/server.mjs";
 import { Session } from "./lib/session.mjs";
 import { ensureWorld } from "./lib/worlds.mjs";
+import { describeDrift, describeMeta, readMeta, sweepMeta } from "./lib/provenance.mjs";
 
 const argv = process.argv.slice(2);
 const flag = name => argv.includes(`--${name}`);
@@ -151,7 +153,7 @@ try {
       console.log(`${s.name.padEnd(28)} ${s.uuid}`);
     }
   } else if ( flag("sweep") ) {
-    exitCode = await runSweep(harness);
+    exitCode = await runSweep(harness, session);
   } else {
     const result = await harness("run", { only, keep });
     exitCode = report(result, { debug: flag("debug") });
@@ -225,8 +227,8 @@ async function load(session) {
  * differences across ninety scenarios is not something to read as it scrolls past.
  * @returns {Promise<number>}   The process exit code.
  */
-async function runSweep(harness) {
-  const { appendFileSync, readFileSync, existsSync } = await import("node:fs");
+async function runSweep(harness, session) {
+  const { appendFileSync, readFileSync, existsSync, writeFileSync } = await import("node:fs");
   const level = Number(value("level") ?? 20);
   // Incremental by default, because it is what a player actually does: one level at a time, each
   // with its own commit. The single-jump walk is the special case — it is how the *creator* reaches
@@ -239,6 +241,7 @@ async function runSweep(harness) {
   // an unflagged run is the one whose result can be read as "would a real character come out right".
   // `--incremental` is still accepted, and now redundant, so existing scripts keep working.
   const incremental = !flag("jump");
+  const mode = incremental ? "incremental" : "jump";
   // Which axis to sweep. "subclass" is the original and the default; "species" holds the class fixed
   // and varies the species instead, covering the advancements a species gains above level 1.
   const axis = value("axis") ?? "subclass";
@@ -267,12 +270,21 @@ async function runSweep(harness) {
     ids = ids.filter((_, idx) => (idx % n) === (i - 1));
   }
 
-  if ( flag("resume") && existsSync(SWEEP_RESULTS) ) {
+  const resuming = flag("resume") && existsSync(SWEEP_RESULTS);
+  if ( resuming ) {
     const done = new Set(readFileSync(SWEEP_RESULTS, "utf8").split("\n").filter(Boolean)
       .map(line => { try { return JSON.parse(line).id; } catch { return null; } }).filter(Boolean));
     const before = ids.length;
     ids = ids.filter(id => !done.has(id));
     console.log(`resuming: ${before - ids.length} already recorded, ${ids.length} to go`);
+
+    // Resuming a file recorded under other flags splices two different runs into one baseline —
+    // the failure this whole header exists to make visible. Only possible where there is a header.
+    const prior = readMeta(SWEEP_RESULTS);
+    const drift = prior ? describeDrift(prior, { mode, level, axis }) : [];
+    if ( drift.length ) throw new Error("--resume would splice two different runs into one file: "
+      + `they differ in ${drift.join(", ")}`
+      + "\n    archive that file under a name of its own and start a fresh run instead.");
   }
 
   if ( flag("plan") ) {
@@ -287,8 +299,33 @@ async function runSweep(harness) {
     return 0;
   }
 
+  // Without this a second unflagged run appends straight onto the first: `--resume` is the only
+  // thing that ever read the file back, and nothing truncated it. Two runs then share one file,
+  // later records shadowing earlier ones by id, and what is archived as a baseline is really two
+  // builds spliced together — `sweep-results-scratch.jsonl` (136 records, 122 scenarios) is one,
+  // and so is `sweep-results-pre-14367-aug16.jsonl` (128/125). Refusing rather than truncating
+  // leaves the choice with whoever knows what the old file was worth.
+  if ( existsSync(SWEEP_RESULTS) && !resuming && !flag("fresh")
+    && readFileSync(SWEEP_RESULTS, "utf8").trim() ) {
+    const prior = readMeta(SWEEP_RESULTS);
+    throw new Error("test-e2e/sweep-results.jsonl already holds a run"
+      + (prior ? ` — ${describeMeta(prior)}` : " with no header (it predates run provenance)")
+      + "\n    archive it   mv sweep-results.jsonl sweep-results-<what-it-is>.jsonl"
+      + "\n    continue it  node run.mjs --sweep --resume"
+      + "\n    discard it   node run.mjs --sweep --fresh");
+  }
+
   console.log(`\nsweeping ${ids.length} subclass(es) at level ${level}`
     + `${incremental ? ", one level at a time" : ", in a single jump"} → test-e2e/sweep-results.jsonl\n`);
+
+  // The provenance header, written before the first scenario so that even an abandoned run says
+  // what it was. A resumed run keeps the header it already carries.
+  if ( !resuming ) {
+    const meta = await sweepMeta(session, { mode, level, axis, world: worldId,
+      scenarios: ids.length, shard: shard ?? null, only });
+    writeFileSync(SWEEP_RESULTS, `${JSON.stringify(meta)}\n`, "utf8");
+    console.log(describeMeta(meta._meta));
+  }
   let passed = 0;
   let failed = 0;
   let errored = 0;
@@ -304,12 +341,20 @@ async function runSweep(harness) {
     }
     appendFileSync(SWEEP_RESULTS, `${JSON.stringify(r)}\n`, "utf8");
 
+    // Deletion failures are orthogonal to the diff: a build can come out identical and still have
+    // had a delete batch rejected on the way, so this is reported on every line rather than only
+    // on failures. See the README's "Foundry 14.367" section.
+    const de = r.deleteErrors?.total
+      ? `  [${r.deleteErrors.total} delete error(s), first `
+        + `${r.deleteErrors.first ? `${r.deleteErrors.first.side} L${r.deleteErrors.first.level}` : "unattributed"}]`
+      : "";
+
     if ( r.error ) {
       errored++;
-      console.log(`${position} ERROR ${r.name} — ${r.error.split("\n")[0]}`);
+      console.log(`${position} ERROR ${r.name} — ${r.error.split("\n")[0]}${de}`);
     } else if ( r.ok ) {
       passed++;
-      console.log(`${position} PASS  ${r.name} (${r.ms}ms)`);
+      console.log(`${position} PASS  ${r.name} (${r.ms}ms)${de}`);
     } else {
       failed++;
       // The level a difference *starts* at is the useful part of an incremental run; the count at
@@ -319,7 +364,7 @@ async function runSweep(harness) {
         + ` (${r.levels.firstDivergence.differences.length} row(s))`
         : ` — ${r.differences.length} difference(s)`;
       console.log(`${position} FAIL  ${r.name} (${r.ms}ms)${at}`
-        + `: ${[...new Set(r.differences.map(d => d.path.split(".")[0]))].join(", ")}`);
+        + `: ${[...new Set(r.differences.map(d => d.path.split(".")[0]))].join(", ")}${de}`);
     }
   }
 

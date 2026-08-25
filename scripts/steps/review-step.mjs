@@ -42,7 +42,10 @@ function bonusTip(delta) {
  */
 function reviewDetails(state) {
   const d = state.details;
-  const tags = DETAIL_FIELDS
+  // Alignment leads, and is named explicitly: it has its own control on the Details step (a list
+  // the GM can restrict, plus an "Other" box) so it is no longer part of DETAIL_FIELDS' plain-text
+  // grid — but it is still a detail the player set, and the summary must account for it.
+  const tags = ["alignment", ...DETAIL_FIELDS]
     .filter(k => d[k]?.trim())
     .map(k => ({ label: t(`step.details.field.${k}`), value: d[k].trim() }));
   const texts = DETAIL_TEXT_FIELDS

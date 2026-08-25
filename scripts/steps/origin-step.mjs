@@ -25,6 +25,8 @@
  * @param {string} [cfg.instructionKey]  i18n key for the one-line instruction under the heading.
  * @param {string} cfg.field        CreatorState property holding the chosen UUID.
  * @param {string} [cfg.hintKey]    i18n key for the "nothing picked yet" Next-button hint.
+ * @param {string} [cfg.rulesTopic]  Topic key for the "Read the Rules" control (see
+ *   {@link module:data/rules-source}). Omit and the step shows no such control.
  * @param {"species"|"background"} [cfg.asiSource]  Compose in the shared ability-increase panel
  *   under this origin key. Set for the species (a 2014 species grants an increase; a 2024 one does
  *   not, and then no aside renders). Omit and the step behaves as a plain grid.
@@ -34,11 +36,12 @@
  */
 import { resolveChoices } from "../data/choice-resolver.mjs";
 import { t } from "../config.mjs";
+import { hasRulesPage } from "../data/rules-source.mjs";
 import {
   ASI_ACTIONS, asiComplete, asiContext, asiHandle, asiHint, asiSummary
 } from "./origin-abilities-panel.mjs";
 
-export function originStep({ id, icon, labelKey, instructionKey, field, cards, hintKey, asiSource }) {
+export function originStep({ id, icon, labelKey, instructionKey, field, cards, hintKey, asiSource, rulesTopic }) {
   return {
     id,
     icon,
@@ -92,10 +95,18 @@ export function originStep({ id, icon, labelKey, instructionKey, field, cards, h
         state.originAsi[asiSource] = await source.abilityScoreIncrease(selected);
       }
 
+      // The character's edition is the chosen class's; on the class step itself nothing is settled
+      // yet, so this falls through to the 2024 default the resolver applies.
+      const edition = source.rulesOf(state.classUuid) ?? null;
+
       return {
         cards: list,
         count: list.length,
         hasSelection: !!selected,
+        // Null unless the world actually has a book covering this step, so the control is hidden
+        // rather than offered as a button that opens nothing.
+        rulesTopic: (rulesTopic && await hasRulesPage(rulesTopic, edition)) ? rulesTopic : null,
+        rulesEdition: edition,
         // Which step action a drawer card fires, so parts/work-picker.hbs stays step-agnostic.
         pickAction: "pick-origin",
         selectedName: detail?.name ?? "",

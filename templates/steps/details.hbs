@@ -67,6 +67,7 @@
   <div class="creator-details-form">
     <h2 class="creator-details-title">{{localize "sogrom-dnd5e-character-creator.step.details.label"}}</h2>
     <p class="creator-details-subtitle">{{subtitle}}</p>
+    {{> "modules/sogrom-dnd5e-character-creator/templates/parts/rules-link.hbs" this}}
 
     <div class="creator-detail-name">
       <label for="creator-cc-name">
@@ -116,6 +117,23 @@
     <p class="creator-detail-optional">{{localize "sogrom-dnd5e-character-creator.step.details.optional"}}</p>
 
     <div class="creator-detail-grid">
+      {{!-- Alignment is a list rather than a text box so the GM's banned-alignment house rule can
+            actually remove entries; "Other" reveals a free-text field for homebrew. --}}
+      <div class="creator-detail-field">
+        <label for="creator-cc-alignment">{{localize "sogrom-dnd5e-character-creator.step.details.field.alignment"}}</label>
+        <select id="creator-cc-alignment" data-step-change="alignment">
+          {{#each alignment.options}}
+            <option value="{{value}}" {{#if selected}}selected{{/if}}>{{label}}</option>
+          {{/each}}
+        </select>
+        {{#if alignment.isOther}}
+        <input type="text" class="creator-detail-alignment-other"
+               data-step-change="detail" data-detail="alignment"
+               value="{{alignment.otherValue}}" autocomplete="off"
+               aria-label="{{localize 'sogrom-dnd5e-character-creator.step.details.alignmentOther'}}"
+               placeholder="{{localize 'sogrom-dnd5e-character-creator.step.details.alignmentOtherPlaceholder'}}">
+        {{/if}}
+      </div>
       {{#each shortFields}}
       <div class="creator-detail-field">
         <label for="creator-cc-{{key}}">{{label}}</label>

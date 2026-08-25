@@ -21,6 +21,11 @@
         "tooltip": "Read this entry's own page from the source book",
         "fallback": "No book page for this entry — showing its own description.",
         "none": "There is nothing more to show for this entry."
+      },
+      "rulesDetails": {
+        "open": "Read the Rules",
+        "tooltip": "Open this step's own page from the rulebook",
+        "none": "No rulebook page for this step in the enabled compendiums."
       }
     },
     "loading": {
@@ -241,6 +246,12 @@
         "subclass": "Subclass",
         "features": "New Features",
         "spells": "New Spells"
+      },
+      "levelUpReady": {
+        "eyebrow": "Ready to level up",
+        "xp": "{value} / {max} XP",
+        "button": "Level Up",
+        "missing": "That character no longer exists."
       }
     },
     "step": {
@@ -350,7 +361,10 @@
           "flaws": "What undermines them?",
           "appearance": "Describe how they look.",
           "biography": "Their story so far…"
-        }
+        },
+        "alignmentNone": "Not decided",
+        "alignmentOther": "Other…",
+        "alignmentOtherPlaceholder": "Type an alignment"
       },
       "spells": {
         "label": "Spells",
@@ -537,7 +551,7 @@
         "hint": "Adds a “Simple Character Builder” button to the Actors sidebar for anyone allowed to create actors."
       },
       "contextMenu": {
-        "name": "Show Level Up in right-click menu",
+        "name": "Show Level Up on right-click",
         "hint": "Adds a “Level Up” option to a character's right-click menu in the Actors sidebar, opening the same level-up flow as the sheet button."
       },
       "pointBuyBudget": {
@@ -567,7 +581,7 @@
         "hint": "Adds a “Level Up” button to the character sheet's header for the character's owner. Levelling through the sheet's own class controls still works either way."
       },
       "headerMenu": {
-        "name": "Show Level Up in sheet menu",
+        "name": "Show Level Up in sheet",
         "hint": "Adds a “Level Up” option to the ⋯ menu in a character sheet's header, opening the same level-up flow as the sheet button. Useful alongside sheets that have no room for the button, or instead of it."
       },
       "allowMulticlass": {
@@ -589,14 +603,14 @@
         "hint": "When a player rolls hit points during a level-up, also post the roll to chat so the whole table can see the result."
       },
       "creationSummary": {
-        "name": "Post a character summary to chat",
+        "name": "Character summary to chat",
         "hint": "When a character is finished, post a card to chat showing who they are — class and level, species, background, ability scores, hit points and armour class. Whisper to the GM keeps it out of the players' chat log.",
         "public": "Post to everyone",
         "gm": "Whisper to the GM",
         "off": "Don't post"
       },
       "levelUpSummary": {
-        "name": "Post a level-up summary to chat",
+        "name": "Level-up summary to chat",
         "hint": "When a level-up is applied, post a card to chat showing what changed — the class levels gained, hit points, proficiency bonus, spell slots, and any new features and spells. Whisper to the GM keeps it out of the players' chat log.",
         "public": "Post to everyone",
         "gm": "Whisper to the GM",
@@ -614,6 +628,24 @@
       "debugLogging": {
         "name": "Debug logging",
         "hint": "Print this module's diagnostics to your browser console. Off by default; turn it on if you've been asked for details about a problem. Affects only you."
+      },
+      "houseRulesMenu": {
+        "name": "House Rules",
+        "label": "Configure House Rules",
+        "hint": "The rules that constrain what a player may build: the ability-score economy, multiclassing, and which alignments your table allows.",
+        "hintEmber": "The rules that constrain what a player may build. Ember sets ability scores in its own builder, so only the multiclassing and alignment rules apply in this world."
+      },
+      "levelUpReadyNotice": {
+        "name": "Announce when a character can level up",
+        "hint": "Whispers a card with a “Level Up” button when a character earns enough XP for the next level. Requires an XP-based world; never posted to the whole table.",
+        "public": "Tell the GM and the player",
+        "gm": "Whisper the GM only",
+        "off": "Don't announce"
+      },
+      "levelUpOptionsMenu": {
+        "name": "Level-Up Options",
+        "label": "Configure Level-Up",
+        "hint": "Everything about levelling: where players can start a level-up from, what it offers for hit points, and what it announces in chat."
       }
     },
     "storeConfig": {
@@ -642,6 +674,26 @@
         "title": "Reset store inventory?",
         "body": "This replaces the current inventory — including your price overrides — with the factory default stock. Nothing is written until you press Save Changes."
       },
+      "save": "Save Changes"
+    },
+    "houseRules": {
+      "title": "House Rules",
+      "intro": "These settings limit what players may build. Everything else about the module — how it looks, which buttons appear, what it announces in chat — stays in the main settings list.",
+      "abilities": "Ability Scores",
+      "multiclassing": "Multiclassing",
+      "alignments": "Alignments",
+      "alignmentsHint": "Tick an alignment to remove it from the Details step. Characters already using it keep it.",
+      "save": "Save Changes"
+    },
+    "levelUpOptions": {
+      "title": "Level-Up Options",
+      "intro": "How levelling works at your table. Character creation, the store and the module's own appearance stay in the main settings list.",
+      "disabled": "This module is set to Creation only, so the level-up flow never runs and nothing on this screen has any effect. Change Module mode in the main settings to turn levelling on.",
+      "entryPoints": "Starting a Level-Up",
+      "entryPointsHint": "Where the Level Up button appears. Turning all three off leaves no way in — players would level through the sheet's own class controls instead.",
+      "hitPoints": "Hit Points",
+      "announcements": "Announcements",
+      "creationNote": "The character-creation summary card is set separately, in the main settings list.",
       "save": "Save Changes"
     }
   }

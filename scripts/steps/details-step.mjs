@@ -1,4 +1,5 @@
-import { t } from "../config.mjs";
+import { t, allowedAlignments } from "../config.mjs";
+import { hasRulesPage } from "../data/rules-source.mjs";
 import { generateName, nameStyleOptions } from "../data/name-generator.mjs";
 import { yieldTakeoverTo } from "../app/takeover.mjs";
 
@@ -15,16 +16,56 @@ import { yieldTakeoverTo } from "../app/takeover.mjs";
 // The biography fields are defined here as plain lists so the template can loop over them and the
 // handler can validate a changed field against them, instead of hard-coding 15 near-identical inputs.
 
-/** The short single-line fields, in display order. */
+/**
+ * The short single-line fields, in display order.
+ *
+ * Alignment is deliberately absent: it is the one biography field the GM can constrain (see the
+ * `bannedAlignments` house rule), which a plain text input cannot express, so it gets its own
+ * list-plus-"Other" control ahead of this grid rather than being one more identical box.
+ */
 export const DETAIL_FIELDS = [
-  "alignment", "faith", "gender", "eyes", "hair", "skin", "height", "weight", "age"
+  "faith", "gender", "eyes", "hair", "skin", "height", "weight", "age"
 ];
+
+/** The select's value for "none chosen yet" and for the free-text escape hatch. */
+const ALIGNMENT_NONE = "";
+const ALIGNMENT_OTHER = "__other__";
 /** The multi-line fields, in display order. */
 export const DETAIL_TEXT_FIELDS = ["trait", "ideals", "bonds", "flaws", "appearance", "biography"];
 /** Multi-line fields that span the full form width (with their textarea row counts). */
 const WIDE_TEXT_FIELDS = { appearance: 4, biography: 6 };
 
 const FALLBACK_IMG = "icons/svg/mystery-man.svg";
+
+/**
+ * The alignment control's context: the offered list, which entry is showing, and the free-text box.
+ *
+ * dnd5e models `system.details.alignment` as a plain `StringField` and the character sheet renders
+ * it verbatim, so what gets stored is the **label** a player picked ("Lawful Good"), never the
+ * `CONFIG.DND5E.alignments` key — writing the key would show them "lg" on their own sheet.
+ *
+ * A value that matches nothing on offer still has to survive: it may be genuine homebrew, an
+ * alignment arriving through the Ember hand-off, or one the GM banned after this character started.
+ * Any of those select "Other" with the text intact rather than being silently blanked — losing what
+ * a player typed is a far worse failure than showing an alignment the house rules no longer allow.
+ * @param {CreatorState} state
+ */
+function alignmentContext(state) {
+  const current = state.details.alignment ?? "";
+  const options = allowedAlignments();
+  const known = options.some(o => o.label === current);
+  const other = state.alignmentOther || (!!current && !known);
+  return {
+    isOther: other,
+    otherValue: other ? current : "",
+    otherKey: ALIGNMENT_OTHER,
+    options: [
+      { value: ALIGNMENT_NONE, label: t("step.details.alignmentNone"), selected: !other && !current },
+      ...options.map(o => ({ value: o.label, label: o.label, selected: !other && (o.label === current) })),
+      { value: ALIGNMENT_OTHER, label: t("step.details.alignmentOther"), selected: other }
+    ]
+  };
+}
 
 export const detailsStep = {
   id: "details",
@@ -53,6 +94,15 @@ export const detailsStep = {
       case "detail": {
         const field = el.dataset.detail;
         if ( field && (field in state.details) ) state.details[field] = el.value;
+        return;
+      }
+      // The alignment list. Picking "Other" clears the stored value and re-renders to reveal the
+      // free-text box (which then writes through the plain `detail` case above like any other
+      // field); picking a real alignment stores its label and puts the list back.
+      case "alignment": {
+        const picked = el.value;
+        state.alignmentOther = picked === ALIGNMENT_OTHER;
+        state.details.alignment = state.alignmentOther ? "" : picked;
         return;
       }
       // Toggle the random-name options popover (pool + style). These are an optional extra,
@@ -123,7 +173,7 @@ export const detailsStep = {
     }
   },
 
-  context({ state, source }) {
+  async context({ state, source }) {
     const d = state.details;
     const field = key => ({
       key,
@@ -156,6 +206,11 @@ export const detailsStep = {
         const rest = nameStyleOptions().map(o => ({ ...o, selected: state.nameStyle === o.key }));
         return [auto, ...rest];
       })(),
+      alignment: alignmentContext(state),
+      // Alignment is the only part of this step the rulebook really speaks to, so that is what the
+      // control opens. Null when the world has no book covering it, so it is hidden rather than dead.
+      rulesTopic: (await hasRulesPage("alignment", source.rulesOf(state.classUuid))) ? "alignment" : null,
+      rulesEdition: source.rulesOf(state.classUuid) ?? null,
       shortFields: DETAIL_FIELDS.map(field),
       gridTextFields: gridTextKeys.map(k => ({ ...field(k), rows: 3 })),
       wideTextFields: Object.entries(WIDE_TEXT_FIELDS).map(([k, rows]) => ({ ...field(k), rows })),

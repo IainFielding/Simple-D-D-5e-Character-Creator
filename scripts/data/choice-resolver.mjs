@@ -1,5 +1,5 @@
 import { t, log } from "../config.mjs";
-import { advancementArray } from "./advancement-util.mjs";
+import { advancementArray, appliesToClass } from "./advancement-util.mjs";
 import { matchesRules } from "./source-index.mjs";
 import { getEnabledPacks, isUsableItemPack } from "./compendium-util.mjs";
 import { toolCategoryKey, toolChoices } from "./tool-source.mjs";
@@ -356,7 +356,7 @@ function proficientSkillKeys(defs) {
     for ( const { item: owner } of d.owners ?? [] ) {
       for ( const adv of advancementArray(owner) ) {
         if ( adv.type !== "Trait" || (adv.level ?? 0) > 1 ) continue;
-        if ( adv.classRestriction === "secondary" || adv.configuration?.mode === "expertise" ) continue;
+        if ( !appliesToClass(adv, owner) || (adv.configuration?.mode === "expertise") ) continue;
         for ( const g of adv.configuration?.grants ?? [] ) if ( isProficiency(g) ) keys.add(g);
         const choices = Array.from(adv.configuration?.choices ?? []);
         for ( let ci = 0; ci < choices.length; ci++ ) {
@@ -393,7 +393,7 @@ async function decorateTraitIcons(options) {
 async function parseAdvancementChoice(adv, ctx) {
   const { source, ownerUuid, sel, reqs, expertiseSkillPool, crossTaken, spellAbilityHint, index, ownerItem, rules } = ctx;
   let level = adv.level ?? 0;
-  if ( level > 1 || adv.classRestriction === "secondary" ) return;
+  if ( level > 1 || !appliesToClass(adv, ownerItem) ) return;
 
   // Subclass: only reachable for a class that unlocks one at level ≤1 — the 2014-rules Cleric,
   // Sorcerer and Warlock. Under the 2024 rules every class takes its subclass at level 3, so this

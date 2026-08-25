@@ -28,5 +28,9 @@ test-e2e/config.mjs
 test-e2e/*.log
 test-e2e/*.jsonl
 test-e2e/*.html
+# The generated manifest of the above: `node baselines.mjs --write` says what each results
+# file on this machine is, and which one a fresh run should be diffed against. It describes
+# one working directory, and a fresh clone has nothing for it to describe.
+test-e2e/BASELINES.md
 # Dropped by shell.mjs and screenshots.mjs when a run fails — a picture of the broken world.
 test-e2e/failure.png

@@ -1,5 +1,6 @@
 import { MODULE_ID, t, fireHook } from "../config.mjs";
-import { sourceDetails } from "./source-details.mjs";
+import { sourceDetails, rulesDetails } from "./source-details.mjs";
+import { rulesPageFor } from "../data/rules-source.mjs";
 
 const { ApplicationV2, HandlebarsApplicationMixin, DialogV2 } = foundry.applications.api;
 
@@ -41,6 +42,9 @@ export const SHELL_ACTIONS = {
   finish(event, target) { return this._finish(target); },
   cancel() { this.close(); },
   openSourceDetails(event, target) { return this._openSourceDetails(target.dataset.uuid); },
+  openRulesDetails(event, target) {
+    return this._openRulesDetails(target.dataset.topic, target.dataset.edition || null);
+  },
   closeSourceDetails() { this._closeSourceDetails(); }
 };
 
@@ -369,6 +373,28 @@ export class CreatorShellBase extends HandlebarsApplicationMixin(ApplicationV2) 
     const details = item ? await sourceDetails(item) : null;
     if ( !details ) {
       ui.notifications?.info(t("common.sourceDetails.none"));
+      return;
+    }
+    this._sourceDetails = details;
+    this.render();
+  }
+
+  /**
+   * Open the rulebook's own page for a topic over the current step — the "Read the rules" control a
+   * step shows when the world has a book covering what it is asking about.
+   *
+   * Shares the overlay (and its Escape handling) with {@link _openSourceDetails}: to a player these
+   * are one feature, and only the source of the page differs — an item's own class page there, a
+   * chapter of the rulebook here. See {@link module:data/rules-source} for the topic map.
+   * @param {string} topic                  One of `RULE_TOPICS`.
+   * @param {"2014"|"2024"|null} edition    The character's rules edition.
+   */
+  async _openRulesDetails(topic, edition) {
+    if ( !topic ) return;
+    const page = await rulesPageFor(topic, edition);
+    const details = page ? await rulesDetails(page) : null;
+    if ( !details ) {
+      ui.notifications?.info(t("common.rulesDetails.none"));
       return;
     }
     this._sourceDetails = details;

@@ -40,6 +40,8 @@ That's the whole trick. Everything below is just detail for when you want it.
 
 Each step is a single, focused screen: pick an option from the list, read about it, and move on. A progress rail down the side shows where you are and ticks off each step as you complete it.
 
+Want the actual rule rather than our summary? A **Read the Rules** button on the Class, Species, Background and Details screens opens that step's own page from the rulebook you already own — the Player's Handbook if you have it, the free rules otherwise — in the same reader the "Full Details" button uses. It follows your character's edition, so a 2014 build gets the 2014 chapters. No book installed for it? The button simply doesn't appear.
+
 ![Choosing a class](docs/screenshots/class-step.png)
 *Screenshot: choosing a class.*
 
@@ -175,34 +177,46 @@ The creator works great straight out of the box, but a handful of settings let y
 
 ### Core settings
 
+These sit directly in the module's settings list.
+
 - **Module mode.** Choose what the module owns: **Creation only**, **Creation + Level-Up** (the default), or **Level-Up only**, which hides the creator and keeps just the guided level-up flow.
 - **Display mode.** Open the creator **fullscreen** for an immersive, distraction-free build, or in a **draggable, resizable window** if you like to keep an eye on the rest of your screen.
 - **Show launch button.** Show or hide the "Simple Character Builder" button in the Actors sidebar.
-- **Show Level Up button.** Show or hide the Level Up button on the character sheet header.
-- **Show Level Up in right-click menu.** Show or hide the right-click "Level Up" entry on characters in the sidebar.
+- **Post a character summary to chat.** A card with the character's portrait, class and level, species, background, the six ability scores, hit points and armour class. It appears once the character is genuinely finished — if the player is starting above 1st level, the card waits until they've climbed to the level they asked for, so it shows the hero they actually made. Choose **Post to everyone**, **Whisper to the GM**, or **Don't post**.
 - **Debug logging.** Off by default, and set per person rather than for the whole world — it only affects your own browser console. Turn it on if you've been asked for details about a problem, then reproduce it and share what the console prints.
 
-### Ability scores
+> In an Ember world the creation card isn't posted. Ember finishes the character after this module's part is done, so announcing it here would be jumping the gun — level-up cards work as normal.
+
+Everything else lives behind one of three buttons in that same list: **House Rules**, **Level-Up Options**, and **Store**.
+
+### House Rules
+
+The **Configure House Rules** button holds what a player is allowed to build.
 
 - **Point-buy budget.** Change how many points players get when building stats (the standard rules use 27).
 - **Ability roll formula.** Set the dice rolled for each ability (the standard rules use `4d6kh3`, four d6 keeping the highest three).
-
-### Level-up options
-
 - **Multiclassing.** Off by default. When enabled, players can add a whole new class from the level-up flow. Choose whether the standard ability prerequisites (13+ in the primary ability of both classes) are enforced or waived.
+- **Alignments.** Tick any alignment you don't want at your table and it disappears from the Details step. Characters already using it keep it, and players can still write their own with the **Other…** option.
+
+### Level-Up Options
+
+The **Configure Level-Up** button holds everything about levelling.
+
+**Starting a level-up** — where the button appears:
+
+- **Show Level Up button** on the character sheet header.
+- **Show Level Up in sheet menu**, the ⋯ menu in the sheet's header.
+- **Show Level Up in right-click menu** on characters in the Actors sidebar.
+
+**Hit points:**
+
 - **Level-up hit points.** Decide what HP options players see: **Player's choice** (average, max, roll, or manual), **Average or roll** (matching the written rules), or **Average only** (applied automatically).
 - **Post hit-die rolls to chat.** When a player rolls for HP, share the result with the whole table.
 
-### Chat summaries
+**Announcements:**
 
-Every finished character and every applied level-up can announce itself in chat, so the rest of the table sees what happened without anyone having to say it.
-
-- **Post a character summary to chat.** A card with the character's portrait, class and level, species, background, the six ability scores, hit points and armour class. It appears once the character is genuinely finished — if the player is starting above 1st level, the card waits until they've climbed to the level they asked for, so it shows the hero they actually made.
 - **Post a level-up summary to chat.** A card with what the level brought: the class levels gained, hit points, proficiency bonus, any change to spell slots, a new subclass, and lists of the new features and spells.
-
-Each has three settings: **Post to everyone**, **Whisper to the GM** (handy if you'd rather review characters quietly than broadcast them), or **Don't post**. Both are set to post to everyone by default.
-
-> In an Ember world the creation card isn't posted. Ember finishes the character after this module's part is done, so announcing it here would be jumping the gun — level-up cards work as normal.
+- **Announce when a character can level up.** When a character earns enough XP for the next level, a card with a **Level Up** button is whispered to the GM — or to the GM *and* the player, if you'd rather they didn't have to wait to be noticed. Off, GM-only (the default), or both. Only applies in worlds that level by XP, and it fires once per threshold rather than nagging.
 
 ### The Starting-Gold Store
 

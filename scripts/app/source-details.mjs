@@ -58,6 +58,35 @@ export async function sourceDetails(item) {
 }
 
 /**
+ * Build the overlay payload for a plain rulebook page (see {@link module:data/rules-source}).
+ *
+ * Unlike a class or subclass page, these carry no dnd5e view template — they are ordinary text
+ * pages — so the body is the page's own enriched content rather than a rendered sheet. Everything
+ * else (the wrapper classes that let the book's stylesheet reach it, the overlay shape) is shared
+ * with {@link sourceDetails}, so the two open into the same overlay and look like one feature.
+ * @param {JournalEntryPage} page
+ * @returns {Promise<{name: string, img: string, pageName: string, html: string, fallback: boolean}|null>}
+ *   `null` when the page has no content worth showing.
+ */
+export async function rulesDetails(page) {
+  if ( !page ) return null;
+  const html = await enrich(page.text?.content ?? "", page);
+  if ( !html ) return null;
+
+  return {
+    // The book's own name heads the overlay — the page name alone ("Step 1: Choose a Class") reads
+    // as one of our own step labels rather than as something quoted from a rulebook.
+    name: page.parent?.name ?? page.name ?? "",
+    img: "icons/svg/book.svg",
+    pageName: page.name ?? "",
+    pageType: page.type ?? "",
+    bodyClasses: bodyClasses(page),
+    html,
+    fallback: false
+  };
+}
+
+/**
  * The class list the rendered page needs on its wrapper for the system's and the content package's
  * stylesheets to reach it.
  *

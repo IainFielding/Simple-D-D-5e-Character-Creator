@@ -5,7 +5,7 @@
   "version": "#{VERSION}#",
   "compatibility": {
     "minimum": "14.359",
-    "verified": "14.366"
+    "verified": "14.367"
   },
   "authors": [
     {
@@ -27,7 +27,7 @@
         "id": "dnd5e",
         "type": "system",
         "compatibility": {
-          "minimum": "5.3.3",
+          "minimum": "5.3.0",
           "verified": "5.3.3"
         }
       }
