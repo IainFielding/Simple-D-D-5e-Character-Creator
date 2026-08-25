@@ -8,6 +8,7 @@ import { hasSourcePage } from "../data/journal-source.mjs";
 import { hasRulesPage } from "../data/rules-source.mjs";
 import { applyQuickBuild } from "../data/quick-build.mjs";
 import { t, log, levelUpEnabled } from "../config.mjs";
+import { pinContext } from "../app/compare.mjs";
 import { matchesRules } from "../data/source-index.mjs";
 
 /**
@@ -127,6 +128,11 @@ export const classStep = {
       // build the mixed-edition character the scoping exists to prevent. Only genuinely
       // incompatible picks are dropped, so switching *within* an edition costs the player nothing.
       dropOffEditionOrigins(state, source);
+      // Origins pinned for comparison were pinned against the *previous* class's edition-scoped
+      // grid, so after a switch some of them may no longer be on offer at all. Dropping them keeps
+      // the comparison honest: it can only ever hold options the player could actually choose.
+      app?.pins?.clear("species");
+      app?.pins?.clear("background");
       // Refresh the cached choice requirements so the Choices step's completion gate
       // reflects the new class even before it is visited.
       state.choiceCache = await resolveChoices(state, source);
@@ -135,13 +141,15 @@ export const classStep = {
     }
   },
 
-  async context({ state, source }) {
+  async context({ state, source, app }) {
     const selected = state.classUuid;
     const detail = selected ? await source.detail(selected) : null;
     const groups = selected ? await source.advancementGroups(selected) : null;
     const cards = source.classes().map(c => ({ ...c, selected: c.uuid === selected }));
     return {
-      cards,
+      // Opts the grid into side-by-side comparison: pin-decorated cards, plus the toolbar's
+      // compare control. Inert without a shell, so the step still renders in tests.
+      ...pinContext(app?.pins, "class", cards),
       count: cards.length,
       hasSelection: !!selected,
       // Which step action a drawer card fires, so parts/work-picker.hbs stays step-agnostic.

@@ -1,0 +1,78 @@
+{{!--
+  The comparison grid: the options a player pinned in a picker, laid out as columns over the stage.
+
+  It is a *transpose of the detail pane*, not a new kind of page. Every cell here is something
+  parts/work-detail.hbs already shows one option at a time — the traits, the granted features and
+  spells, the provenance — turned ninety degrees so two to four of them can be read at once. That is
+  why the item cells reuse the same `.creator-grant` markup and the same rich item tooltip: a
+  feature must look the same whether you met it on the option's own page or in this grid.
+
+  One CSS grid rather than a table, because the row labels have to stick to the left edge and the
+  column heads to the top while the middle scrolls both ways, and a table cannot do both without
+  fighting its own layout algorithm. `gridStyle` carries the column count as a custom property so
+  two, three and four columns need no separate rule.
+
+  Data from app/compare.mjs buildCompare(): `columns` (uuid/name/img/source), `rows` (each with a
+  label, an icon, and one cell per column), and the title.
+--}}
+<div class="creator-compare" role="dialog" aria-modal="true" aria-label="{{title}}" tabindex="-1">
+  <header class="creator-compare-head">
+    <i class="fa-solid fa-scale-balanced" aria-hidden="true"></i>
+    <h2>{{title}}</h2>
+    <button type="button" class="creator-btn creator-btn-ghost creator-compare-close"
+            data-action="closeCompare">
+      <i class="fa-solid fa-xmark"></i>
+      {{localize "sogrom-dnd5e-character-creator.common.close"}}
+    </button>
+  </header>
+
+  <div class="creator-compare-body">
+    <div class="creator-compare-grid" style="{{gridStyle}}">
+      {{!-- The corner cell. Empty by design: it sits above the row labels and beside the column
+            heads, and anything written in it would be read as a heading for both. --}}
+      <div class="creator-compare-corner" aria-hidden="true"></div>
+
+      {{#each columns}}
+      <div class="creator-compare-col">
+        <img class="creator-compare-col-img" src="{{img}}" alt="">
+        <div class="creator-compare-col-title">
+          <span class="creator-compare-col-name">{{name}}</span>
+          {{!-- The book, under the name. With both editions of a book enabled the names are
+                identical, so this is the only thing distinguishing two adjacent columns. --}}
+          {{#if source}}<span class="creator-compare-col-source">{{source}}</span>{{/if}}
+        </div>
+        <button type="button" class="creator-compare-drop"
+                data-action="unpinCompare" data-category="{{../category}}" data-uuid="{{uuid}}"
+                data-tooltip="{{localize "sogrom-dnd5e-character-creator.compare.unpin"}}"
+                aria-label="{{localize "sogrom-dnd5e-character-creator.compare.unpin"}}">
+          <i class="fa-solid fa-xmark" aria-hidden="true"></i>
+        </button>
+      </div>
+      {{/each}}
+
+      {{#each rows}}
+      <div class="creator-compare-label">
+        <i class="{{icon}}" aria-hidden="true"></i>
+        <span>{{label}}</span>
+      </div>
+      {{#each cells}}
+      <div class="creator-compare-cell">
+        {{#if items}}
+        <div class="creator-grant-list">
+          {{#each items}}
+          <div class="creator-grant">
+            <img class="creator-grant-icon" src="{{img}}" alt="">
+            <a class="content-link" data-uuid="{{uuid}}" data-link data-tooltip="{{ccItemTooltip uuid}}">{{name}}</a>
+            {{#if level}}<span class="creator-grant-tag">{{localize "sogrom-dnd5e-character-creator.step.class.levelTag" level=level}}</span>{{/if}}
+          </div>
+          {{/each}}
+        </div>
+        {{else}}
+        <span class="creator-compare-text">{{text}}</span>
+        {{/if}}
+      </div>
+      {{/each}}
+      {{/each}}
+    </div>
+  </div>
+</div>

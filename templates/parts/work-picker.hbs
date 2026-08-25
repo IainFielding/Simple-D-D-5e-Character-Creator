@@ -13,9 +13,10 @@
   from `state.pickerFor` — see #drawerOpen() in creator-shell.mjs — so it needs no reset on
   navigation.
 
-  Reads from the step context: `cards` (each with uuid/name/img/selected), `count`, `pickAction`
-  (which step action a card fires), and optionally `abilityOptions` for the background step's
-  increased-ability filter.
+  Reads from the step context: `cards` (each with uuid/name/img/selected, and `pinned` where the
+  step opted into comparison), `count`, `pickAction` (which step action a card fires), optionally
+  `abilityOptions` for the background step's increased-ability filter, and `compareCategory` /
+  `compare` from pinContext() — see app/compare.mjs.
 --}}
 {{!-- The id is what the switcher's aria-controls points at. Only one drawer is ever in the DOM
       at a time (one pick step is active), so a fixed id is safe. --}}
@@ -54,6 +55,21 @@
           aria-live="polite" aria-atomic="true"
     >{{localize "sogrom-dnd5e-character-creator.common.available"}}: {{count}}</span>
 
+    {{!-- Compare: the way out of "pick one, read it, pick the other, read that, and hold the first
+          in your head". Disabled rather than hidden below two pins, because the button is also
+          where a player learns the pins on the rows do something — hiding it until they had already
+          worked that out would be the wrong way round. Its label carries the count, and both label
+          and tooltip are patched in place as pins change (see _togglePin) so pinning never costs a
+          re-render of this grid or the search text in the field above. --}}
+    {{#if compare}}
+    <button type="button" class="creator-btn creator-btn-ghost creator-compare-btn"
+            data-action="openCompare" data-category="{{compare.category}}"
+            data-tooltip="{{compare.hint}}" {{#unless compare.canCompare}}disabled{{/unless}}>
+      <i class="fa-solid fa-scale-balanced"></i>
+      <span class="creator-compare-btn-label">{{compare.label}}</span>
+    </button>
+    {{/if}}
+
     {{!-- Only offered once there is something to go back to. With nothing chosen the drawer is
           the step, and a close button would be a control that does nothing. --}}
     {{#if hasSelection}}
@@ -79,6 +95,19 @@
         {{#if rules}}<span class="creator-pickrow-rules">{{rules}}</span>{{/if}}
         {{#if selected}}<i class="creator-pickrow-tick fa-solid fa-check"></i>{{/if}}
       </button>
+      {{!-- The pin, as a *sibling* of the row rather than inside it: the row is itself a button, and
+            a button inside a button is invalid markup that browsers silently unnest, which would
+            leave the pin firing the pick. Pinning is not choosing — a player weighing two subclasses
+            must be able to mark both without either becoming their answer. --}}
+      {{#if ../compareCategory}}
+      <button type="button" class="creator-pin {{#if pinned}}is-pinned{{/if}}"
+              data-action="togglePin" data-category="{{../compareCategory}}" data-uuid="{{uuid}}"
+              aria-pressed="{{#if pinned}}true{{else}}false{{/if}}"
+              data-tooltip="{{#if pinned}}{{localize "sogrom-dnd5e-character-creator.compare.unpin"}}{{else}}{{localize "sogrom-dnd5e-character-creator.compare.pin"}}{{/if}}"
+              aria-label="{{localize "sogrom-dnd5e-character-creator.compare.pinAria" name=name}}">
+        <i class="fa-solid fa-scale-balanced" aria-hidden="true"></i>
+      </button>
+      {{/if}}
     </li>
     {{else}}
     <p class="creator-empty">{{localize "sogrom-dnd5e-character-creator.common.noEntries"}}</p>

@@ -52,6 +52,9 @@ Hooks.once("init", () => {
     tpl("parts/abilities-panel.hbs"),
     tpl("parts/origin-abilities.hbs"),
     tpl("parts/source-details.hbs"),
+    // The comparison grid is included by stage.hbs alongside the book-page overlay, so it is a
+    // partial for the same reason that one is: the stage is loaded as a PART, its includes are not.
+    tpl("parts/compare.hbs"),
     tpl("parts/rules-link.hbs"),
     // The chat cards themselves are rendered on demand rather than loaded as PARTS, but the
     // partial they include still has to be registered up front — a partial is resolved at render

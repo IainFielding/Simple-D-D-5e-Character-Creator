@@ -187,6 +187,9 @@ export class CreatorShell extends CreatorShellBase {
       loadingLabel: this.#loadingLabel ?? t("loading.indexing"),
       // The source-book overlay, when one is open — window chrome over the stage, not step data.
       sourceDetails: this._sourceDetails,
+      // The comparison grid, likewise. Both are the shell's, not the step's: the step supplies the
+      // options, the shell decides what is covering them.
+      compare: this._compare,
       version: game.modules.get(MODULE_ID)?.version ?? "",
       cancelLabel: t("nav.cancel"),
       dossier: this.#dossierContext(lines),
@@ -254,7 +257,7 @@ export class CreatorShell extends CreatorShellBase {
     if ( !this._stageRendered(options) ) return;
     // Selects/inputs don't fire click "actions"; wire their change events to the dispatcher.
     this._wireStepChanges(root);
-    this._wireSourceDetails(root);
+    this._wireOverlays(root);
     this.#wireDragDrop(root);
     // Client-side filtering — no re-render, so the field keeps focus while typing. The spell steps
     // add level/school dropdowns; when present, search + dropdowns drive the combined spell filter,

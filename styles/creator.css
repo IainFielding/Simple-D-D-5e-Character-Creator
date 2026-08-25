@@ -4651,6 +4651,169 @@ body:has(.sogrom-creator-fullscreen) .application.compendium-browser {
 .creator-source-details-btn { margin-left: auto; padding: 0.35rem 0.7rem; font-size: 0.85rem; }
 .creator-quick-build-btn + .creator-source-details-btn { margin-left: 0.5rem; }
 
+/* --- Pinning, and the side-by-side comparison ---
+   The gap Quick Build does not close. Quick Build decides *for* a player who does not want to;
+   this is for the player who knows exactly what they are choosing between and cannot see both at
+   once, because every picker in here shows one detail page at a time by design.
+
+   Two pieces of UI. The pin is a per-row toggle that must never be mistaken for the pick, and the
+   grid is a full-surface overlay sharing the stage-body slot with the book page. */
+
+/* The pin sits beside the row, not inside it — the row is itself a button (see work-picker.hbs) —
+   so the <li> becomes the flex line and the row takes the slack. Scoped to lists that actually
+   have a pin, so every other pick-list is untouched. */
+.creator-picklist li:has(> .creator-pin),
+.creator-drawer-grid > li:has(> .creator-pin) { display: flex; align-items: stretch; }
+.creator-picklist li:has(> .creator-pin) > .creator-pickrow,
+.creator-drawer-grid > li:has(> .creator-pin) > .creator-pickrow { flex: 1 1 auto; min-width: 0; }
+/* Deliberately quiet until used. An always-lit control on every row of an eighty-row list would
+   compete with the selection tab, which is the only thing on a row that should read as loud.
+   It brightens on hover of its own row, and stays gold once pinned. */
+.creator-pin {
+  flex: 0 0 auto;
+  width: 2.25rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  background: transparent;
+  border: 0;
+  border-bottom: 1px solid rgba(42, 40, 54, 0.55);
+  border-radius: 0;
+  color: var(--cc-text-faint);
+  font-size: 0.8rem;
+  cursor: pointer;
+  box-shadow: none;
+  transition: color 0.18s var(--cc-ease), background 0.18s var(--cc-ease);
+}
+.creator-drawer .creator-drawer-grid .creator-pin { border-bottom: 0; }
+.creator-picklist li:hover > .creator-pin,
+.creator-drawer-grid > li:hover > .creator-pin { color: var(--cc-muted); }
+.creator-pin:hover { color: var(--cc-gold-bright); background: rgba(255, 255, 255, 0.04); }
+.creator-pin.is-pinned { color: var(--cc-gold); }
+.creator-pin.is-pinned:hover { color: var(--cc-gold-bright); }
+
+/* The control that opens the grid, in the drawer head and the level-up toolbar. Disabled rather
+   than hidden below two pins — it is also where a player learns the pins do something. */
+.creator-compare-btn { padding: 0.35rem 0.7rem; font-size: 0.85rem; }
+.creator-compare-btn:disabled { opacity: 0.45; cursor: default; }
+
+/* The overlay itself. Same frame as the book page next door, and for the same reasons: absolute
+   and opaque over the stage body, because a translucent panel would leave the picker underneath
+   competing for the same pixels. */
+.creator-compare {
+  position: absolute;
+  inset: 0;
+  z-index: 6;
+  display: flex;
+  flex-direction: column;
+  background: var(--cc-bg, var(--cc-sunk));
+}
+.creator-compare-head {
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  gap: 0.85rem;
+  padding: 0.85rem 1.6rem;
+  border-bottom: 1px solid var(--cc-line);
+}
+.creator-compare-head > i { color: var(--cc-gold); }
+.creator-compare-head h2 { margin: 0; font-size: 1.15rem; line-height: 1.2; }
+.creator-compare-close { margin-left: auto; padding: 0.35rem 0.7rem; font-size: 0.85rem; }
+/* The only scroll container, and it scrolls both ways: four columns of feature lists are wider
+   than a narrow window, and the sticky label column below is what keeps that readable. */
+.creator-compare-body {
+  flex: 1 1 0;
+  min-height: 0;
+  overflow: auto;
+}
+
+/* One grid rather than a table. A table cannot hold its first column and its header row still
+   while the middle scrolls without fighting its own layout algorithm; grid + position:sticky can.
+   The column count arrives as --cc-compare-cols on the element, so two, three and four columns
+   need no rule of their own. */
+.creator-compare-grid {
+  display: grid;
+  grid-template-columns: minmax(10rem, 13rem) repeat(var(--cc-compare-cols, 2), minmax(14rem, 1fr));
+  align-items: stretch;
+  /* The seam between cells is a background showing through 1px gaps, the same trick the drawer
+     grid uses — so no cell needs to know whether it is the last in its row or column. */
+  gap: 1px;
+  background: var(--cc-line);
+  border-bottom: 1px solid var(--cc-line);
+}
+.creator-compare-grid > * { background: var(--cc-bg); }
+
+/* The column heads stay put while the rows scroll under them; the row labels stay put while the
+   columns scroll past. The corner does both, so it needs the higher z-index of the two. */
+.creator-compare-corner,
+.creator-compare-col { position: sticky; top: 0; z-index: 2; background: var(--cc-panel); }
+.creator-compare-corner { left: 0; z-index: 3; }
+.creator-compare-col {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  padding: 0.7rem 0.85rem;
+}
+.creator-compare-col-img {
+  flex: 0 0 34px;
+  width: 34px;
+  height: 34px;
+  border: 1px solid var(--cc-line-2);
+  border-radius: var(--cc-radius);
+  object-fit: cover;
+}
+.creator-compare-col-title { min-width: 0; display: flex; flex-direction: column; }
+.creator-compare-col-name { font-size: 0.95rem; line-height: 1.2; overflow-wrap: anywhere; }
+/* The book, under the name. With both editions enabled the names are identical and this is the
+   only thing telling two adjacent columns apart. */
+.creator-compare-col-source { font-size: 0.7rem; color: var(--cc-muted); overflow-wrap: anywhere; }
+.creator-compare-drop {
+  flex: 0 0 auto;
+  margin-left: auto;
+  padding: 0.2rem 0.35rem;
+  background: transparent;
+  border: 0;
+  border-radius: 0;
+  color: var(--cc-text-faint);
+  font-size: 0.75rem;
+  cursor: pointer;
+  box-shadow: none;
+}
+.creator-compare-drop:hover { color: var(--cc-danger); background: transparent; }
+
+.creator-compare-label {
+  position: sticky;
+  left: 0;
+  z-index: 1;
+  display: flex;
+  align-items: baseline;
+  gap: 0.5rem;
+  padding: 0.65rem 0.85rem;
+  background: var(--cc-panel-2);
+  color: var(--cc-bright);
+  font-size: 0.8rem;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+.creator-compare-label > i { color: var(--cc-muted); font-size: 0.75rem; }
+.creator-compare-cell {
+  padding: 0.65rem 0.85rem;
+  font-size: 0.88rem;
+  line-height: 1.45;
+  overflow-wrap: anywhere;
+}
+.creator-compare-text { color: var(--cc-text); }
+/* Granted items reuse the detail pane's own markup, so a feature looks the same wherever it is
+   met. Only the multi-column flow has to go: `.creator-grant-list` is laid out in 22rem columns
+   for a full-width page, which inside a 14rem cell collapses to one very cramped one. */
+.creator-compare-cell .creator-grant-list { columns: auto; column-rule: none; }
+.creator-compare-cell .creator-grant { margin-bottom: 0.4rem; gap: 0.4rem; }
+.creator-compare-cell .creator-grant-icon { flex: 0 0 20px; width: 20px; height: 20px; }
+/* While the grid is open the picker underneath must not scroll behind it — only the overlay does.
+   Same rule as the book page, and it has to name this overlay too or the `:has()` misses. */
+.creator-stage-body:has(> .creator-compare) { overflow: hidden; padding: 0; }
+
 /* ==========================================================================
    Chat summary cards
    --------------------------------------------------------------------------

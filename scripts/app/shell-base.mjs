@@ -1,5 +1,6 @@
 import { MODULE_ID, t, fireHook } from "../config.mjs";
 import { sourceDetails, rulesDetails } from "./source-details.mjs";
+import { buildCompare, MAX_PINS, PinSet } from "./compare.mjs";
 import { rulesPageFor } from "../data/rules-source.mjs";
 
 const { ApplicationV2, HandlebarsApplicationMixin, DialogV2 } = foundry.applications.api;
@@ -45,7 +46,11 @@ export const SHELL_ACTIONS = {
   openRulesDetails(event, target) {
     return this._openRulesDetails(target.dataset.topic, target.dataset.edition || null);
   },
-  closeSourceDetails() { this._closeSourceDetails(); }
+  closeSourceDetails() { this._closeSourceDetails(); },
+  togglePin(event, target) { this._togglePin(target); },
+  openCompare(event, target) { return this._openCompare(target.dataset.category); },
+  unpinCompare(event, target) { return this._unpinCompare(target.dataset.category, target.dataset.uuid); },
+  closeCompare() { this._closeCompare(); }
 };
 
 /**
@@ -235,6 +240,9 @@ export class CreatorShellBase extends HandlebarsApplicationMixin(ApplicationV2) 
   _leaveStepFor(index) {
     const from = this._stepIndex;
     this._sourceDetails = null;
+    // Same reasoning for the comparison grid: it belongs to the picker that opened it, and the
+    // footer sits outside the surface it covers.
+    this._compare = null;
     this._stepIndex = index;
     // Announce after the index has moved but before the render, so a listener reading the shell
     // sees the step it is being told about rather than the one being left.
@@ -376,6 +384,8 @@ export class CreatorShellBase extends HandlebarsApplicationMixin(ApplicationV2) 
       return;
     }
     this._sourceDetails = details;
+    // One overlay at a time — see {@link CreatorShellBase#_openCompare} for the other half.
+    this._compare = null;
     this.render();
   }
 
@@ -398,6 +408,8 @@ export class CreatorShellBase extends HandlebarsApplicationMixin(ApplicationV2) 
       return;
     }
     this._sourceDetails = details;
+    // One overlay at a time — see {@link CreatorShellBase#_openCompare} for the other half.
+    this._compare = null;
     this.render();
   }
 
@@ -408,21 +420,123 @@ export class CreatorShellBase extends HandlebarsApplicationMixin(ApplicationV2) 
   }
 
   /**
-   * Wire the overlay's keyboard dismissal. Called from each shell's `_onRender`; Escape is the
+   * Wire an open overlay's keyboard dismissal. Called from each shell's `_onRender`; Escape is the
    * expected way out of anything covering the screen, and without it the only exit is the button.
+   *
+   * Both overlays — the book page and the comparison grid — are handled here because they are the
+   * same interaction: one absolute surface over the stage body, closed by its own button or by
+   * Escape. Only one can be open at a time (opening either clears the other), so the first match
+   * wins and there is never a contest over the key.
    * @param {HTMLElement} root
    */
-  _wireSourceDetails(root) {
-    const overlay = root.querySelector(".creator-source-details");
-    if ( !overlay ) return;
-    overlay.addEventListener("keydown", ev => {
-      if ( ev.key !== "Escape" ) return;
-      ev.preventDefault();
-      ev.stopPropagation();
-      this._closeSourceDetails();
-    });
-    // Take focus so Escape reaches the handler above without the player clicking first.
-    overlay.querySelector(".creator-source-details-close")?.focus();
+  _wireOverlays(root) {
+    const overlays = [
+      [".creator-source-details", ".creator-source-details-close", () => this._closeSourceDetails()],
+      [".creator-compare", ".creator-compare-close", () => this._closeCompare()]
+    ];
+    for ( const [selector, closer, close] of overlays ) {
+      const overlay = root.querySelector(selector);
+      if ( !overlay ) continue;
+      overlay.addEventListener("keydown", ev => {
+        if ( ev.key !== "Escape" ) return;
+        ev.preventDefault();
+        ev.stopPropagation();
+        close();
+      });
+      // Take focus so Escape reaches the handler above without the player clicking first.
+      overlay.querySelector(closer)?.focus();
+      return;
+    }
+  }
+
+  /* -------------------------------------------- */
+  /*  Comparison                                  */
+  /* -------------------------------------------- */
+
+  /**
+   * The options pinned for comparison in this window, per pick category. Session-scoped and never
+   * written anywhere — see {@link module:app/compare}.
+   * @type {PinSet}
+   */
+  pins = new PinSet();
+
+  /**
+   * The comparison grid currently open over the stage, or null. Read into both shells' contexts,
+   * where `templates/stage.hbs` renders it as a full-surface overlay beside the book page.
+   * @type {?object}
+   */
+  _compare = null;
+
+  /**
+   * Pin or unpin one option, without a re-render.
+   *
+   * Deliberately hand-patched rather than rendered. Pinning happens inside the picker drawer, where
+   * a re-render would rebuild several dozen compendium icons and — worse — discard whatever the
+   * player has typed into the search box, which is very often how they found the second thing they
+   * want to compare. Two elements change: the row's own button, and the toolbar's compare control.
+   * @param {HTMLElement} target   The pin button that was clicked.
+   */
+  _togglePin(target) {
+    const { category, uuid } = target.dataset;
+    const outcome = this.pins.toggle(category, uuid);
+    if ( outcome === "invalid" ) return;
+    if ( outcome === "full" ) {
+      ui.notifications?.warn(t("compare.full", { max: MAX_PINS }));
+      return;
+    }
+    const pinned = outcome === "added";
+    target.classList.toggle("is-pinned", pinned);
+    target.setAttribute("aria-pressed", String(pinned));
+    target.dataset.tooltip = t(pinned ? "compare.unpin" : "compare.pin");
+
+    const control = this.element.querySelector(`[data-action="openCompare"][data-category="${category}"]`);
+    if ( !control ) return;
+    const count = this.pins.count(category);
+    const canCompare = this.pins.canCompare(category);
+    control.disabled = !canCompare;
+    control.dataset.tooltip = canCompare ? t("compare.tooltip") : t("compare.needTwo");
+    const label = control.querySelector(".creator-compare-btn-label");
+    if ( label ) label.textContent = count ? t("compare.openCount", { count }) : t("compare.open");
+  }
+
+  /**
+   * Open the comparison grid for a category over the current step.
+   *
+   * Nothing is pinned to it: the grid is built from the pins as they stand at the moment it opens,
+   * so unpinning a column inside it rebuilds rather than mutating what is on screen.
+   * @param {string} category   One of `COMPARE_CATEGORIES`.
+   */
+  async _openCompare(category) {
+    const compare = await buildCompare(category, this.pins.list(category), this._ctx().source);
+    if ( !compare ) {
+      // Reachable when pinned content has gone away since it was pinned (a module disabled
+      // mid-session), which leaves fewer than two resolvable columns.
+      ui.notifications?.info(t("compare.none"));
+      return;
+    }
+    // One overlay at a time: a book page opened from the detail pane underneath would otherwise
+    // still be sitting there when the grid is closed.
+    this._sourceDetails = null;
+    this._compare = compare;
+    this.render();
+  }
+
+  /**
+   * Drop one column from the open comparison. The grid rebuilds, and closes itself once fewer than
+   * two columns are left — a one-column comparison is just the detail pane with extra steps.
+   * @param {string} category
+   * @param {string} uuid
+   */
+  async _unpinCompare(category, uuid) {
+    this.pins.toggle(category, uuid);
+    if ( this.pins.canCompare(category) ) return this._openCompare(category);
+    this._closeCompare();
+  }
+
+  /** Close the comparison and return to the picker underneath, pins intact. */
+  _closeCompare() {
+    this._compare = null;
+    this.render();
   }
 
   /**
