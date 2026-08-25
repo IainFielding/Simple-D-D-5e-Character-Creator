@@ -26,7 +26,9 @@
  *   • Per-item repeats. `flags.dnd5e.riders` on nine items is one cause, not nine.
  */
 
-import { readFileSync, writeFileSync, existsSync } from "node:fs";
+import { writeFileSync, existsSync } from "node:fs";
+
+import { describeMeta, readResults } from "./lib/provenance.mjs";
 
 const argv = process.argv.slice(2);
 const value = (name, fallback) => {
@@ -39,9 +41,10 @@ const outPath = new URL(value("out", "./sweep-report.html"), import.meta.url);
 
 if ( !existsSync(inPath) ) throw new Error(`no results at ${inPath.pathname} — run \`node run.mjs --sweep\` first`);
 
-const reports = readFileSync(inPath, "utf8").split("\n").filter(Boolean).map((line, i) => {
-  try { return JSON.parse(line); } catch { throw new Error(`line ${i + 1} of the results file is not JSON`); }
-});
+// A results file opens with a `_meta` header describing the run (see `lib/provenance.mjs`); the
+// reader skips it and puts it in the report's footer, so a report saved next to its jsonl says
+// which run it is a report of. Files written before headers existed simply have none.
+const { meta, records: reports } = readResults(inPath);
 
 /* -------------------------------------------- */
 /*  Signatures                                   */
@@ -431,7 +434,8 @@ ${inFlight ? '<meta http-equiv="refresh" content="30">' : ""}
 
   <footer>${inFlight ? `IN PROGRESS — ${total} of ${expected}, this page refreshes every 30s · ` : ""}${total} subclass${total === 1 ? "" : "es"} ·
     ${Math.round(reports.reduce((n, r) => n + (r.ms ?? 0), 0) / 60000)} minutes of build time ·
-    generated ${new Date().toISOString().replace("T", " ").slice(0, 16)}</footer>
+    generated ${new Date().toISOString().replace("T", " ").slice(0, 16)}
+    ${meta ? `<br>run: ${esc(describeMeta(meta))}` : ""}</footer>
 </div></div>
 `;
 

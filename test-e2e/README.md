@@ -368,6 +368,7 @@ node run.mjs --sweep --shard 1/20     # every 20th, for a smoke test
 node run.mjs --sweep --only artificer # substring match on the id, for chasing one finding
 node run.mjs --sweep --resume         # skip what is already recorded
 node run.mjs --sweep --plan           # list what it would run, and what it skips
+node run.mjs --sweep --fresh          # start over an unarchived sweep-results.jsonl
 ```
 
 Origins are the same Human/Sage the scenarios above use, so anything they contribute is already
@@ -449,6 +450,62 @@ Which resolves the Artificer three ways, deliberately:
 
 The 2014-vs-2024 split is the point of tier 2, and it is not cosmetic: 38 of the 122 scenarios now
 build on `dnd5e.classes` — Tasha's 26 non-Artificer subclasses plus the twelve 2014 SRD ones.
+
+## Baselines: what a results file is
+
+A sweep writes `sweep-results.jsonl`, and the way it gets used is that somebody renames it —
+`sweep-results-final-2.4.0.jsonl`, `sweep-results-preaudit-1002.jsonl` — and diffs the next run
+against it with `compare-baseline.mjs`. That makes the results files the most valuable thing the
+harness produces. It also made them the least legible: two dozen of them, 2 MB each, gitignored
+because they quote paid-pack text, named by whoever was chasing something that afternoon, and
+carrying not one field that says what run produced them.
+
+That was survivable while every run meant the same thing. It stopped being survivable when
+`--sweep` changed its default from a single jump to one level at a time, because the older files
+became non-comparable with the newer ones while looking exactly the same from the outside. A diff
+across that boundary reports the change of default as a pile of regressions.
+
+So a run now opens its results file with a header line describing itself:
+
+```json
+{"_meta":{"kind":"sweep","startedAt":"2026-08-25T16:04:11.298Z","mode":"incremental","level":20,
+          "axis":"subclass","world":"playwright","scenarios":122,"shard":null,
+          "versions":{"foundry":"14.367","system":"dnd5e 5.3.3","module":"2.4.0"},
+          "git":{"branch":"14367_Tests","sha":"e9cb5dc","dirty":true}}}
+```
+
+It lives inside the jsonl rather than in a sidecar, because archiving a baseline is a rename and a
+rename leaves a sidecar behind. It carries no `id`, which is what every reader keys on, so files
+written before it existed stay exactly as readable as they were. `compare-baseline.mjs` prints both
+headers and refuses to imply a match when the two runs are not comparable; `report.mjs` puts the
+header in the report footer.
+
+`node baselines.mjs` says what everything in the directory is:
+
+```bash
+node baselines.mjs              # print the manifest
+node baselines.mjs --write      # also write BASELINES.md (gitignored) next to the files
+node baselines.mjs --stale      # only the ones nothing should be diffed against
+```
+
+It is generated rather than hand-written for the reason the hand-written one never existed: a
+manifest kept by discipline goes stale on the first busy afternoon. Files with a header are reported
+from it. Older ones are read for their fingerprints — an incremental run leaves a per-level
+`levels.profile` on every scenario and a jump run leaves it empty; the axis is in the id prefix; the
+level is the deepest the profile reached — and everything recovered that way is marked `derived`,
+because a good guess about provenance is not provenance. Three flags matter:
+
+| Flag | Meaning |
+| --- | --- |
+| **spliced** | the file records some scenario twice, so it is two runs appended into one and cannot be read as a single baseline |
+| **jump** | recorded when `--sweep` meant a single jump; not comparable with anything recorded since, however similar the name |
+| **partial** | fewer scenarios than the axis has — a shard, or an abandoned run |
+
+Splicing was not a discipline failure: nothing ever truncated `sweep-results.jsonl`, `--resume` was
+the only thing that read it back, so a second run without `--resume` appended onto the first and the
+later records shadowed the earlier ones by id. Two files on disk are like this. A sweep now refuses
+to start on top of an existing results file and tells you the three ways out — archive it, resume
+it, or `--fresh` over it — rather than truncating something whose worth it cannot judge.
 
 ## The public hook and API surface: also an assertion
 

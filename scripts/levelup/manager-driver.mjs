@@ -57,10 +57,18 @@ export function asiFeatFilters(level) {
  * The real actor is never touched until {@link commit}; everything happens on the clone, so a
  * cancelled level-up rolls back for free by simply discarding this driver.
  *
- * Phase 1 supports level-ups whose only player decision is hit points: every other gained
- * advancement (granted features, scale values, fixed traits/size) applies automatically. The
- * synchronous {@link canDrive} gate ensures we only claim such level-ups; anything carrying an
- * ASI, subclass, or feature/trait *choice* is left to the native flow for now.
+ * Every decision a level-up raises is ours now: hit points, ability-score improvements (points or
+ * a feat), subclasses, feature/spell choices, choosable traits, optional grants (Tasha's), and a
+ * granted spell's casting ability — plus, on the headless path only, a choosable size. What the
+ * driver declines is spelled out in {@link canDrive}: reversals (a level-*down*, or modifying an
+ * earlier choice), a level-up that raises no class level, a brand-new class unless the world opts
+ * into multiclassing, and any advancement type {@link isStepSupported} does not recognise. Those
+ * fall through to the native wizard untouched.
+ *
+ * Two callers drive it: the interactive level-up wizard, answering the decision arrays as the
+ * player clicks; and character creation, answering the same arrays headlessly from a choice
+ * provider via {@link autoResolve} — through the very same apply methods, so the two paths cannot
+ * drift apart.
  *
  * ── For a junior dev: how to read this file ──
  * The system's AdvancementManager is a state machine with a private `steps` array and a private
@@ -69,8 +77,10 @@ export function asiFeatFilters(level) {
  *   canDrive / isStepSupported  – the GATE: can we handle this whole level-up? If not, bail out.
  *   prepare()                    – WALK every step: auto-apply the ones with no choice, and collect
  *                                  the ones that DO need a choice into the decision arrays (hpSteps,
- *                                  asiSteps, choiceSteps, traitSteps, subclassSteps, grantSteps).
+ *                                  asiSteps, choiceSteps, traitSteps, subclassSteps, grantSteps,
+ *                                  optionalGrantSteps, sizeSteps).
  *   the apply/reverse helpers    – when the player picks in the UI, apply it to the clone (reversible).
+ *   autoResolve()                – the same decisions, answered from a provider instead of the UI.
  *   commit()                     – write the finished clone onto the real actor.
  * "Synthesis" = choosing something (a subclass, a feat) can spawn NEW advancement steps mid-walk;
  * the code below detects those new items and folds their decisions in. Read prepare() first, then
@@ -1500,7 +1510,33 @@ export class LevelUpDriver {
    * `isAdvancement: true`, then fire the system's completion hook so other modules react exactly
    * as they would after a native level-up.
    *
-   * Two deliberate departures from the native code, both for Apply speed:
+   * ── This is a copy. Here is the original ──
+   * `AdvancementManager##complete` — `dnd5e/module/applications/advancement/advancement-manager.mjs`,
+   * around line 880 in **5.3.3**, the version this was ported from. `module.json` declares a wider
+   * floor than that (`minimum: 5.3.0`), so this has to hold for the oldest system it claims as well
+   * as the newest it is verified on.
+   *
+   * Everywhere else the driver merely *drives* the system: if dnd5e changes an advancement's
+   * `apply`, we call the changed one. This method is the exception — it reimplements system
+   * behaviour rather than calling it, and it is the last thing to run, on the real actor, after the
+   * clone is already correct. A dnd5e change here therefore does not break us loudly; it makes us
+   * quietly write a different actor than the native wizard would, on a path the equivalence harness
+   * only catches if a scenario happens to cover the difference. It is the single most valuable
+   * thing to re-read on a system upgrade.
+   *
+   * What to diff, in the order it bites:
+   *  1. **The create/update/delete partition** — which items land in which set, and the
+   *     `toDelete.findSplice` that spares an item the actor already has.
+   *  2. **Both hooks**: `dnd5e.preAdvancementManagerComplete` (cancellable, and its argument order
+   *     `manager, updates, toCreate, toUpdate, toDelete` is part of the contract other modules read)
+   *     and `dnd5e.advancementManagerComplete` after the writes.
+   *  3. **The write options** — `isAdvancement: true` on all four, `keepId: true` on the creates,
+   *     `diff: false, recursive: false` on the updates. These are what tell the system, and every
+   *     module listening, that this is advancement rather than an edit.
+   *  4. **The `Promise.all` ordering**, which the note at the end of this comment depends on.
+   *
+   * Two deliberate departures from the native code, both for Apply speed — and they are departures
+   * to re-justify rather than reapply if the original moves:
    *  - The native manager re-writes *every* item the actor owns (`diff: false` over the full
    *    list), so applying scales with inventory size. Untouched items are byte-identical between
    *    the clone and the actor, so they are compared and skipped here — only what the level-up
