@@ -5,6 +5,17 @@
   <div class="creator-pick-side">
     <div class="creator-toolbar creator-toolbar--stacked">
       <span class="creator-count">{{localize "sogrom-dnd5e-character-creator.common.available"}}: {{count}}</span>
+      {{!-- The subclass pick is the one this feature was built for: a level-3 character choosing
+            between two archetypes is comparing whole progressions, and this pane shows one at a
+            time. Same control and same grid as the creation pickers — see parts/compare.hbs. --}}
+      {{#if compare}}
+      <button type="button" class="creator-btn creator-btn-ghost creator-compare-btn"
+              data-action="openCompare" data-category="{{compare.category}}"
+              data-tooltip="{{compare.hint}}" {{#unless compare.canCompare}}disabled{{/unless}}>
+        <i class="fa-solid fa-scale-balanced"></i>
+        <span class="creator-compare-btn-label">{{compare.label}}</span>
+      </button>
+      {{/if}}
     </div>
 
     <ul class="creator-picklist">
@@ -17,6 +28,16 @@
           <span class="creator-pickrow-name">{{name}}</span>
           {{#if selected}}<i class="creator-pickrow-tick fa-solid fa-check"></i>{{/if}}
         </button>
+        {{!-- A sibling of the row, not a child: the row is a button already. See work-picker.hbs. --}}
+        {{#if ../compareCategory}}
+        <button type="button" class="creator-pin {{#if pinned}}is-pinned{{/if}}"
+                data-action="togglePin" data-category="{{../compareCategory}}" data-uuid="{{uuid}}"
+                aria-pressed="{{#if pinned}}true{{else}}false{{/if}}"
+                data-tooltip="{{#if pinned}}{{localize "sogrom-dnd5e-character-creator.compare.unpin"}}{{else}}{{localize "sogrom-dnd5e-character-creator.compare.pin"}}{{/if}}"
+                aria-label="{{localize "sogrom-dnd5e-character-creator.compare.pinAria" name=name}}">
+          <i class="fa-solid fa-scale-balanced" aria-hidden="true"></i>
+        </button>
+        {{/if}}
       </li>
       {{else}}
       <p class="creator-empty">{{localize "sogrom-dnd5e-character-creator.common.noEntries"}}</p>

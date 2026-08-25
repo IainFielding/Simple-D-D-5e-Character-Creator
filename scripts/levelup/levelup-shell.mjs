@@ -229,7 +229,10 @@ export class LevelUpShell extends CreatorShellBase {
       // is being levelled up — so the primary button says so.
       finishLabel: t(this.state.emberCreation ? "levelup.nav.emberApply" : "levelup.nav.apply"),
       // The source-book overlay, when one is open — window chrome over the stage, not step data.
-      sourceDetails: this._sourceDetails
+      sourceDetails: this._sourceDetails,
+      // The subclass comparison, likewise: the block supplies the options, the shell decides what
+      // is covering them.
+      compare: this._compare
     };
   }
 
@@ -327,7 +330,7 @@ export class LevelUpShell extends CreatorShellBase {
     // insurance against a partial render being added later, not a fix for a live fault.
     if ( !this._stageRendered(options) ) return;
     this._wireStepChanges(this.element);
-    this._wireSourceDetails(this.element);
+    this._wireOverlays(this.element);
     // Client-side spell-list filters on the spell step — search box plus the level/school
     // dropdowns. All filter in the DOM without a re-render, so the search field keeps focus
     // while typing; their values live on the state so the re-render a spell click causes

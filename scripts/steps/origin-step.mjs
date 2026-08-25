@@ -36,6 +36,7 @@
  */
 import { resolveChoices } from "../data/choice-resolver.mjs";
 import { t } from "../config.mjs";
+import { pinContext } from "../app/compare.mjs";
 import { hasRulesPage } from "../data/rules-source.mjs";
 import {
   ASI_ACTIONS, asiComplete, asiContext, asiHandle, asiHint, asiSummary
@@ -83,11 +84,15 @@ export function originStep({ id, icon, labelKey, instructionKey, field, cards, h
       state.choiceCache = await resolveChoices(state, source);
     },
 
-    async context({ state, source }) {
+    async context({ state, source, app }) {
       const selected = state[field];
       const detail = selected ? await source.detail(selected) : null;
       const groups = selected ? await source.advancementGroups(selected) : null;
       const list = cards(source, state).map(c => ({ ...c, selected: c.uuid === selected }));
+      // Opting this step's grid into side-by-side comparison. The step id doubles as the compare
+      // category ("species", "background"), the same way it doubles as the advancement-choice
+      // source key above. Silently inert without a shell, so the step still renders in tests.
+      const pins = pinContext(app?.pins, id, list);
 
       // Resolve (and cache) the increase config for the active pick, so the panel and the
       // synchronous completion check share one source of truth.
@@ -100,7 +105,7 @@ export function originStep({ id, icon, labelKey, instructionKey, field, cards, h
       const edition = source.rulesOf(state.classUuid) ?? null;
 
       return {
-        cards: list,
+        ...pins,                                  // cards (pin-decorated), compareCategory, compare
         count: list.length,
         hasSelection: !!selected,
         // Null unless the world actually has a book covering this step, so the control is hidden

@@ -64,6 +64,40 @@
       "partial": "Quick Build finished with some gaps — check the remaining steps.",
       "failed": "Quick Build failed; your choices were left as they were."
     },
+    "compare": {
+      "open": "Compare",
+      "openCount": "Compare ({count})",
+      "tooltip": "Show the pinned options side by side",
+      "needTwo": "Pin at least two options to compare them",
+      "pin": "Pin for comparison",
+      "unpin": "Remove from the comparison",
+      "pinAria": "Pin {name} for comparison",
+      "full": "You can compare up to {max} options at once — unpin one first.",
+      "none": "There is nothing left to compare — the pinned entries could not be loaded.",
+      "chooseN": "Choose {count}: {options}",
+      "anyAbility": "any ability",
+      "pointsToSpend": "{points} points (max +{cap} each) across {abilities}",
+      "title": {
+        "class": "Comparing Classes",
+        "species": "Comparing Species",
+        "background": "Comparing Backgrounds",
+        "subclass": "Comparing Subclasses"
+      },
+      "row": {
+        "source": "Source",
+        "spellcasting": "Spellcasting",
+        "subclassLevel": "Subclass at Level",
+        "asiLevels": "Ability Score Improvements",
+        "parentClass": "Class",
+        "creatureType": "Creature Type",
+        "size": "Size",
+        "speed": "Speed",
+        "senses": "Senses",
+        "abilityIncrease": "Ability Increase",
+        "features": "Features",
+        "spells": "Spells"
+      }
+    },
     "menu": {
       "launch": "Simple Character Builder"
     },

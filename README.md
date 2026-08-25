@@ -21,6 +21,7 @@ If you can pick from a menu, you can build a character.
 - **Nothing gets forgotten.** The wizard guides you through each part of your character in order and won't let you finish until the essentials are done.
 - **One thing at a time.** Instead of juggling sheets, compendiums, and drag-and-drop, you make one decision per screen and click **Next**.
 - **In a hurry? Quick Build has your back.** Pick a class, hit one button, and the wizard fills in a sensible, ready-to-play character you can tweak or run with as-is.
+- **Torn between two options? Put them side by side.** Pin the classes, species, backgrounds or subclasses you are weighing up and read them as a comparison table — hit dice, proficiencies, features and all — instead of clicking back and forth trying to remember the last one.
 - **It does the bookkeeping for you.** Proficiencies, starting equipment, hit points, and class features are all applied automatically when your character is created.
 - **Your table, your rules.** Prefer point buy? Standard array? Rolling for stats? It's your choice, and your Game Master can set the house rules.
 
@@ -51,6 +52,14 @@ See the **Quick Build** button? Give it a click after you've chosen a class and 
 
 ![Quick Build fills the whole character in one click](docs/screenshots/quick-build.png)
 *Screenshot: the Quick Build button on the class step.*
+
+### Can't decide? Compare them side by side
+
+Quick Build is for when you don't want to choose. This is for when you know exactly what you're choosing *between*.
+
+Every option in the Class, Species, Background and subclass lists has a small **scales** icon beside it. Click it to pin that option — pin two, three or four — and the **Compare** button at the top of the list lays them out as a table: one column per option, one row per thing that differs. Hit die, primary ability, saving throws, proficiencies, ability increases, spellcasting, the level a subclass unlocks, and every feature and spell each one grants.
+
+Pinning is not choosing, so you can weigh up two subclasses without either one becoming your answer. Nothing you pin is saved — close the window and the pins go with it.
 
 ### The steps
 

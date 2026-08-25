@@ -1,4 +1,5 @@
 import { ABILITIES, t } from "../config.mjs";
+import { pinContext } from "../app/compare.mjs";
 import { resolveChoices } from "../data/choice-resolver.mjs";
 import { hasRulesPage } from "../data/rules-source.mjs";
 import {
@@ -57,7 +58,7 @@ export const backgroundStep = {
     if ( ASI_ACTIONS.has(action) ) asiHandle(action, el, state, "background");
   },
 
-  async context({ state, source }) {
+  async context({ state, source, app }) {
     const selected = state.backgroundUuid;
     const detail = selected ? await source.detail(selected) : null;
     const groups = selected ? await source.advancementGroups(selected) : null;
@@ -80,7 +81,9 @@ export const backgroundStep = {
     }
 
     return {
-      cards: list,
+      // Opts the grid into side-by-side comparison: pin-decorated cards, plus the toolbar's
+      // compare control. Inert without a shell, so the step still renders in tests.
+      ...pinContext(app?.pins, "background", list),
       count: list.length,
       hasSelection: !!selected,
       // Which step action a drawer card fires, so parts/work-picker.hbs stays step-agnostic.
