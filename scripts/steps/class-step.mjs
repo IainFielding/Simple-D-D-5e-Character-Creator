@@ -5,6 +5,7 @@ import {
 import { spellInfoFor } from "./spells-step.mjs";
 import { resolveChoices } from "../data/choice-resolver.mjs";
 import { hasSourcePage } from "../data/journal-source.mjs";
+import { hasRulesPage } from "../data/rules-source.mjs";
 import { applyQuickBuild } from "../data/quick-build.mjs";
 import { t, log, levelUpEnabled } from "../config.mjs";
 import { matchesRules } from "../data/source-index.mjs";
@@ -152,6 +153,12 @@ export const classStep = {
       // Offer "Full Details" only when the active content package actually ships a book page for
       // this class. Without the check the button would open our own description a second time.
       sourceUuid: (selected && await hasSourcePage(selected)) ? selected : null,
+      // The class step is where the edition gets decided, so its own rules link uses whatever is
+      // picked so far and otherwise falls through to the resolver's 2024 default.
+      // Null unless the world actually has a book covering this step, so the control is hidden
+      // rather than offered as a button that opens nothing.
+      rulesTopic: (await hasRulesPage("class", source.rulesOf(selected))) ? "class" : null,
+      rulesEdition: source.rulesOf(selected) ?? null,
       abilities: abilitiesContext(state),
       targetLevel: targetLevelContext(state)
     };

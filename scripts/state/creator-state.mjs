@@ -73,6 +73,15 @@ export class CreatorState {
   tokenTab = "token";
 
   /**
+   * Transient Details-step UI: whether the alignment field is showing its free-text box rather than
+   * the standard list. Needed as its own flag because "Other" with nothing typed yet is
+   * indistinguishable from "nothing chosen" by `details.alignment` alone — without it, picking
+   * Other would snap straight back to the list on the next render. Not persisted; the character
+   * only ever carries the resulting string.
+   */
+  alignmentOther = false;
+
+  /**
    * Transient Details-step UI: which name pool the random-name roller draws from —
    * "any" (both), "male", or "female". Independent of the free-text gender field. Not persisted.
    */

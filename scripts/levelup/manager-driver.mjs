@@ -1,5 +1,5 @@
 import { log, levelUpHpRollToChat } from "../config.mjs";
-import { withItemSegment } from "../data/advancement-util.mjs";
+import { withItemSegment, addedEntries } from "../data/advancement-util.mjs";
 import { phbWeaponIcon } from "../data/weapon-source.mjs";
 import { bg3TraitIcon } from "../data/bg3-icons.mjs";
 
@@ -997,7 +997,10 @@ export class LevelUpDriver {
     for ( const sib of Object.values(adv.item?.advancement?.byId ?? {}) ) {
       if ( sib === adv ) continue;
       if ( sib.value?.ability && abilities.includes(sib.value.ability) ) return sib.value.ability;
-      for ( const id of Object.keys(sib.value?.added ?? {}) ) {
+      // Siblings are of mixed type, and `value.added` is flat on an ItemGrant but keyed by level
+      // on an ItemChoice — reading an ItemChoice's flat would yield level numbers where item ids
+      // were expected, so every lookup below would quietly miss. {@link addedEntries} normalises.
+      for ( const id of Object.keys(addedEntries(sib)) ) {
         const ability = this.clone.items.get(id)?.system?.ability;
         if ( ability && abilities.includes(ability) ) return ability;
       }

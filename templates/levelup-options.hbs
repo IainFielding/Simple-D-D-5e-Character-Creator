@@ -1,0 +1,108 @@
+{{!--
+  The GM's Level-Up Options window (opened from the module settings menu): everything about
+  levelling in one place — where the flow can be started from, what it offers for hit points, and
+  what it announces afterwards. Data and submit live in scripts/app/levelup-options.mjs; the Save
+  button comes from Foundry's generic form-footer part.
+
+  Every control is a real named form field, so Foundry's own serialisation carries the values
+  across. Everything below sits inside ONE root element — an ApplicationV2 template part that
+  renders more than one fails to render at all.
+--}}
+<div class="sogrom-levelup-options-fields">
+
+{{#if levelUpOff}}
+<p class="notification warning">
+  {{localize "sogrom-dnd5e-character-creator.levelUpOptions.disabled"}}
+</p>
+{{/if}}
+
+<p class="sogrom-levelup-options-intro">
+  {{localize "sogrom-dnd5e-character-creator.levelUpOptions.intro"}}
+</p>
+
+<fieldset>
+  <legend>{{localize "sogrom-dnd5e-character-creator.levelUpOptions.entryPoints"}}</legend>
+  <p class="hint">{{localize "sogrom-dnd5e-character-creator.levelUpOptions.entryPointsHint"}}</p>
+
+  <div class="form-group">
+    <label for="sogrom-lu-button">{{localize "sogrom-dnd5e-character-creator.settings.levelUpButton.name"}}</label>
+    <div class="form-fields">
+      <input id="sogrom-lu-button" type="checkbox" name="showLevelUpButton" {{#if showLevelUpButton}}checked{{/if}}>
+    </div>
+    <p class="hint">{{localize "sogrom-dnd5e-character-creator.settings.levelUpButton.hint"}}</p>
+  </div>
+
+  <div class="form-group">
+    <label for="sogrom-lu-header">{{localize "sogrom-dnd5e-character-creator.settings.headerMenu.name"}}</label>
+    <div class="form-fields">
+      <input id="sogrom-lu-header" type="checkbox" name="showLevelUpHeaderMenu" {{#if showLevelUpHeaderMenu}}checked{{/if}}>
+    </div>
+    <p class="hint">{{localize "sogrom-dnd5e-character-creator.settings.headerMenu.hint"}}</p>
+  </div>
+
+  <div class="form-group">
+    <label for="sogrom-lu-context">{{localize "sogrom-dnd5e-character-creator.settings.contextMenu.name"}}</label>
+    <div class="form-fields">
+      <input id="sogrom-lu-context" type="checkbox" name="showContextMenu" {{#if showContextMenu}}checked{{/if}}>
+    </div>
+    <p class="hint">{{localize "sogrom-dnd5e-character-creator.settings.contextMenu.hint"}}</p>
+  </div>
+</fieldset>
+
+<fieldset>
+  <legend>{{localize "sogrom-dnd5e-character-creator.levelUpOptions.hitPoints"}}</legend>
+
+  <div class="form-group">
+    <label for="sogrom-lu-hpmode">{{localize "sogrom-dnd5e-character-creator.settings.levelUpHpMode.name"}}</label>
+    <div class="form-fields">
+      <select id="sogrom-lu-hpmode" name="levelUpHpMode">
+        {{#each hpModes}}
+          <option value="{{value}}" {{#if selected}}selected{{/if}}>{{label}}</option>
+        {{/each}}
+      </select>
+    </div>
+    <p class="hint">{{localize "sogrom-dnd5e-character-creator.settings.levelUpHpMode.hint"}}</p>
+  </div>
+
+  <div class="form-group">
+    <label for="sogrom-lu-hpchat">{{localize "sogrom-dnd5e-character-creator.settings.levelUpHpRollToChat.name"}}</label>
+    <div class="form-fields">
+      <input id="sogrom-lu-hpchat" type="checkbox" name="levelUpHpRollToChat" {{#if levelUpHpRollToChat}}checked{{/if}}>
+    </div>
+    <p class="hint">{{localize "sogrom-dnd5e-character-creator.settings.levelUpHpRollToChat.hint"}}</p>
+  </div>
+</fieldset>
+
+<fieldset>
+  <legend>{{localize "sogrom-dnd5e-character-creator.levelUpOptions.announcements"}}</legend>
+
+  <div class="form-group">
+    <label for="sogrom-lu-summary">{{localize "sogrom-dnd5e-character-creator.settings.levelUpSummary.name"}}</label>
+    <div class="form-fields">
+      <select id="sogrom-lu-summary" name="levelUpSummary">
+        {{#each summaryModes}}
+          <option value="{{value}}" {{#if selected}}selected{{/if}}>{{label}}</option>
+        {{/each}}
+      </select>
+    </div>
+    <p class="hint">{{localize "sogrom-dnd5e-character-creator.settings.levelUpSummary.hint"}}</p>
+  </div>
+
+  <div class="form-group">
+    <label for="sogrom-lu-ready">{{localize "sogrom-dnd5e-character-creator.settings.levelUpReadyNotice.name"}}</label>
+    <div class="form-fields">
+      <select id="sogrom-lu-ready" name="levelUpReadyNotice">
+        {{#each readyModes}}
+          <option value="{{value}}" {{#if selected}}selected{{/if}}>{{label}}</option>
+        {{/each}}
+      </select>
+    </div>
+    <p class="hint">{{localize "sogrom-dnd5e-character-creator.settings.levelUpReadyNotice.hint"}}</p>
+  </div>
+
+  {{!-- The creation summary is deliberately NOT here: it belongs to creation, and pairing the two
+        in the main settings list is what lets a GM see they share the same three modes. --}}
+  <p class="hint">{{localize "sogrom-dnd5e-character-creator.levelUpOptions.creationNote"}}</p>
+</fieldset>
+
+</div>

@@ -20,6 +20,7 @@ const { SCENARIOS } = await import(`./scenarios.mjs${BUST}`);
 const { AnswerBook } = await import(`./answers.mjs${BUST}`);
 const { sweepScenarios } = await import(`./sweep.mjs${BUST}`);
 const { checkHooks } = await import(`./hooks.mjs${BUST}`);
+const deleteErrors = await import(`./delete-errors.mjs${BUST}`);
 
 // The module under test, imported *without* a buster — the same instance the world already loaded.
 const { SourceIndex } = await import("/modules/sogrom-dnd5e-character-creator/scripts/data/source-index.mjs");
@@ -223,12 +224,26 @@ export async function runScenario(scenario, { keep = false, render = false } = {
     // level it first appears at rather than to "level 20". Each side records independently and the
     // two are lined up afterwards; there is no need to interleave the builds.
     const perLevel = scenario.incremental ? { native: new Map(), creator: new Map() } : null;
-    const record = side => perLevel ? ((level, actor) => perLevel[side].set(level, snapshot(actor))) : undefined;
+    // Every level boundary is marked whether or not snapshots are being kept: the delete errors
+    // collected below are bucketed on these marks, and they are worth attributing in either mode.
+    const record = side => (level, actor) => {
+      deleteErrors.mark(side, level);
+      if ( perLevel ) perLevel[side].set(level, snapshot(actor));
+    };
 
+    deleteErrors.install();
+    deleteErrors.begin();
+
+    deleteErrors.mark("native", 0);
     native = await buildNative(
       { ...scenario, name: `${PREFIX}${scenario.name} [native]` },
       { book, consumed, onLevel: record("native") }
     );
+    // Let the native build's trailing rejections land before the boundary moves: `#complete` keeps
+    // writing after its manager has closed, and anything arriving after this mark would otherwise be
+    // charged to the creator's level 1.
+    await new Promise(resolve => setTimeout(resolve, 400));
+    deleteErrors.mark("creator", 0);
     creator = await buildCreator(
       { ...scenario, name: `${PREFIX}${scenario.name} [creator]` },
       { book, diagnostics: report.diagnostics, consumed, unofferable, onLevel: record("creator") }
@@ -273,6 +288,11 @@ export async function runScenario(scenario, { keep = false, render = false } = {
   } catch ( err ) {
     report.error = `${err.message}\n${err.stack ?? ""}`;
   } finally {
+    // Collected before the teardown deletes: a rejection raised by the last level can still be in
+    // flight, and deleting the actors would add deletions of its own to the same listener.
+    await new Promise(resolve => setTimeout(resolve, 250));
+    report.deleteErrors = deleteErrors.collect();
+
     if ( !keep ) {
       const ids = [native?.id, creator?.id].filter(Boolean);
       if ( ids.length ) await Actor.implementation.deleteDocuments(ids, { render: false }).catch(() => {});

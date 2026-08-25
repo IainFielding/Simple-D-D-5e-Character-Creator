@@ -28,6 +28,7 @@ Copy `config.example.mjs` to `config.mjs` and edit the paths before the setup st
 | `in-world/sweep.mjs` | Generates one scenario per subclass in the world |
 | `in-world/shots.mjs` | Opens and drives the real wizard, for `screenshots.mjs` |
 | `in-world/hooks.mjs` | Asserts the public hook/API surface against the real wizards |
+| `in-world/delete-errors.mjs` | Attributes failed deletions to the side and level that caused them |
 
 ## Screenshots
 
@@ -142,7 +143,7 @@ alone and counts an item at each level. The module stays junction-linked into `D
 harness's own files are still served: Foundry's static routes come from the filesystem, not from the
 world's module list.
 
-Both run dnd5e 5.3.3 on Foundry 14.365, on port 30099 (not 30000).
+Both run dnd5e 5.3.3 on Foundry 14.367, on port 30099 (not 30000).
 
 **Foundry locks its data directory**, so the harness cannot run while the Foundry desktop app is
 open. A crashed run leaves a lock that goes stale after ~10s; `startFoundry` retries through that.
@@ -1399,6 +1400,176 @@ node run.mjs --compare-item "sweep:artificer/battle-smith/Battle Smith Spells"
 node run.mjs playwright-clean --probe-native "sweep:artificer/battle-smith/Heroism" --level 5
 #   0 copies at every level — the grant is never applied
 ```
+
+## Foundry 14.367: advancement delete batches abort, and features duplicate
+
+Measured 2026-08-22, after the core upgrade from 14.365. The console signature is:
+
+```
+Error: Item "EYjsFd1pZl9i3Oee" does not exist!
+    at ServerDatabaseBackend._deleteDocuments (/C:/foundryvtt/dist/database/backend/server-backend.mjs)
+```
+
+**This is not a new bug in core's delete path**, and that was worth establishing before anything
+else. Diffing 14.367 against the 14.362 build the desktop app still carries, every function in the
+deletion machinery is byte-identical: `ServerDatabaseBackend._deleteDocuments`,
+`ClientDatabaseBackend._deleteDocuments`, `#preDeleteDocumentArray`, `deleteEmbeddedDocuments`,
+`deleteDocuments`, `#dispatchRequest`, `#handleResponse`, `#buildRequest`. The sole
+`_onDeleteOperation` change concerns Scene Regions. **Don't re-hunt the core delete path** — the
+throw has always been there.
+
+What makes it hurt is where the check sits. In `_deleteDocuments` the server does:
+
+```js
+await Promise.all(f.map(async (e, t) => {
+  if ( !e ) throw new Error(`${l} "${o[t]}" does not exist!`);
+```
+
+so **one stale id rejects the entire delete batch and nothing in it is deleted**. On
+`AdvancementManager#complete` that batch is every item the clone dropped, which turns the old
+symptom — one cached spell quietly missing, see the section above — into stale items surviving on
+the character.
+
+It is a client/server *desync* rather than a plain stale id, and the stack says so: the client's
+`#preDeleteDocumentArray` looks each id up with `collection.get(id, {strict: true, invalid: true})`
+and would have thrown locally first. The error arriving from the server means the client still held
+an item the server had already dropped.
+
+Three paths delete the same cached-spell id, and `#complete` fires its four operations in one
+`Promise.all`, so the third races the first:
+
+| Path | What it deletes |
+| --- | --- |
+| `advancement-manager.mjs:894` | `toDelete` — every actor item not on the manager's clone |
+| `activities.mjs:450` (`onUpdateActivities`) | `options.dnd5e.removedCachedItems` |
+| `activities.mjs:479` (`onDeleteActivities`) | each Cast activity's `cachedSpell.id`, when the parent feature is deleted |
+
+### What it measures
+
+`--sweep --shard 1/4` — 31 subclasses, level 20, incremental, base world — against
+`sweep-results-final-2.4.0.jsonl`:
+
+| | 14.365 baseline | 14.367 |
+| --- | --- | --- |
+| identical at 20 | 26 | **20** |
+| differing | 5 | **11** |
+
+**Six subclasses that were clean on 14.365 now fail — 23% of everything that previously passed.**
+Two known failures now bite earlier, and one passes at 20 while diverging mid-walk.
+
+Every one of the six is the *same* defect, and the rows say so: they are **100% spell rows with no
+`source.book` noise at all**, and in every case it is **native** that has lost the spell.
+
+| Subclass | Diverges at | Spell native loses |
+| --- | --- | --- |
+| `ranger/hunter` | 2 | Hunter's Mark |
+| `warlock/great-old-one-patron` | 3 | Water Breathing |
+| `monk/warrior-of-shadow` | 4 | Darkness |
+| `warlock/the-fathomless` | 6 | Sending |
+| `warlock/the-fiend` | 6 | Sending |
+| `rogue/phantom` | 10 | Speak with Dead, Augury |
+
+The two that got worse are the ones the section above already documented — same defect, earlier onset:
+
+| Subclass | 14.365 | 14.367 |
+| --- | --- | --- |
+| `ranger/winter-walker` | FAIL @5, 10 rows | FAIL **@2**, 10 rows (identical rows) |
+| `artificer/alchemist` | FAIL @17 | FAIL **@11** |
+
+And `cleric/war-domain` is the shape the pass/fail column hides: **identical at 20, but diverging at
+level 7**. A character standing at 7 is wrong even though the endpoint is clean — an argument for the
+incremental walk on its own.
+
+**1967** delete failures across those 31 characters — attributed per subclass and level below.
+
+**It is a race, so counts move run to run.** The same shard at 1/20 put `artificer/alchemist` at 5
+rows including a duplicated **`Soul of Artifice ×2`** capstone; the 1/4 run put it at 2 rows with no
+duplicate at all. `warlock/the-fiend` likewise moved from @1/6 rows to @6/2 rows. **The level a
+divergence starts at reproduced in every case; the row count did not.** Don't read a changed count as
+a fix or a new bug without re-running — and prefer `firstDivergence` as the stable signal.
+
+### Which subclass, and at which level
+
+`report.deleteErrors` records every failure against the side and level that produced it, so the
+question "which characters, and when" has an answer rather than a total. Nine of the 31 subclasses
+raise them, and **every first error is on the native side**:
+
+| Class / subclass | 1st error | Errors | Diverges | At 20 |
+| --- | --- | --- | --- | --- |
+| `ranger/winter-walker` | **L2** | 224 | L2 | differs |
+| `ranger/hunter` | **L2** | 186 | L2 | differs |
+| `warlock/great-old-one-patron` | **L2** | 406 | L3 | differs |
+| `monk/warrior-of-shadow` | **L4** | 205 | L4 | differs |
+| `warlock/the-fathomless` | **L6** | 173 | L6 | differs |
+| `warlock/the-fiend` | **L6** | 153 | L6 | differs |
+| `cleric/war-domain` | **L7** | 190 | L7 | **identical** |
+| `rogue/phantom` | **L10** | 187 | L10 | differs |
+| `artificer/alchemist` | **L11** | 243 | L11 | differs |
+
+**1967 failures in total** across 31 characters. (A `grep -c` of `console.log` reports ~9726 — that
+counts *lines*, and one failure prints about five of them between the notification, the rejection and
+the stack. Count incidents from `deleteErrors.total`, not from the log.)
+
+**The first error lands at the divergence level in eight of the nine cases**, Great Old One Patron
+being the exception at L2 against a divergence at L3 — the failed delete leaves state that only shows
+in the diff a level later. That correspondence is the causal link made visible, and it holds
+negatively too: of the 22 subclasses with **zero** delete errors, 19 are identical, and the three that
+differ all do so at level 1 with `decision`/`source.book` rows — the pre-existing noise class
+documented above, nothing to do with this.
+
+`cleric/war-domain` is the row to keep in mind. It is **identical at level 20 and still had 190 delete
+batches rejected**, diverging at level 7 on the way. A character standing at 7 is wrong; the endpoint
+is clean. This is why the count prints on passing lines too.
+
+**Is this module affected as well?** On the evidence here, no — but not conclusively. Native accounts
+for 1768 failures across 135 level-buckets; the creator shows 199 across 13, and **190 of those sit in
+its level-1 bucket**, which is the catch-all for anything arriving after the side boundary. Despite a
+400ms settle, native's trailing rejections still land there: `#complete` keeps writing after its
+manager closes. The tell is that no subclass with zero native errors has any creator errors at all —
+if `commit()` genuinely raced, it would fire independently. What that argument does **not** explain is
+nine mid-walk creator errors (`alchemist` L10/L11/L16, `great-old-one-patron` L2/L6). They are 0.5% of
+the total and unexplained; treat "the creator is clean" as likely rather than established.
+
+### The clean room says it is dnd5e's
+
+With the module **not enabled** at all:
+
+```bash
+node run.mjs playwright-clean --probe-native "sweep:artificer/alchemist/Soul of Artifice" --level 20
+#   L1–L19  0 copies … L20  2 copies   ← both advOrigin nZn38dWgImz9keV3.l0clraX6Pr6oDtx5
+```
+
+**1064** delete errors in that single build, and the capstone genuinely granted twice — the duplicate
+is real when it lands, it just does not land every run. And it is not an artefact of how this harness
+drives the wizard: `native.mjs` renders the *flow* and never `manager.render()`, precisely so a nudge
+cannot fake a duplicate grant (see "Gotchas found the hard way").
+
+### This module is equally exposed
+
+`manager-driver.mjs`'s `commit()` is a faithful port of `#complete` — the same `Promise.all`, the
+same `toDelete` built from every item the actor owns, differing only by `render: false`. Nothing
+here protects against the aborted batch, and matching native's logic is deliberate. If this needs a
+workaround, it belongs in both places or neither.
+
+### Running it against a new core build
+
+`config.mjs`'s `CORE_VERSION` is what `lib/worlds.mjs` writes into new manifests, but `ensureWorld`
+leaves an existing `world.json` alone — so after a core upgrade an already-provisioned world keeps
+its old `coreVersion`, **the join form never renders, and the run dies with "The join form never
+appeared"**. `playwright-clean` did exactly that at 14.365 while the other two had been migrated.
+Bump the manifest's `coreVersion` and `compatibility.verified` by hand, or re-provision with
+`--force`.
+
+`compare-baseline.mjs` diffs a fresh run against an archived baseline scenario by scenario, which is
+how the table above was produced:
+
+```bash
+node compare-baseline.mjs sweep-results.jsonl sweep-results-final-2.4.0.jsonl
+```
+
+Baselines remain mode-specific (see "One jump, or one level at a time") and are now also **core-version
+specific**. `sweep-results-14367-shard1of20.jsonl` / `console-shard1-14367.log` and
+`sweep-results-14367-shard1of4.jsonl` / `console-shard1of4-14367.log` hold these runs.
 
 ## Ember
 

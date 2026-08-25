@@ -22,7 +22,10 @@ const source = {
   ],
   card: uuid => ({ name: uuid?.endsWith("wizard") ? "Wizard" : "Fighter" }),
   detail: async () => ({ name: "Wizard", img: "w.webp", enriched: "<p>arcane</p>" }),
-  advancementGroups: async () => []
+  advancementGroups: async () => [],
+  // The step reads the chosen class's edition to scope its "Read the Rules" link. These fixtures
+  // declare none, which is the real "content that names no edition" case.
+  rulesOf: () => null
 };
 
 /** The dispatcher context a step handler receives. */

@@ -1,0 +1,70 @@
+{{!--
+  The GM's House Rules window (opened from the module settings menu): the settings that constrain
+  what a player may build, as opposed to the flat settings list's UI toggles and announcements.
+  The ability-score economy and multiclassing come first (they gate whole steps), then the
+  alignment grid. Data and submit live in scripts/app/house-rules.mjs; the Save button comes from
+  Foundry's generic form-footer part. Unlike the store window every control here is a real named
+  form field, so Foundry's own serialisation carries the values across — the alignment checkboxes
+  are named `banned.<key>`, which `expandObject` turns back into a {key: bool} map. Everything
+  below sits inside ONE root element — an ApplicationV2 template part that renders more than one
+  fails to render at all.
+--}}
+<div class="sogrom-house-rules-fields">
+
+<p class="sogrom-house-rules-intro">
+  {{localize "sogrom-dnd5e-character-creator.houseRules.intro"}}
+</p>
+
+{{#if showAbilities}}
+<fieldset>
+  <legend>{{localize "sogrom-dnd5e-character-creator.houseRules.abilities"}}</legend>
+
+  <div class="form-group">
+    <label for="sogrom-hr-budget">{{localize "sogrom-dnd5e-character-creator.settings.pointBuyBudget.name"}}</label>
+    <div class="form-fields">
+      <input id="sogrom-hr-budget" type="number" name="pointBuyBudget" value="{{pointBuyBudget}}" min="1" step="1">
+    </div>
+    <p class="hint">{{localize "sogrom-dnd5e-character-creator.settings.pointBuyBudget.hint"}}</p>
+  </div>
+
+  <div class="form-group">
+    <label for="sogrom-hr-formula">{{localize "sogrom-dnd5e-character-creator.settings.rollFormula.name"}}</label>
+    <div class="form-fields">
+      <input id="sogrom-hr-formula" type="text" name="rollFormula" value="{{rollFormula}}">
+    </div>
+    <p class="hint">{{localize "sogrom-dnd5e-character-creator.settings.rollFormula.hint"}}</p>
+  </div>
+</fieldset>
+{{/if}}
+
+<fieldset>
+  <legend>{{localize "sogrom-dnd5e-character-creator.houseRules.multiclassing"}}</legend>
+
+  <div class="form-group">
+    <label for="sogrom-hr-multiclass">{{localize "sogrom-dnd5e-character-creator.settings.allowMulticlass.name"}}</label>
+    <div class="form-fields">
+      <select id="sogrom-hr-multiclass" name="multiclass">
+        {{#each multiclassOptions}}
+          <option value="{{value}}" {{#if selected}}selected{{/if}}>{{label}}</option>
+        {{/each}}
+      </select>
+    </div>
+    <p class="hint">{{localize "sogrom-dnd5e-character-creator.settings.allowMulticlass.hint"}}</p>
+  </div>
+</fieldset>
+
+<fieldset>
+  <legend>{{localize "sogrom-dnd5e-character-creator.houseRules.alignments"}}</legend>
+  <p class="hint">{{localize "sogrom-dnd5e-character-creator.houseRules.alignmentsHint"}}</p>
+
+  <div class="sogrom-house-rules-alignments">
+    {{#each alignments}}
+      <label class="sogrom-house-rules-alignment {{#if banned}}is-banned{{/if}}">
+        <input type="checkbox" name="banned.{{key}}" {{#if banned}}checked{{/if}}>
+        <span>{{label}}</span>
+      </label>
+    {{/each}}
+  </div>
+</fieldset>
+
+</div>

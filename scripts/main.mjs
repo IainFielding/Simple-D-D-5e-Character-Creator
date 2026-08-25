@@ -5,7 +5,10 @@ import {
 import { STEPS } from "./steps/registry.mjs";
 import { warmSources } from "./data/source-cache.mjs";
 import { registerLevelUp, triggerLevelUp, canLevelUp } from "./levelup/intercept.mjs";
+import { registerXpNotice } from "./levelup/xp-notice.mjs";
 import { StoreConfigApp } from "./app/store-config.mjs";
+import { HouseRulesApp } from "./app/house-rules.mjs";
+import { LevelUpOptionsApp } from "./app/levelup-options.mjs";
 import { watchForeignWindows } from "./app/takeover.mjs";
 import { registerApi, launchCreator } from "./api.mjs";
 
@@ -49,10 +52,12 @@ Hooks.once("init", () => {
     tpl("parts/abilities-panel.hbs"),
     tpl("parts/origin-abilities.hbs"),
     tpl("parts/source-details.hbs"),
+    tpl("parts/rules-link.hbs"),
     // The chat cards themselves are rendered on demand rather than loaded as PARTS, but the
     // partial they include still has to be registered up front — a partial is resolved at render
     // time from the registry, not fetched.
-    tpl("chat/value.hbs")
+    tpl("chat/value.hbs"),
+    tpl("chat/levelup-ready.hbs")
   ]);
 
   // The `data-tooltip` payload that triggers a dnd5e *rich* item tooltip. The system's
@@ -114,59 +119,52 @@ function registerSettings() {
     hint: t("settings.launchButton.hint"),
     scope: "world", config: !ember, type: Boolean, default: true
   });
+  // Every level-up setting — these three entry points, the hit-point pair below, and the two
+  // announcements — is edited through the Level-Up Options menu rather than the flat settings list,
+  // hence `config: false` throughout. They keep their original keys, so every existing accessor and
+  // stored world value carries over untouched; only where they are *edited* changed.
+  // (Level-up entry points are live in an Ember world too — Ember owns creation, not levelling.)
   game.settings.register(MODULE_ID, SETTINGS.levelUpButton, {
-    name: t("settings.levelUpButton.name"),
-    hint: t("settings.levelUpButton.hint"),
-    scope: "world", config: true, type: Boolean, default: DEFAULTS.levelUpButton
+    scope: "world", config: false, type: Boolean, default: DEFAULTS.levelUpButton
   });
-  // Level-up entry points are live in an Ember world too — Ember owns creation, not levelling.
   game.settings.register(MODULE_ID, SETTINGS.headerMenu, {
-    name: t("settings.headerMenu.name"),
-    hint: t("settings.headerMenu.hint"),
-    scope: "world", config: true, type: Boolean, default: DEFAULTS.headerMenu
+    scope: "world", config: false, type: Boolean, default: DEFAULTS.headerMenu
   });
   game.settings.register(MODULE_ID, SETTINGS.contextMenu, {
-    name: t("settings.contextMenu.name"),
-    hint: t("settings.contextMenu.hint"),
-    scope: "world", config: true, type: Boolean, default: true
+    scope: "world", config: false, type: Boolean, default: true
   });
   // Both dead under Ember: they are read only by the creator's Abilities step, and Ember decides
   // ability scores in its own builder before the hand-off ever reaches us. The hand-off's rail has
   // no Abilities step to spend a budget or roll a formula on (see levelup/registry.mjs).
+  // The three below, plus bannedAlignments, are the "what may a player build" rules, and they are
+  // edited through the House Rules menu rather than the flat settings list — hence `config: false`
+  // on all four. They keep their original setting keys, so every existing accessor and stored world
+  // value carries over untouched; only where they are *edited* changed.
   game.settings.register(MODULE_ID, SETTINGS.pointBuyBudget, {
-    name: t("settings.pointBuyBudget.name"),
-    hint: t("settings.pointBuyBudget.hint"),
-    scope: "world", config: !ember, type: Number, default: DEFAULTS.pointBuyBudget
+    scope: "world", config: false, type: Number, default: DEFAULTS.pointBuyBudget
   });
   game.settings.register(MODULE_ID, SETTINGS.rollFormula, {
-    name: t("settings.rollFormula.name"),
-    hint: t("settings.rollFormula.hint"),
-    scope: "world", config: !ember, type: String, default: DEFAULTS.rollFormula
+    scope: "world", config: false, type: String, default: DEFAULTS.rollFormula
   });
   game.settings.register(MODULE_ID, SETTINGS.multiclass, {
-    name: t("settings.allowMulticlass.name"),
-    hint: t("settings.allowMulticlass.hint"),
-    scope: "world", config: true, type: String, default: DEFAULTS.multiclass,
-    choices: {
-      "off": t("settings.allowMulticlass.off"),
-      "prereq": t("settings.allowMulticlass.prereq"),
-      "free": t("settings.allowMulticlass.free")
-    }
+    scope: "world", config: false, type: String, default: DEFAULTS.multiclass
+  });
+  game.settings.register(MODULE_ID, SETTINGS.bannedAlignments, {
+    scope: "world", config: false, type: Array, default: DEFAULTS.bannedAlignments
+  });
+  game.settings.registerMenu(MODULE_ID, "houseRulesMenu", {
+    name: t("settings.houseRulesMenu.name"),
+    label: t("settings.houseRulesMenu.label"),
+    hint: ember ? t("settings.houseRulesMenu.hintEmber") : t("settings.houseRulesMenu.hint"),
+    icon: "fa-solid fa-gavel",
+    type: HouseRulesApp,
+    restricted: true
   });
   game.settings.register(MODULE_ID, SETTINGS.levelUpHpMode, {
-    name: t("settings.levelUpHpMode.name"),
-    hint: t("settings.levelUpHpMode.hint"),
-    scope: "world", config: true, type: String, default: DEFAULTS.levelUpHpMode,
-    choices: {
-      "choice": t("settings.levelUpHpMode.choice"),
-      "average-roll": t("settings.levelUpHpMode.averageRoll"),
-      "average": t("settings.levelUpHpMode.average")
-    }
+    scope: "world", config: false, type: String, default: DEFAULTS.levelUpHpMode
   });
   game.settings.register(MODULE_ID, SETTINGS.levelUpHpRollToChat, {
-    name: t("settings.levelUpHpRollToChat.name"),
-    hint: t("settings.levelUpHpRollToChat.hint"),
-    scope: "world", config: true, type: Boolean, default: DEFAULTS.levelUpHpRollToChat
+    scope: "world", config: false, type: Boolean, default: DEFAULTS.levelUpHpRollToChat
   });
   // The two summary cards. Both share the same three modes, so they read the same to a GM
   // scanning the settings list; see SUMMARY_MODES in config.mjs.
@@ -187,14 +185,21 @@ function registerSettings() {
     }
   });
   game.settings.register(MODULE_ID, SETTINGS.levelUpSummary, {
-    name: t("settings.levelUpSummary.name"),
-    hint: t("settings.levelUpSummary.hint"),
-    scope: "world", config: true, type: String, default: DEFAULTS.levelUpSummary,
-    choices: {
-      "public": t("settings.levelUpSummary.public"),
-      "gm": t("settings.levelUpSummary.gm"),
-      "off": t("settings.levelUpSummary.off")
-    }
+    scope: "world", config: false, type: String, default: DEFAULTS.levelUpSummary
+  });
+  // Not a summary of something that happened, but a prompt about something that can — it shares the
+  // three modes because the question ("who hears about this?") is the same one. `public` here means
+  // "the GM and the character's owner", never the whole table; see levelUpReadyMode.
+  game.settings.register(MODULE_ID, SETTINGS.levelUpReadyNotice, {
+    scope: "world", config: false, type: String, default: DEFAULTS.levelUpReadyNotice
+  });
+  game.settings.registerMenu(MODULE_ID, "levelUpOptionsMenu", {
+    name: t("settings.levelUpOptionsMenu.name"),
+    label: t("settings.levelUpOptionsMenu.label"),
+    hint: t("settings.levelUpOptionsMenu.hint"),
+    icon: "fa-solid fa-trophy-star",
+    type: LevelUpOptionsApp,
+    restricted: true
   });
   // The starting-gold store: the enabled flag and the GM's stock configuration are both
   // hidden objects, edited only through the config form; a single menu button opens it.
@@ -239,6 +244,10 @@ Hooks.once("ready", () => {
   // fallback: a sheet button when the world has disabled native advancements). Both paths
   // self-gate on the `mode` setting and Hero Mancer, so this is safe to register unconditionally.
   registerLevelUp();
+
+  // Watch for characters crossing their XP threshold. Registered unconditionally for the same
+  // reason: it self-gates on the `mode` and notice settings, and on being the one active GM.
+  registerXpNotice();
 
   // Pre-warm the shared compendium index in the background, so the builder opens instantly
   // instead of showing its loading screen on first use. Gated to the audiences that will

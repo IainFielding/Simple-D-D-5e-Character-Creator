@@ -185,7 +185,9 @@ export const SETTINGS = {
   levelUpHpRollToChat: "levelUpHpRollToChat",
   creationSummary: "creationSummary",
   levelUpSummary: "levelUpSummary",
+  levelUpReadyNotice: "levelUpReadyNotice",
   multiclass: "allowMulticlass",
+  bannedAlignments: "bannedAlignments",
   storeEnabled: "storeEnabled",
   storeConfig: "storeConfig",
   debug: "debugLogging"
@@ -207,7 +209,10 @@ export const DEFAULTS = {
   levelUpHpRollToChat: true,
   creationSummary: "public",
   levelUpSummary: "public",
+  // Whispered to the GM by default: this is a nudge about one character, not table news.
+  levelUpReadyNotice: "gm",
   multiclass: "off",
+  bannedAlignments: [],
   storeEnabled: true,
   storeConfig: {
     priceMultiplier: 1.0,
@@ -285,6 +290,19 @@ export function levelUpSummaryMode() {
 }
 
 /**
+ * Who is told when a character has earned enough XP to level up.
+ *
+ * Shares the three chat-summary modes, but they read a little differently here: `"gm"` whispers the
+ * GM alone (the default — the GM decides when the table levels), and `"public"` additionally
+ * whispers the character's own owner, so a player can act without waiting to be noticed. Neither
+ * mode posts to everyone: an individual character crossing a threshold is not table news.
+ * @returns {"public"|"gm"|"off"}
+ */
+export function levelUpReadyMode() {
+  return summaryMode(SETTINGS.levelUpReadyNotice);
+}
+
+/**
  * The valid values of the multiclass setting, from most to least restrictive:
  *  - `"off"`    — the level-up wizard never adds a new class; multiclass drops go to the native UI.
  *  - `"prereq"` — multiclassing allowed, enforcing the rules-as-written ability prerequisites
@@ -301,6 +319,38 @@ export const MULTICLASS_MODES = ["off", "prereq", "free"];
 export function multiclassMode() {
   const raw = game.settings.get(MODULE_ID, SETTINGS.multiclass);
   return MULTICLASS_MODES.includes(raw) ? raw : DEFAULTS.multiclass;
+}
+
+/**
+ * The alignment keys (`CONFIG.DND5E.alignments` keys, e.g. `"le"`) the GM has ruled out.
+ *
+ * Guarded to an array of strings so a malformed stored value can never make the Details step throw
+ * — a broken house rule should cost the GM their restriction, not the player their character.
+ * @returns {string[]}
+ */
+export function bannedAlignments() {
+  let raw;
+  try {
+    raw = game.settings.get(MODULE_ID, SETTINGS.bannedAlignments);
+  } catch {
+    raw = null;
+  }
+  return Array.isArray(raw) ? raw.filter(k => typeof k === "string" && k) : [];
+}
+
+/**
+ * The alignments a player may actually choose, as `{key, label}` in `CONFIG.DND5E.alignments` order.
+ *
+ * Labels rather than keys are what get stored on the character: dnd5e models
+ * `system.details.alignment` as a plain `StringField`, and the sheet renders it verbatim, so writing
+ * the key would show a player "le" where they picked Lawful Evil.
+ * @returns {{key: string, label: string}[]}
+ */
+export function allowedAlignments() {
+  const banned = new Set(bannedAlignments());
+  return Object.entries(CONFIG.DND5E?.alignments ?? {})
+    .filter(([key]) => !banned.has(key))
+    .map(([key, label]) => ({ key, label: game.i18n.localize(label) }));
 }
 
 /**

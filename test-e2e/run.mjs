@@ -304,12 +304,20 @@ async function runSweep(harness) {
     }
     appendFileSync(SWEEP_RESULTS, `${JSON.stringify(r)}\n`, "utf8");
 
+    // Deletion failures are orthogonal to the diff: a build can come out identical and still have
+    // had a delete batch rejected on the way, so this is reported on every line rather than only
+    // on failures. See the README's "Foundry 14.367" section.
+    const de = r.deleteErrors?.total
+      ? `  [${r.deleteErrors.total} delete error(s), first `
+        + `${r.deleteErrors.first ? `${r.deleteErrors.first.side} L${r.deleteErrors.first.level}` : "unattributed"}]`
+      : "";
+
     if ( r.error ) {
       errored++;
-      console.log(`${position} ERROR ${r.name} — ${r.error.split("\n")[0]}`);
+      console.log(`${position} ERROR ${r.name} — ${r.error.split("\n")[0]}${de}`);
     } else if ( r.ok ) {
       passed++;
-      console.log(`${position} PASS  ${r.name} (${r.ms}ms)`);
+      console.log(`${position} PASS  ${r.name} (${r.ms}ms)${de}`);
     } else {
       failed++;
       // The level a difference *starts* at is the useful part of an incremental run; the count at
@@ -319,7 +327,7 @@ async function runSweep(harness) {
         + ` (${r.levels.firstDivergence.differences.length} row(s))`
         : ` — ${r.differences.length} difference(s)`;
       console.log(`${position} FAIL  ${r.name} (${r.ms}ms)${at}`
-        + `: ${[...new Set(r.differences.map(d => d.path.split(".")[0]))].join(", ")}`);
+        + `: ${[...new Set(r.differences.map(d => d.path.split(".")[0]))].join(", ")}${de}`);
     }
   }
 
