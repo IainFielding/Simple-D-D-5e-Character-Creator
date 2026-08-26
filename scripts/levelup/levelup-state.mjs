@@ -155,14 +155,19 @@ export class LevelUpState {
   focusedSpellUuid = null;
 
   /**
-   * The spell list's client-side filters (name search, spell level, school). They filter the DOM
-   * directly, but every spell click re-renders the stage and rebuilds the controls — so the
-   * values live here and the shell restores them after each render rather than letting them
-   * reset. Cleared only with the window.
+   * The spell list's client-side filters. They filter the DOM directly, but every spell click
+   * re-renders the stage and rebuilds the controls — so the values live here and the shell restores
+   * them after each render rather than letting them reset. Cleared only with the window.
+   *
+   * One field per control in `SPELL_FILTER_CONTROLS`; `spellPropFilter` holds a `"<key>:yes|no"`
+   * pair ("Ritual only", "Without Concentration") rather than a bare key.
    */
   spellSearch = "";
   spellLevelFilter = "";
   spellSchoolFilter = "";
+  spellPropFilter = "";
+  spellCastingFilter = "";
+  spellRangeFilter = "";
 
   /**
    * Phase 4b spell swaps: an owned cantrip / leveled spell the player has marked to replace this
@@ -272,6 +277,14 @@ export class LevelUpState {
     this.swapSpell = null;
     this.spellTab = "cantrips";
     this.focusedSpellUuid = null;
+    // The filters narrowed the old class's list. A school or casting time that matched half of it
+    // can easily match none of the next one, leaving the player on an empty list with no clue why.
+    this.spellSearch = "";
+    this.spellLevelFilter = "";
+    this.spellSchoolFilter = "";
+    this.spellPropFilter = "";
+    this.spellCastingFilter = "";
+    this.spellRangeFilter = "";
     this.collapsedBlocks.clear();
   }
 

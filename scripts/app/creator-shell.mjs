@@ -259,16 +259,13 @@ export class CreatorShell extends CreatorShellBase {
     this._wireStepChanges(root);
     this._wireOverlays(root);
     this.#wireDragDrop(root);
-    // Client-side filtering — no re-render, so the field keeps focus while typing. The spell steps
-    // add level/school dropdowns; when present, search + dropdowns drive the combined spell filter,
-    // otherwise the search box filters the card/list grid by name.
+    // Client-side filtering — no re-render, so the field keeps focus while typing. A spell step's
+    // dropdowns and its search box drive one combined filter, wired (and restored from the state)
+    // by the shared base; anything else falls through to the plain name search below.
     const search = root.querySelector("[data-creator-search]");
-    const spellFilters = root.querySelectorAll("[data-spell-filter-level], [data-spell-filter-school]");
     const bgFilter = root.querySelector("[data-bg-filter-ability]");
-    if ( spellFilters.length ) {
-      const apply = () => this._applySpellFilters();
-      if ( search ) search.addEventListener("input", apply);
-      for ( const sel of spellFilters ) sel.addEventListener("change", apply);
+    if ( this._wireSpellFilters(root) ) {
+      // Wired by the base — nothing further to do here.
     } else if ( bgFilter ) {
       // Background step: search box + the increased-ability dropdown drive a combined filter.
       const apply = () => this.#applyBackgroundFilter();

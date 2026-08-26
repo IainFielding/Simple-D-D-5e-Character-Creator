@@ -1,4 +1,6 @@
 import { t } from "../config.mjs";
+import { pinContext } from "../app/compare.mjs";
+import { spellFilterOptions } from "../data/spell-source.mjs";
 import { originGrantedSpellCards } from "./feat-spells-step.mjs";
 
 /**
@@ -83,7 +85,7 @@ export const spellsStep = {
     }
   },
 
-  async context({ state, spells, source }) {
+  async context({ state, spells, source, app }) {
     const data = await spells.forClass(state.classUuid);
     // Keep the completion gate's view of the class in sync with what we render.
     state.spellInfo = {
@@ -136,6 +138,8 @@ export const spellsStep = {
 
     const list = pool.filter(s => !granted.has(s.uuid) || picked.has(s.uuid)).map(s => ({
       ...s,
+      // Blank for a cantrip: "Lvl 0" is not what a player calls one, and the tab already says so.
+      levelLabel: s.level === 0 ? "" : t("levelup.step.spells.levelTag", { level: s.level }),
       active: picked.has(s.uuid),
       focused: state.focusedSpellUuid === s.uuid,
       disabled: atLimit && !picked.has(s.uuid)
@@ -156,13 +160,11 @@ export const spellsStep = {
 
     // Filter dropdown options drawn from the active list, mirroring the level-up spell browser so
     // the two screens read the same. The level filter is only meaningful on the leveled tab.
-    const levelOptions = [...new Set(list.filter(s => s.level > 0).map(s => s.level))]
-      .sort((a, b) => a - b)
-      .map(level => ({ value: level, label: t("levelup.step.spells.levelTag", { level }) }));
-    const schoolOptions = [...new Set(list.map(s => s.school).filter(Boolean))]
-      .sort((a, b) => a.localeCompare(b, game.i18n.lang))
-      .map(school => ({ value: school, label: school }));
+    const filters = spellFilterOptions(list, t);
     const className = source?.card(state.classUuid)?.name ?? "";
+    // Pin/compare, exactly as the class and origin pickers opt in — the shell owns the pins, the
+    // step only decorates its rows and asks for the toolbar control.
+    const pinned = pinContext(app?.pins, "spell", list);
 
     return {
       isSpellcaster: true,
@@ -180,10 +182,11 @@ export const spellsStep = {
       spellsFull: maxSpells > 0 && state.selectedSpells.length >= maxSpells,
       atLimit,
       needLabel: t("levelup.step.spells.need", { count: Math.max(0, activeMax - activeBucket.length) }),
-      list,
+      list: pinned.cards,
+      compareCategory: pinned.compareCategory,
+      compare: pinned.compare,
       count: list.length,
-      levelOptions,
-      schoolOptions,
+      ...filters,
       selectedCantrips,
       selectedSpells,
       hasSelected: selectedCantrips.length + selectedSpells.length > 0,

@@ -253,3 +253,58 @@ describe("spellChanges", () => {
     expect(spellChanges(state).deleteIds).toEqual(["oldCantrip000000"]);
   });
 });
+
+/* -------------------------------------------- */
+/*  Edition-gated swapping                       */
+/* -------------------------------------------- */
+
+/**
+ * Which replacements a level-up may offer, by rules edition — see {@link module:data/spell-swap}.
+ *
+ * The rule this encodes: replacing a *cantrip* when you gain a level arrived with the 2024 PHB. No
+ * 2014 class does it, so a 2014 Sorcerer used to be offered a swap the rules never grant. The
+ * leveled-spell swap survives in both editions and only changes its wording, because in dnd5e a
+ * prepared spell is an ordinary Item and trading one for another is how a prepared list changes.
+ */
+describe("computeSpellPlan swap allowance", () => {
+  /** A 2014 or 2024 wizard actor — the fixture with its `source.rules` set (or cleared). */
+  function editionWizard(rules, identifier = "wizard") {
+    const { cls, actor } = makeWizardActor({
+      classLevel: 4, preparedMax: 7, preparedValue: 5, slots: { spell1: 4, spell2: 3 }
+    });
+    cls.system.identifier = identifier;
+    if ( rules === null ) delete cls.system.source;
+    else cls.system.source = { ...(cls.system.source ?? {}), rules };
+    return { cls, actor };
+  }
+
+  it("offers both swaps under the 2024 rules", () => {
+    const { cls, actor } = editionWizard("2024");
+    const plan = computeSpellPlan(actor, cls);
+    expect(plan.canSwapCantrip).toBe(true);
+    expect(plan.canSwapSpell).toBe(true);
+  });
+
+  it("withholds the cantrip swap under the 2014 rules", () => {
+    const { cls, actor } = editionWizard("2014", "sorcerer");
+    const plan = computeSpellPlan(actor, cls);
+    expect(plan.canSwapCantrip).toBe(false);
+    // A 2014 Sorcerer knows a fixed list and does trade one spell on level-up.
+    expect(plan.canSwapSpell).toBe(true);
+    expect(plan.swapLabelKey).toBe("levelup.step.spells.swapHint");
+  });
+
+  it("re-words the swap for a 2014 prepared caster rather than removing it", () => {
+    const { cls, actor } = editionWizard("2014", "wizard");
+    const plan = computeSpellPlan(actor, cls);
+    expect(plan.canSwapSpell).toBe(true);
+    expect(plan.swapLabelKey).toBe("levelup.step.spells.swapHintPrepared");
+  });
+
+  it("treats a class that names no edition as 2024, so homebrew keeps every option", () => {
+    const { cls, actor } = editionWizard(null, "warmage");
+    const plan = computeSpellPlan(actor, cls);
+    expect(plan.canSwapCantrip).toBe(true);
+    expect(plan.canSwapSpell).toBe(true);
+  });
+});

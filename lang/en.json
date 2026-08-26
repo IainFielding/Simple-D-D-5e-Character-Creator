@@ -81,7 +81,8 @@
         "class": "Comparing Classes",
         "species": "Comparing Species",
         "background": "Comparing Backgrounds",
-        "subclass": "Comparing Subclasses"
+        "subclass": "Comparing Subclasses",
+        "spell": "Comparing Spells"
       },
       "row": {
         "source": "Source",
@@ -95,7 +96,16 @@
         "senses": "Senses",
         "abilityIncrease": "Ability Increase",
         "features": "Features",
-        "spells": "Spells"
+        "spells": "Spells",
+        "spellLevel": "Level",
+        "school": "School",
+        "castingTime": "Casting Time",
+        "range": "Range",
+        "duration": "Duration",
+        "components": "Components",
+        "properties": "Properties",
+        "save": "Saving Throw",
+        "damage": "Damage"
       }
     },
     "menu": {
@@ -235,6 +245,7 @@
           "picked": "{count} chosen",
           "noneNeeded": "No new spells to choose this level.",
           "swapHint": "You may also swap one spell you know — pick a known spell and choose Swap Out to trade it for another.",
+          "swapHintPrepared": "You may also change one spell you have prepared — pick a prepared spell and choose Swap Out to trade it for another.",
           "releasedHint": "{count} extra pick — a new feature grants a spell you already knew, always prepared, so the selection it was using is yours again.",
           "swapOut": "Swap Out",
           "keep": "Keep",
@@ -245,8 +256,18 @@
           "selectHint": "Pick a spell from the list to read it, then learn it.",
           "filterAllLevels": "All levels",
           "filterAllSchools": "All schools",
+          "filterAllProps": "Any property",
+          "filterAllCasting": "Any casting time",
+          "filterAllRanges": "Any range",
+          "filterPropOnly": "{property} only",
+          "filterPropWithout": "Without {property}",
+          "filterPropGroupOnly": "Only",
+          "filterPropGroupWithout": "Without",
           "filterLevelAria": "Filter by spell level",
           "filterSchoolAria": "Filter by spell school",
+          "filterPropsAria": "Filter by spell property",
+          "filterCastingAria": "Filter by casting time",
+          "filterRangeAria": "Filter by range",
           "empty": "No spells available.",
           "concentration": "Concentration",
           "ritual": "Ritual"

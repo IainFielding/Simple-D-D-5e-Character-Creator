@@ -23,14 +23,25 @@ const CLERIC_LIST = {
   ],
   level1: [
     { uuid: "Compendium.dnd-players-handbook.spells.Item.bless", name: "Bless", img: "b.webp" }
+  ],
+  level2: [
+    { uuid: "Compendium.dnd-players-handbook.spells.Item.aid", name: "Aid", img: "a.webp" }
   ]
 };
 
+/**
+ * Stands in for `SpellSource#forSpellList`, which indexes a list by spell level and *also* exposes
+ * the first two buckets under their old names. Only levels the caller asked for are populated, so a
+ * fetch capped at 1 cannot serve a 2nd-level restriction.
+ */
 const spellsStub = {
   calls: [],
   async forSpellList(classId, maxLevel) {
     this.calls.push([classId, maxLevel]);
-    return classId === "cleric" ? CLERIC_LIST : { cantrips: [], level1: [] };
+    if ( classId !== "cleric" ) return { cantrips: [], level1: [], byLevel: {} };
+    const byLevel = { 0: CLERIC_LIST.cantrips, 1: CLERIC_LIST.level1 };
+    if ( maxLevel >= 2 ) byLevel[2] = CLERIC_LIST.level2;
+    return { cantrips: CLERIC_LIST.cantrips, level1: CLERIC_LIST.level1, byLevel };
   }
 };
 
@@ -105,6 +116,14 @@ describe("level-up spell choice (Blessed Warrior)", () => {
     const data = await choicesStep.sectionsAt({ state, driver, spells: spellsStub }, 2);
     expect(data[0].sections[0].options.some(o => o.recommended)).toBe(false);
     expect(data[0].sections[0].groups).toBeNull();
+  });
+
+  it("draws a 2nd-level restriction from the same list, fetching deep enough to reach it", async () => {
+    const { state, driver } = blessedWarrior();
+    state.choiceSteps[0].advancement.configuration.restriction.level = "2";
+    const data = await choicesStep.sectionsAt({ state, driver, spells: spellsStub }, 2);
+    expect(data[0].sections[0].options.map(o => o.name)).toEqual(["Aid"]);
+    expect(spellsStub.calls).toEqual([["cleric", 2]]);
   });
 
   it("yields no list options for a restriction level with no bucket to draw from", async () => {

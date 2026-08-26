@@ -182,6 +182,20 @@ export class CreatorState {
   focusedSpellUuid = null;
 
   /**
+   * The spell list's client-side filters, one field per control in `SPELL_FILTER_CONTROLS`. They
+   * filter the DOM directly, but picking a spell re-renders the stage and rebuilds the controls —
+   * so searching for a spell and then clicking it used to wipe the search that found it. Keeping
+   * the values here lets the shell put them back after each render, as the level-up wizard has
+   * always done. `spellPropFilter` holds a `"<key>:yes|no"` pair, not a bare property key.
+   */
+  spellSearch = "";
+  spellLevelFilter = "";
+  spellSchoolFilter = "";
+  spellPropFilter = "";
+  spellCastingFilter = "";
+  spellRangeFilter = "";
+
+  /**
    * Slim spellcasting summary for the current class — `{isSpellcaster, maxCantrips, maxSpells}`
    * — so the (synchronous) completion gate can tell whether the Spells step applies and
    * whether every known spell has been chosen. Refreshed whenever the class changes. Null
@@ -310,10 +324,20 @@ export class CreatorState {
    * Forget everything keyed to the class: its level-1 spell picks, its advancement
    * choices, and its equipment selection. Called when the class selection changes so
    * a spell list or skill pick never carries over to a different class.
+   *
+   * The spell filters go with them. They are narrowing a list that is about to be replaced
+   * wholesale, and a school or casting time that matched the old class's spells can easily match
+   * none of the new one's — leaving the player on an empty list with no obvious cause.
    */
   resetClassDependent() {
     this.selectedCantrips = [];
     this.selectedSpells = [];
+    this.spellSearch = "";
+    this.spellLevelFilter = "";
+    this.spellSchoolFilter = "";
+    this.spellPropFilter = "";
+    this.spellCastingFilter = "";
+    this.spellRangeFilter = "";
     this.advChoices.class = {};
     this.#forgetFeatSpellLists("class");
     this.equipment.class = { selectedOption: 0, orSelections: {} };

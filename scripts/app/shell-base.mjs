@@ -114,6 +114,26 @@ export function dossierStageParts(scrollable = []) {
   };
 }
 
+/**
+ * The spell list's client-side filter controls, in the order they appear in the toolbar.
+ *
+ * One descriptor shared by both wizards. Every control is a plain value-carrying input or select, so
+ * restoring one is `el.value = state[key]` and reading it is the reverse — which is what lets
+ * {@link CreatorShellBase#_wireSpellFilters} handle the whole set without either shell knowing how
+ * many there are. Adding a filter is a line here, a control in the two templates, and a clause in
+ * {@link CreatorShellBase#_applySpellFilters}.
+ *
+ * @type {{selector: string, stateKey: string, event: string}[]}
+ */
+export const SPELL_FILTER_CONTROLS = [
+  { selector: "[data-creator-search]", stateKey: "spellSearch", event: "input" },
+  { selector: "[data-spell-filter-level]", stateKey: "spellLevelFilter", event: "change" },
+  { selector: "[data-spell-filter-school]", stateKey: "spellSchoolFilter", event: "change" },
+  { selector: "[data-spell-filter-prop]", stateKey: "spellPropFilter", event: "change" },
+  { selector: "[data-spell-filter-casting]", stateKey: "spellCastingFilter", event: "change" },
+  { selector: "[data-spell-filter-range]", stateKey: "spellRangeFilter", event: "change" }
+];
+
 export class CreatorShellBase extends HandlebarsApplicationMixin(ApplicationV2) {
 
   /** Index of the step currently on screen, into whatever list the subclass walks. */
@@ -328,23 +348,72 @@ export class CreatorShellBase extends HandlebarsApplicationMixin(ApplicationV2) 
   /* -------------------------------------------- */
 
   /**
-   * Hide pick-rows that don't match the active spell filters — the name search, spell level, and
-   * spell school — combined (a row must satisfy all three to show). Each control reads its value
-   * straight from the DOM so any of them can drive the same pass, and nothing re-renders, so the
-   * search field keeps focus while typing.
+   * Bind the spell filters to the DOM, restoring each control's value from the state first.
+   *
+   * The restore is the point. Every spell click re-renders the stage, which rebuilds the controls
+   * from the template — so a filter that lived only in the DOM would reset the moment the player
+   * picked something, wiping the search they used to find it. Keeping the values on the state and
+   * putting them back after each render is what makes filtering and picking coexist.
+   *
+   * Returns whether this step has any spell filters at all, so a caller can fall through to another
+   * kind of search box when it doesn't.
+   * @param {HTMLElement} root
+   * @returns {boolean}
+   */
+  _wireSpellFilters(root) {
+    // A search box alone is not a spell step — every picker has one, and claiming it here would
+    // steal the class and background grids' own filtering. One of the dropdowns is the tell, so
+    // decide before binding anything.
+    const controls = SPELL_FILTER_CONTROLS
+      .map(c => ({ ...c, el: root.querySelector(c.selector) }))
+      .filter(c => c.el);
+    if ( !controls.some(c => c.selector !== "[data-creator-search]") ) return false;
+
+    for ( const { el, stateKey, event } of controls ) {
+      el.value = this.state?.[stateKey] ?? "";
+      el.addEventListener(event, () => {
+        if ( this.state ) this.state[stateKey] = el.value;
+        this._applySpellFilters();
+      });
+    }
+    this._applySpellFilters();
+    return true;
+  }
+
+  /**
+   * Hide pick-rows that don't match the active spell filters — name search, spell level, school,
+   * property, casting time and range — combined: a row must satisfy every active one to show. Each
+   * control reads its value straight from the DOM so any of them can drive the same pass, and
+   * nothing re-renders, so the search field keeps focus while typing.
+   *
+   * The property filter is the only one that isn't a plain equality test. Its value is
+   * `"<propertyKey>:yes"` or `"<propertyKey>:no"` — "Ritual only", "Without Concentration" — which
+   * covers both directions with a single control instead of a row of tri-state toggles. The keys are
+   * dnd5e's own (`ritual`, `concentration`), matched against the row's raw `data-props`, so the pair
+   * cannot come apart on a translated world.
    */
   _applySpellFilters() {
     const root = this.element;
+    const valueOf = attr => root.querySelector(`[${attr}]`)?.value ?? "";
     const needle = (root.querySelector("[data-creator-search]")?.value ?? "").trim().toLowerCase();
-    const level = root.querySelector("[data-spell-filter-level]")?.value ?? "";
-    const school = root.querySelector("[data-spell-filter-school]")?.value ?? "";
+    const level = valueOf("data-spell-filter-level");
+    const school = valueOf("data-spell-filter-school");
+    const prop = valueOf("data-spell-filter-prop");
+    const casting = valueOf("data-spell-filter-casting");
+    const range = valueOf("data-spell-filter-range");
+
+    const [propKey, propWant] = prop ? prop.split(":") : [];
     for ( const row of root.querySelectorAll(".creator-pickrow") ) {
-      const matchesName = !needle || (row.dataset.name ?? "").toLowerCase().includes(needle);
-      const matchesLevel = !level || (row.dataset.level ?? "") === level;
-      const matchesSchool = !school || (row.dataset.school ?? "") === school;
-      (row.closest("li") ?? row).classList.toggle("is-hidden", !(matchesName && matchesLevel && matchesSchool));
+      const has = propKey ? (row.dataset.props ?? "").split(" ").includes(propKey) : false;
+      const matches = (!needle || (row.dataset.name ?? "").toLowerCase().includes(needle))
+        && (!level || (row.dataset.level ?? "") === level)
+        && (!school || (row.dataset.school ?? "") === school)
+        && (!propKey || (has === (propWant === "yes")))
+        && (!casting || (row.dataset.casting ?? "") === casting)
+        && (!range || (row.dataset.range ?? "") === range);
+      (row.closest("li") ?? row).classList.toggle("is-hidden", !matches);
     }
-    this._afterFilter(needle, !!(level || school));
+    this._afterFilter(needle, !!(level || school || prop || casting || range));
   }
 
   /**

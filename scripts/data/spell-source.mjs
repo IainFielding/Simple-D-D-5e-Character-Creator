@@ -152,10 +152,13 @@ export class SpellSource {
    * `${classId}:${maxLevel}`.
    * @param {string} classId
    * @param {number} [maxLevel=1]
-   * @returns {Promise<{cantrips: object[], level1: object[]}>}
+   * @returns {Promise<{cantrips: object[], level1: object[], byLevel: Record<number, object[]>}>}
+   *   `cantrips`/`level1` are the two buckets every caller wanted before spell choices above 1st
+   *   level had to be served; `byLevel` is the same spells indexed by their own level, for a
+   *   restriction that names one (see {@link module:levelup/steps/choices-step}).
    */
   async forSpellList(classId, maxLevel = 1) {
-    if ( !classId ) return { cantrips: [], level1: [] };
+    if ( !classId ) return { cantrips: [], level1: [], byLevel: {} };
     const key = `${classId}:${maxLevel}`;
     if ( !this.#byList.has(key) ) {
       const promise = this.#resolveList(classId, maxLevel)
@@ -169,10 +172,12 @@ export class SpellSource {
     const all = deduplicateSpells(
       await loadSpellsForClass(classId, maxLevel, "class", this.#fetchSpellPool(maxLevel)));
     const byName = (a, b) => a.name.localeCompare(b.name, game.i18n.lang);
-    return {
-      cantrips: all.filter(s => s.level === 0).sort(byName),
-      level1: all.filter(s => s.level === 1).sort(byName)
-    };
+    const byLevel = {};
+    for ( let l = 0; l <= maxLevel; l++ ) byLevel[l] = all.filter(s => s.level === l).sort(byName);
+    // The two named buckets are `byLevel`'s first two entries under their old names: every existing
+    // caller asks for cantrips or 1st-level spells, and re-filtering for them would be the same
+    // work twice.
+    return { cantrips: byLevel[0] ?? [], level1: byLevel[1] ?? [], byLevel };
   }
 
   /**
@@ -523,12 +528,57 @@ function deduplicateSpells(spells) {
   return [...byKey.values()];
 }
 
+/**
+ * Casting time as a player reads it — "Action", "1 Minute", "10 Minutes" — from an index entry's
+ * `system.activation`, plus the raw type key the filter matches on.
+ *
+ * A deliberately small mirror of dnd5e's own `ActivationField.prepareData`: that runs on a prepared
+ * *document*, and a list of two hundred spells only ever holds index entries. The system's
+ * formatters do the work, so an entry reads the same here as on the sheet.
+ * @param {object} entry
+ * @returns {{key: string, label: string}}
+ */
+function castingTimeOf(entry) {
+  const activation = entry.system?.activation ?? {};
+  const key = activation.type ?? "";
+  if ( !key ) return { key: "", label: "" };
+  const config = CONFIG.DND5E?.activityActivationTypes?.[key];
+  const value = activation.value ?? 1;
+  // A scalar type ("minute", "hour") reads as a duration and carries a count; everything else
+  // ("action", "bonus", "reaction") is a flat label the count would only clutter.
+  const label = (key in (CONFIG.DND5E?.timeUnits ?? {}))
+    ? (dnd5e.utils?.formatTime?.(value, key) ?? `${value} ${config?.label ?? key}`)
+    : (config?.label ?? key);
+  return { key, label };
+}
+
+/**
+ * Range as a player reads it — "60 ft", "Touch", "Self" — from an index entry's `system.range`,
+ * plus the raw units key the filter matches on. The companion to {@link castingTimeOf}, mirroring
+ * `RangeField.prepareData` for index entries.
+ * @param {object} entry
+ * @returns {{key: string, label: string}}
+ */
+function rangeOf(entry) {
+  const range = entry.system?.range ?? {};
+  const key = range.units ?? "";
+  // No units at all is dnd5e's own reading of "Self", which is what its RangeField falls back to.
+  if ( !key ) return { key: "self", label: CONFIG.DND5E?.distanceUnits?.self ?? "" };
+  const scalar = key in (CONFIG.DND5E?.movementUnits ?? {});
+  if ( scalar && range.value ) {
+    return { key, label: dnd5e.utils?.formatLength?.(range.value, key) ?? `${range.value} ${key}` };
+  }
+  return { key, label: scalar ? "" : (CONFIG.DND5E?.distanceUnits?.[key] ?? key) };
+}
+
 /** A lightweight spell card from an index entry or full document; description loads on focus. */
 export function buildSpellFromEntry(entry) {
   const level = entry.system?.level ?? 0;
   const schoolKey = entry.system?.school ?? "";
   const props = entry.system?.properties;
   const hasProp = p => props instanceof Set ? props.has(p) : Array.isArray(props) ? props.includes(p) : false;
+  const casting = castingTimeOf(entry);
+  const range = rangeOf(entry);
   return {
     // `||` (not `??`) so an empty identifier falls through to a usable unique id.
     id: entry.system?.identifier || entry._id || entry.id || entry.uuid,
@@ -544,7 +594,94 @@ export function buildSpellFromEntry(entry) {
     components: [hasProp("vocal") && "V", hasProp("somatic") && "S", hasProp("material") && "M"]
       .filter(Boolean).join(", "),
     isConcentration: hasProp("concentration"),
-    isRitual: hasProp("ritual")
+    isRitual: hasProp("ritual"),
+    // Every property the spell carries, space-joined, as the property filter's haystack. Kept raw
+    // (`vocal`, `concentration`) rather than localised: it is matched against a filter value built
+    // from the same CONFIG keys, and a translated string would break that on any non-English world.
+    propertyKeys: [...(props instanceof Set ? props : Array.isArray(props) ? props : [])].join(" "),
+    // Both of these come from index fields SPELL_INDEX_FIELDS has always requested. They back the
+    // casting-time and range filters, and the meta line each row shows.
+    castingTimeKey: casting.key,
+    castingTime: casting.label,
+    rangeKey: range.key,
+    range: range.label
+  };
+}
+
+/**
+ * The filter dropdown options for a rendered spell list — level, school, property, casting time and
+ * range — derived from the spells actually in the list, so a dropdown only ever offers values that
+ * can match something.
+ *
+ * Built here rather than in either step because both steps want exactly the same five, and the
+ * shapes they read (`school`, `castingTime`, `propertyKeys`) are this module's own card fields.
+ *
+ * The property list is the one set that isn't derived from the rows: it comes from
+ * `CONFIG.DND5E.validProperties.spell`, so dnd5e supplies both the keys and their labels and a
+ * sixth spell property would appear here for free. Each one yields two options — "only" and
+ * "without" — which is how a single select covers both directions of a question a player actually
+ * asks ("just the rituals", "nothing that needs concentration").
+ *
+ * @param {object[]} list                  The decorated rows about to be rendered.
+ * @param {(key: string, data?: object) => string} translate  The module's `t()`, passed in so this
+ *   stays free of the config import cycle and testable without i18n.
+ * @returns {{levelOptions: object[], schoolOptions: object[], castingOptions: object[],
+ *   rangeOptions: object[], propertyGroups: {label: string, options: object[]}[]}}
+ */
+export function spellFilterOptions(list, translate) {
+  const lang = game.i18n?.lang;
+  const byLabel = (a, b) => a.label.localeCompare(b.label, lang);
+
+  // Only meaningful on a leveled tab — cantrips are all level 0 — but harmless to build either way:
+  // the template decides whether to render the control.
+  const levelOptions = [...new Set(list.filter(s => s.level > 0).map(s => s.level))]
+    .sort((a, b) => a - b)
+    .map(level => ({ value: level, label: translate("levelup.step.spells.levelTag", { level }) }));
+
+  // The keys present in the list, labelled from CONFIG rather than from the first row that carried
+  // them. The row labels are per-spell — "1 Minute" and "10 Minutes" share the key `minute`, "60 ft"
+  // and "120 ft" share `ft` — so using one would put an arbitrary spell's wording on a filter that
+  // matches all of them. The key's own name is what the option means.
+  const distinct = (key, labels) => {
+    const seen = new Set(list.map(s => s[key]).filter(Boolean));
+    return [...seen]
+      .map(value => ({ value, label: labels?.[value]?.label ?? labels?.[value] ?? value }))
+      .sort(byLabel);
+  };
+
+  // Two <optgroup>s rather than a flat list: the same keys appear twice, once each way round, and
+  // the headings are what stop that reading as a duplicated menu.
+  const valid = CONFIG.DND5E?.validProperties?.spell ?? new Set();
+  const present = new Set(list.flatMap(s => (s.propertyKeys ?? "").split(" ").filter(Boolean)));
+  const propertyGroups = [
+    { want: "yes", labelKey: "levelup.step.spells.filterPropOnly", groupKey: "levelup.step.spells.filterPropGroupOnly" },
+    { want: "no", labelKey: "levelup.step.spells.filterPropWithout", groupKey: "levelup.step.spells.filterPropGroupWithout" }
+  ].map(({ want, labelKey, groupKey }) => ({
+    label: translate(groupKey),
+    options: [...valid]
+      // A property no spell in the list carries would filter to nothing ("only") or to everything
+      // ("without"); neither is worth a row in the menu.
+      .filter(key => present.has(key))
+      .map(key => ({
+        value: `${key}:${want}`,
+        label: translate(labelKey, { property: CONFIG.DND5E?.itemProperties?.[key]?.label ?? key })
+      }))
+      .sort(byLabel)
+  })).filter(group => group.options.length);
+
+  // Schools are already localised labels on the card (there is no key to look up), so they are the
+  // one axis whose values *are* their labels.
+  const schools = [...new Set(list.map(s => s.school).filter(Boolean))]
+    .map(school => ({ value: school, label: school })).sort(byLabel);
+
+  return {
+    levelOptions,
+    schoolOptions: schools,
+    propertyGroups,
+    // Sorted by label, not by the underlying key, so the menu reads in the order a player scans it
+    // rather than in CONFIG order.
+    castingOptions: distinct("castingTimeKey", CONFIG.DND5E?.activityActivationTypes),
+    rangeOptions: distinct("rangeKey", CONFIG.DND5E?.distanceUnits)
   };
 }
 
