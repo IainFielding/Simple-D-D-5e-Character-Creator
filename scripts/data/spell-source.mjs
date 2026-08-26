@@ -20,6 +20,81 @@ export const SUBCLASS_SPELL_LISTS = {
   "rogue:arcane-trickster": "wizard" // …but older/third-party data spells it out
 };
 
+/**
+ * Every class spell list the world has registered, as picker options.
+ *
+ * The map above can only ever name casters we have heard of, and dnd5e's subclass schema has no
+ * field naming the list a caster borrows — `system.spellcasting` is progression, ability and a
+ * preparation formula, nothing more. So a third-party third-caster resolves to an empty pool, and
+ * no amount of extending that map fixes the next one. This is the general answer: when we cannot
+ * work out which list a caster draws from, show the player the lists that exist and let them say.
+ *
+ * Reads the registry's own options rather than scanning packs, so a list registered by any module
+ * (or authored in the world) is offered on the same footing as the system's.
+ * @returns {{id: string, label: string}[]}  Sorted by label, as the registry sorts them.
+ */
+export function registeredClassLists() {
+  try {
+    return (dnd5e.registry?.spellLists?.options ?? [])
+      .filter(option => String(option.value ?? "").startsWith("class:"))
+      .map(option => ({ id: option.value.slice("class:".length), label: option.label }))
+      // An empty list would be a dead option: picking it changes nothing the player can see.
+      .filter(option => registeredList("class", option.id));
+  } catch ( err ) {
+    log("could not read the spell list registry's options", err);
+    return [];
+  }
+}
+
+/**
+ * The registry's own display name for a list — "Wizard", "Life Domain" — for the line that tells a
+ * player which list they are looking at. Falls back to the identifier, which is at least true.
+ * @param {string} type
+ * @param {string} identifier
+ * @returns {string}
+ */
+function listLabel(type, identifier) {
+  try {
+    return dnd5e.registry?.spellLists?.forType?.(type, identifier)?.name || identifier;
+  } catch {
+    return identifier;
+  }
+}
+
+/** The " from the class \"wizard\" list" fragment the debug log appends, or "" when it isn't borrowed. */
+function listNote(list, classId) {
+  return list.id === classId ? "" : ` from the ${list.type} "${list.id}" list`;
+}
+
+/**
+ * What a spell step needs to explain the pool it is about to show.
+ *
+ * Three states, and each wants different words on screen:
+ *  - the ordinary one, where a caster draws from its own list and there is nothing to say;
+ *  - **borrowed** — an Eldritch Knight preparing from the Wizard list. Saying so is what stops the
+ *    grid reading as "why is my Fighter being shown wizard spells";
+ *  - **missing** — every lookup and both pack scans came back with nothing, which for a caster is
+ *    never the right answer, only an unanswerable one. The step turns this into the picker.
+ *
+ * `chosen` rides along so the step can word a borrowed list the player picked themselves
+ * differently from one we worked out for them.
+ * @param {{id: string, type: string, chosen?: boolean}} list
+ * @param {string} classId  The caster's own identifier.
+ * @param {number} found    How many spells the list actually yielded.
+ * @returns {{listId: string, listSource: string, listLabel: string, listBorrowed: boolean,
+ *   listChosen: boolean, listMissing: boolean}}
+ */
+function listProvenance(list, classId, found) {
+  return {
+    listId: list.id,
+    listSource: list.type,
+    listLabel: listLabel(list.type, list.id),
+    listBorrowed: list.id !== classId,
+    listChosen: !!list.chosen,
+    listMissing: found === 0
+  };
+}
+
 /** Index fields fetched for spells, so cards can show components/range without the full doc. */
 const SPELL_INDEX_FIELDS = new Set([
   "system.level", "system.school", "system.identifier", "system.properties",
@@ -70,14 +145,17 @@ export class SpellSource {
    * @returns {Promise<{isSpellcaster:boolean, cantrips?:object[], level1?:object[],
    *   maxCantrips?:number, maxSpells?:number, classId?:string}>}
    */
-  async forClass(classUuid) {
+  async forClass(classUuid, { listOverride = "" } = {}) {
     if ( !classUuid ) return { isSpellcaster: false };
-    if ( !this.#byClass.has(classUuid) ) {
-      const promise = this.#resolve(classUuid)
-        .catch(err => { this.#byClass.delete(classUuid); throw err; });
-      this.#byClass.set(classUuid, promise);
+    // The override is part of the key, not a filter applied after: it changes which list is loaded,
+    // so a memo made before the player answered must not be handed back afterwards.
+    const key = `${classUuid}:${listOverride}`;
+    if ( !this.#byClass.has(key) ) {
+      const promise = this.#resolve(classUuid, listOverride)
+        .catch(err => { this.#byClass.delete(key); throw err; });
+      this.#byClass.set(key, promise);
     }
-    return this.#byClass.get(classUuid);
+    return this.#byClass.get(key);
   }
 
   /**
@@ -124,16 +202,16 @@ export class SpellSource {
    *   subclass caster (Eldritch Knight / Arcane Trickster), whose list is registered under it.
    * @returns {Promise<{isSpellcaster:boolean, byLevel?:Record<number,object[]>, classId?:string, maxSpellLevel?:number}>}
    */
-  async forClassAtLevel(classUuid, maxSpellLevel, listType = "class", { doc = null } = {}) {
+  async forClassAtLevel(classUuid, maxSpellLevel, listType = "class", { doc = null, listOverride = "" } = {}) {
     if ( !classUuid && !doc ) return { isSpellcaster: false };
     // Key on the casting item's identifier when we have the document, since that — not the UUID it
     // was copied from — is what the spell list is actually looked up by; every character casting as
     // a sorcerer then shares one load. A UUID-only call keeps its old key.
-    const key = `${listType}:${doc?.system?.identifier || classUuid}:${maxSpellLevel}`;
+    const key = `${listType}:${doc?.system?.identifier || classUuid}:${maxSpellLevel}:${listOverride}`;
     // Memoise the in-flight promise so the level-up shell's background warm-up and the spell
     // step's own load converge on one fetch; a failed load un-caches itself so it can retry.
     if ( !this.#byLevelUp.has(key) ) {
-      const promise = this.#resolveAtLevel(classUuid, maxSpellLevel, listType, doc)
+      const promise = this.#resolveAtLevel(classUuid, maxSpellLevel, listType, doc, listOverride)
         .catch(err => { this.#byLevelUp.delete(key); throw err; });
       this.#byLevelUp.set(key, promise);
     }
@@ -187,22 +265,25 @@ export class SpellSource {
    *   class onto the clone without a `compendiumSource`, so `fromUuid` yields nothing and the pool
    *   would come back empty.
    */
-  async #resolveAtLevel(classUuid, maxSpellLevel, listType, staged = null) {
+  async #resolveAtLevel(classUuid, maxSpellLevel, listType, staged = null, listOverride = "") {
     const doc = staged ?? await fromUuid(classUuid);
     const progression = doc?.system?.spellcasting?.progression;
     if ( !doc || !progression || progression === "none" ) return { isSpellcaster: false };
 
     const classId = doc.system?.identifier ?? doc.name?.toLowerCase() ?? "";
-    const list = spellListFor(doc, classId, listType);
+    const list = spellListFor(doc, classId, listType, listOverride);
     const all = deduplicateSpells(
       await loadSpellsForClass(list.id, maxSpellLevel, list.type, this.#fetchSpellPool(maxSpellLevel)));
     const byName = (a, b) => a.name.localeCompare(b.name, game.i18n.lang);
     const byLevel = {};
     for ( let l = 0; l <= maxSpellLevel; l++ ) byLevel[l] = all.filter(s => s.level === l).sort(byName);
 
-    const borrowed = list.id === classId ? "" : ` from the ${list.type} "${list.id}" list`;
-    log(`level-up spells for "${classId}"${borrowed} (≤ lvl ${maxSpellLevel}): ${all.length} total`);
-    return { isSpellcaster: true, byLevel, classId, maxSpellLevel };
+    log(`level-up spells for "${classId}"${listNote(list, classId)} ` +
+      `(≤ lvl ${maxSpellLevel}): ${all.length} total`);
+    return {
+      isSpellcaster: true, byLevel, classId, maxSpellLevel,
+      ...listProvenance(list, classId, all.length)
+    };
   }
 
   /**
@@ -245,7 +326,7 @@ export class SpellSource {
     });
   }
 
-  async #resolve(classUuid) {
+  async #resolve(classUuid, listOverride = "") {
     const doc = await fromUuid(classUuid);
     const progression = doc?.system?.spellcasting?.progression;
     if ( !doc || !progression || progression === "none" ) return { isSpellcaster: false };
@@ -254,14 +335,19 @@ export class SpellSource {
     const maxCantrips = scaleCount(doc, classId, "cantrip", DEFAULT_CANTRIPS);
     const maxSpells = scaleCount(doc, classId, "spell", DEFAULT_LEVEL1_SPELLS);
 
-    const all = deduplicateSpells(await loadSpellsForClass(classId, 1, "class", this.#fetchSpellPool(1)));
+    const list = spellListFor(doc, classId, "class", listOverride);
+    const all = deduplicateSpells(
+      await loadSpellsForClass(list.id, 1, list.type, this.#fetchSpellPool(1)));
     const byName = (a, b) => a.name.localeCompare(b.name, game.i18n.lang);
     const cantrips = all.filter(s => s.level === 0).sort(byName);
     const level1 = all.filter(s => s.level === 1).sort(byName);
 
-    log(`spells for "${classId}": ${cantrips.length} cantrips, ${level1.length} lvl-1 ` +
-      `(know ${maxCantrips}/${maxSpells})`);
-    return { isSpellcaster: true, cantrips, level1, maxCantrips, maxSpells, classId };
+    log(`spells for "${classId}"${listNote(list, classId)}: ${cantrips.length} cantrips, ` +
+      `${level1.length} lvl-1 (know ${maxCantrips}/${maxSpells})`);
+    return {
+      isSpellcaster: true, cantrips, level1, maxCantrips, maxSpells, classId,
+      ...listProvenance(list, classId, all.length)
+    };
   }
 
   /** Enriched description html for the focused spell, memoised. */
@@ -367,17 +453,28 @@ function registeredList(type, identifier) {
 }
 
 /**
- * The spell list a caster actually draws from. A subclass caster usually has a list registered
- * under its own identifier, but one that doesn't borrows a class list instead ({@link
- * SUBCLASS_SPELL_LISTS}, else its parent class's own list — right for a homebrew subclass of a
- * casting class). Falls back to the caster's own key when neither is registered, so the pack-scan
- * fallbacks in {@link loadSpellsForClass} still get their turn.
+ * The spell list a caster actually draws from.
+ *
+ * Resolution order, most certain first:
+ *  1. **The player's own answer.** `override` is what they picked when we had to ask
+ *     ({@link registeredClassLists}); nothing should second-guess it.
+ *  2. A list registered under the caster's own identifier — the ordinary case for a class, and for
+ *     the subclass casters that ship a `subclass:` list (the domains, the Circles, the Oaths).
+ *  3. {@link SUBCLASS_SPELL_LISTS}, the two third-casters whose borrowed list lives only in prose.
+ *  4. The parent class's own list — right for a homebrew subclass of a casting class.
+ *
+ * Falls back to the caster's own key when none of those is registered, so the pack-scan fallbacks in
+ * {@link loadSpellsForClass} still get their turn before anyone concludes the pool is empty.
  * @param {Item5e} doc                   The casting class or subclass document.
  * @param {string} identifier            That document's own identifier.
  * @param {"class"|"subclass"} listType  Registry type of the caster itself.
- * @returns {{ id: string, type: "class"|"subclass" }}
+ * @param {string} [override]            A class list identifier the player chose explicitly.
+ * @returns {{ id: string, type: "class"|"subclass", chosen?: boolean }}
  */
-export function spellListFor(doc, identifier, listType) {
+export function spellListFor(doc, identifier, listType, override = "") {
+  // An override is only meaningful while it still names a list this world has; content disabled
+  // since the pick was made falls back to the ordinary resolution rather than to nothing.
+  if ( override && registeredList("class", override) ) return { id: override, type: "class", chosen: true };
   if ( (listType !== "subclass") || registeredList("subclass", identifier) ) {
     return { id: identifier, type: listType };
   }
@@ -682,6 +779,36 @@ export function spellFilterOptions(list, translate) {
     // rather than in CONFIG order.
     castingOptions: distinct("castingTimeKey", CONFIG.DND5E?.activityActivationTypes),
     rangeOptions: distinct("rangeKey", CONFIG.DND5E?.distanceUnits)
+  };
+}
+
+/**
+ * The view-model for {@link module:templates/parts/spell-list-notice}: which list this caster is
+ * drawing from, and — when we could not work that out — the class lists the world does have, so
+ * the player can say.
+ *
+ * Shared by both spell steps because the question and its answer are identical in each; only the
+ * step that asks differs. Silent in the ordinary case: every field is false or empty, and the
+ * partial renders nothing.
+ * @param {{listBorrowed?: boolean, listChosen?: boolean, listLabel?: string, listMissing?: boolean}} data
+ *   The resolved pool, carrying the provenance this module stamped on it.
+ * @param {string} override    The list identifier the player has chosen, if any.
+ * @param {string} className   The caster's name, for the "no list for X" wording.
+ * @returns {object}
+ */
+export function spellListNotice(data, override, className) {
+  const missing = !!data.listMissing;
+  return {
+    className,
+    listMissing: missing,
+    listBorrowed: !!data.listBorrowed,
+    listChosen: !!data.listChosen,
+    listLabel: data.listLabel ?? "",
+    // Only built when it is about to be shown: reading the registry's options is cheap, but doing it
+    // on every render of every ordinary caster's spell step would be work for nothing.
+    listOptions: missing
+      ? registeredClassLists().map(option => ({ ...option, selected: option.id === override }))
+      : []
   };
 }
 

@@ -270,7 +270,15 @@
           "filterRangeAria": "Filter by range",
           "empty": "No spells available.",
           "concentration": "Concentration",
-          "ritual": "Ritual"
+          "ritual": "Ritual",
+          "listBorrowed": "Preparing from the {list} spell list.",
+          "listChosen": "Drawing from the {list} spell list, as you chose.",
+          "listReset": "Change",
+          "listMissing": "No spell list is registered for {class}, so there is nothing to choose from. Pick the class list it should draw from — an Eldritch Knight or Arcane Trickster uses the Wizard list.",
+          "listChoose": "Draw spells from",
+          "listChooseAria": "Choose which class spell list this caster draws from",
+          "listNone": "Choose a spell list…",
+          "listNoneAvailable": "This world has no class spell lists enabled at all. Ask your GM to enable a compendium that provides them."
         }
       }
     },

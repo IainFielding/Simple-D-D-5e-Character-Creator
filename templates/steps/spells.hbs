@@ -9,7 +9,13 @@
   <!-- Main column: intro, tabs, filters, and the spell list for the active tab -->
   <div class="creator-pick-side">
     <p class="levelup-spells-intro">{{intro}}</p>
+    {{> "modules/sogrom-dnd5e-character-creator/templates/parts/spell-list-notice.hbs" this}}
 
+    {{!-- With no list to draw from there is nothing behind any of these: the tabs would count
+          toward a quota that cannot be filled, the filters would narrow an empty list, and the
+          "choose 3 more" tally would contradict the panel above saying nothing can be chosen. The
+          notice is the whole screen until it is answered. --}}
+    {{#unless listMissing}}
     <div class="creator-spell-tabs">
       {{#if hasCantrips}}
       <button type="button" class="creator-spell-tab {{#if isCantripsTab}}is-active{{/if}} {{#if cantripsFull}}is-full{{/if}}"
@@ -39,6 +45,8 @@
       <p class="creator-empty">{{localize "sogrom-dnd5e-character-creator.step.spells.empty"}}</p>
       {{/each}}
     </ul>
+    {{/unless}}
+
   </div>
 
   <!-- Sidebar: focused spell (scrolls), with the running tally pinned at the bottom -->

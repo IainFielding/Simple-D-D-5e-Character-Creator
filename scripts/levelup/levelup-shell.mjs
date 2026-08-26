@@ -403,8 +403,11 @@ export class LevelUpShell extends CreatorShellBase {
   #warmSpellPool() {
     const plan = this.state.spellPlan();
     if ( !plan.isSpellcaster || !plan.hasDelta || !plan.castUuid ) return;
-    // Same arguments the step itself uses, so the warm and the step share one memoised load.
-    this.#spells.forClassAtLevel(plan.castUuid, plan.maxSpellLevel, plan.listType, { doc: plan.castItem })
+    // Same arguments the step itself uses, so the warm and the step share one memoised load — the
+    // chosen spell list included, since it is part of the memo key rather than a filter applied
+    // after, and warming without it would load a pool nobody goes on to read.
+    this.#spells.forClassAtLevel(plan.castUuid, plan.maxSpellLevel, plan.listType,
+      { doc: plan.castItem, listOverride: this.state.spellListOverride })
       .catch(err => log("level-up spell pool warm-up failed", err));
   }
 

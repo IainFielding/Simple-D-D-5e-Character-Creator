@@ -1,6 +1,6 @@
 import { t } from "../config.mjs";
 import { pinContext } from "../app/compare.mjs";
-import { spellFilterOptions } from "../data/spell-source.mjs";
+import { spellFilterOptions, spellListNotice } from "../data/spell-source.mjs";
 import { originGrantedSpellCards } from "./feat-spells-step.mjs";
 
 /**
@@ -27,6 +27,10 @@ export const spellsStep = {
     const info = state.spellInfo;
     if ( !info ) return false;            // no class chosen yet — not started, so no tick
     if ( !info.isSpellcaster ) return true; // non-caster: nothing to choose (rail greys it)
+    // A caster whose spell list resolves to nothing has no picks to make. Holding the build shut
+    // over a quota that cannot be filled would trap the player on this screen with no way forward,
+    // so the step steps aside and the panel explains what is missing instead.
+    if ( info.listMissing ) return true;
     return state.selectedCantrips.length >= info.maxCantrips
         && state.selectedSpells.length >= info.maxSpells;
   },
@@ -34,7 +38,7 @@ export const spellsStep = {
   /** Why Next is blocked: how many spells are still to be chosen. */
   incompleteHint(state) {
     const info = state.spellInfo;
-    if ( !info?.isSpellcaster ) return null;
+    if ( !info?.isSpellcaster || info.listMissing ) return null;
     const remain = Math.max(0, info.maxCantrips - state.selectedCantrips.length)
                  + Math.max(0, info.maxSpells - state.selectedSpells.length);
     return remain ? t("step.spells.hint", { count: remain }) : null;
@@ -69,8 +73,26 @@ export const spellsStep = {
       state.focusedSpellUuid = el.dataset.uuid;
       return;
     }
+    // The player naming the list this caster draws from, when nothing could work it out for them.
+    // Clearing it hands the question back to {@link module:data/spell-source.spellListFor}.
+    if ( action === "choose-spell-list" ) {
+      state.spellListOverride = el.value ?? "";
+      state.focusedSpellUuid = null;
+      // The pool is about to be a different set of spells, so picks made against the old one are
+      // not picks against this one.
+      state.selectedCantrips = [];
+      state.selectedSpells = [];
+      return;
+    }
+    if ( action === "clear-spell-list" ) {
+      state.spellListOverride = "";
+      state.focusedSpellUuid = null;
+      state.selectedCantrips = [];
+      state.selectedSpells = [];
+      return;
+    }
     if ( action === "pick-spell" ) {
-      const data = await spells.forClass(state.classUuid);
+      const data = await spells.forClass(state.classUuid, { listOverride: state.spellListOverride });
       if ( !data.isSpellcaster ) return;
       const uuid = el.dataset.uuid;
       const isCantrip = Number(el.dataset.level) === 0;
@@ -86,12 +108,13 @@ export const spellsStep = {
   },
 
   async context({ state, spells, source, app }) {
-    const data = await spells.forClass(state.classUuid);
+    const data = await spells.forClass(state.classUuid, { listOverride: state.spellListOverride });
     // Keep the completion gate's view of the class in sync with what we render.
     state.spellInfo = {
       isSpellcaster: !!data.isSpellcaster,
       maxCantrips: data.maxCantrips ?? 0,
-      maxSpells: data.maxSpells ?? 0
+      maxSpells: data.maxSpells ?? 0,
+      listMissing: !!data.listMissing
     };
     // "Not a caster" and "a caster with nothing to learn yet" both mean there is nothing to show, so
     // both take the short message rather than an empty list. The second is the half-casters: a 2014
@@ -162,6 +185,7 @@ export const spellsStep = {
     // the two screens read the same. The level filter is only meaningful on the leveled tab.
     const filters = spellFilterOptions(list, t);
     const className = source?.card(state.classUuid)?.name ?? "";
+    const listNotice = spellListNotice(data, state.spellListOverride, className);
     // Pin/compare, exactly as the class and origin pickers opt in — the shell owns the pins, the
     // step only decorates its rows and asks for the toolbar control.
     const pinned = pinContext(app?.pins, "spell", list);
@@ -169,6 +193,7 @@ export const spellsStep = {
     return {
       isSpellcaster: true,
       tab,
+      ...listNotice,
       intro: t("step.spells.intro", { class: className }),
       isCantripsTab: tab === "cantrips",
       isLevel1Tab: tab === "level1",
@@ -206,12 +231,14 @@ export const spellsStep = {
  * known at level 1 — read from the (memoised) {@link SpellSource}. Cached on
  * `state.spellInfo` so the synchronous `isComplete`/`applicable` checks can use it.
  */
-export async function spellInfoFor(spells, classUuid) {
+export async function spellInfoFor(spells, classUuid, listOverride = "") {
   if ( !classUuid ) return null;
-  const info = await spells.forClass(classUuid);
+  const info = await spells.forClass(classUuid, { listOverride });
   return {
     isSpellcaster: !!info.isSpellcaster,
     maxCantrips: info.maxCantrips ?? 0,
-    maxSpells: info.maxSpells ?? 0
+    maxSpells: info.maxSpells ?? 0,
+    // Whether the pool came back empty, so the gate knows not to demand picks that cannot be made.
+    listMissing: !!info.listMissing
   };
 }

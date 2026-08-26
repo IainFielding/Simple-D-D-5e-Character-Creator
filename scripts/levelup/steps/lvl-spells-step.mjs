@@ -1,5 +1,5 @@
 import { t } from "../../config.mjs";
-import { cantripsKnownAtLevel, buildSpellFromEntry, spellFilterOptions, spellMethodFor }
+import { cantripsKnownAtLevel, buildSpellFromEntry, spellFilterOptions, spellListNotice, spellMethodFor }
   from "../../data/spell-source.mjs";
 import { ownedSpellKeys, spellKey } from "../../data/spell-identity.mjs";
 import { planSpellReconciliation } from "../../build/spell-reconcile.mjs";
@@ -181,6 +181,16 @@ export const lvlSpellsStep = {
     }
     if ( action === "pick-spell" ) return pickSpell(el, ctx);
     if ( action === "swap-spell" ) return toggleSwap(el, ctx);
+    // The player naming the list this caster draws from, when nothing could work it out for them,
+    // and taking it back again. Either way the pool changes, so picks staged against the old one go.
+    if ( (action === "choose-spell-list") || (action === "clear-spell-list") ) {
+      state.spellListOverride = (action === "choose-spell-list") ? (el.value ?? "") : "";
+      state.focusedSpellUuid = null;
+      state.selectedCantrips = [];
+      state.selectedSpells = [];
+      state.swapCantrip = null;
+      state.swapSpell = null;
+    }
   },
 
   async context({ state, spells, app }) {
@@ -188,7 +198,7 @@ export const lvlSpellsStep = {
     if ( !plan.isSpellcaster ) return { isSpellcaster: false, hint: t("levelup.step.spells.noneNeeded") };
 
     const pool = await spells.forClassAtLevel(plan.castUuid, plan.maxSpellLevel, plan.listType,
-      { doc: plan.castItem });
+      { doc: plan.castItem, listOverride: state.spellListOverride });
     const tab = bucketFor(state, plan);
     const isCantrips = tab === "cantrips";
 
@@ -265,9 +275,11 @@ export const lvlSpellsStep = {
     // pinnable too: "is the spell I already know still better than this one" is the same question.
     const pinned = pinContext(app?.pins, "spell", list);
 
+    const className = state.classItem?.name ?? "";
     return {
       isSpellcaster: true,
-      intro: t("levelup.step.spells.intro", { class: state.classItem?.name ?? "" }),
+      ...spellListNotice(pool, state.spellListOverride, className),
+      intro: t("levelup.step.spells.intro", { class: className }),
       // The wording follows the class: a 2014 prepared caster is changing what it has prepared,
       // not trading a spell it knows forever.
       swapHint: ownedRows.length ? t(plan.swapLabelKey ?? "levelup.step.spells.swapHint") : "",
