@@ -177,9 +177,36 @@ export class CreatorState {
    */
   storeBudgetCp = 0;
 
+  /**
+   * A class spell list the player named themselves, when the caster's own could not be worked out
+   * — see {@link module:data/spell-source.registeredClassLists}. Empty in every ordinary build:
+   * only a caster whose list resolves to nothing ever asks.
+   *
+   * Session state, deliberately. Persisting it would be a second place a spell list can be
+   * declared, able to disagree with the registry that is the real answer; the fix for a caster that
+   * needs this is for its content to register a list, and an override that outlived the window
+   * would quietly hide that.
+   * @type {string}
+   */
+  spellListOverride = "";
+
   /** Transient Spells-step UI: which tab is shown and which spell is focused. Not persisted. */
   spellTab = "cantrips";
   focusedSpellUuid = null;
+
+  /**
+   * The spell list's client-side filters, one field per control in `SPELL_FILTER_CONTROLS`. They
+   * filter the DOM directly, but picking a spell re-renders the stage and rebuilds the controls —
+   * so searching for a spell and then clicking it used to wipe the search that found it. Keeping
+   * the values here lets the shell put them back after each render, as the level-up wizard has
+   * always done. `spellPropFilter` holds a `"<key>:yes|no"` pair, not a bare property key.
+   */
+  spellSearch = "";
+  spellLevelFilter = "";
+  spellSchoolFilter = "";
+  spellPropFilter = "";
+  spellCastingFilter = "";
+  spellRangeFilter = "";
 
   /**
    * Slim spellcasting summary for the current class — `{isSpellcaster, maxCantrips, maxSpells}`
@@ -310,10 +337,22 @@ export class CreatorState {
    * Forget everything keyed to the class: its level-1 spell picks, its advancement
    * choices, and its equipment selection. Called when the class selection changes so
    * a spell list or skill pick never carries over to a different class.
+   *
+   * The spell filters go with them. They are narrowing a list that is about to be replaced
+   * wholesale, and a school or casting time that matched the old class's spells can easily match
+   * none of the new one's — leaving the player on an empty list with no obvious cause.
    */
   resetClassDependent() {
     this.selectedCantrips = [];
     this.selectedSpells = [];
+    this.spellSearch = "";
+    this.spellLevelFilter = "";
+    this.spellSchoolFilter = "";
+    this.spellPropFilter = "";
+    this.spellCastingFilter = "";
+    this.spellRangeFilter = "";
+    // The override answered "which list does *this* caster use", so it dies with the caster.
+    this.spellListOverride = "";
     this.advChoices.class = {};
     this.#forgetFeatSpellLists("class");
     this.equipment.class = { selectedOption: 0, orSelections: {} };

@@ -1,0 +1,85 @@
+{{!--
+  The spell list's toolbar: the name search plus the filter dropdowns, shared by the creation and
+  level-up spell steps so the two screens read identically. Every control carries the `data-*`
+  attribute the shell's SPELL_FILTER_CONTROLS descriptor looks it up by; the shell restores each
+  value after a render and filters the rows in the DOM without re-rendering, so typing never loses
+  focus and picking a spell never wipes the search that found it.
+
+  Options come from spellFilterOptions() and are derived from the rows actually on screen, so a
+  dropdown is rendered only when it has something to offer. `showLevel` is the caller's call: spell
+  level means nothing on the cantrips tab.
+--}}
+<div class="creator-spell-search-row">
+  <label class="creator-search">
+    <i class="fa-solid fa-magnifying-glass"></i>
+    <input type="search" data-creator-search autocomplete="off"
+            aria-label="{{localize 'sogrom-dnd5e-character-creator.common.search'}}"
+            placeholder="{{localize 'sogrom-dnd5e-character-creator.common.search'}}">
+  </label>
+  <div class="creator-spell-filters">
+    {{#if showLevel}}{{#if levelOptions.length}}
+    <label class="creator-spell-filter">
+      <i class="fa-solid fa-layer-group"></i>
+      <select data-spell-filter-level aria-label="{{localize 'sogrom-dnd5e-character-creator.levelup.step.spells.filterLevelAria'}}">
+        <option value="">{{localize "sogrom-dnd5e-character-creator.levelup.step.spells.filterAllLevels"}}</option>
+        {{#each levelOptions}}<option value="{{value}}">{{label}}</option>{{/each}}
+      </select>
+    </label>
+    {{/if}}{{/if}}
+    {{#if schoolOptions.length}}
+    <label class="creator-spell-filter">
+      <i class="fa-solid fa-hat-wizard"></i>
+      <select data-spell-filter-school aria-label="{{localize 'sogrom-dnd5e-character-creator.levelup.step.spells.filterSchoolAria'}}">
+        <option value="">{{localize "sogrom-dnd5e-character-creator.levelup.step.spells.filterAllSchools"}}</option>
+        {{#each schoolOptions}}<option value="{{value}}">{{label}}</option>{{/each}}
+      </select>
+    </label>
+    {{/if}}
+    {{#if castingOptions.length}}
+    <label class="creator-spell-filter">
+      <i class="fa-solid fa-hourglass-half"></i>
+      <select data-spell-filter-casting aria-label="{{localize 'sogrom-dnd5e-character-creator.levelup.step.spells.filterCastingAria'}}">
+        <option value="">{{localize "sogrom-dnd5e-character-creator.levelup.step.spells.filterAllCasting"}}</option>
+        {{#each castingOptions}}<option value="{{value}}">{{label}}</option>{{/each}}
+      </select>
+    </label>
+    {{/if}}
+    {{#if rangeOptions.length}}
+    <label class="creator-spell-filter">
+      <i class="fa-solid fa-ruler-horizontal"></i>
+      <select data-spell-filter-range aria-label="{{localize 'sogrom-dnd5e-character-creator.levelup.step.spells.filterRangeAria'}}">
+        <option value="">{{localize "sogrom-dnd5e-character-creator.levelup.step.spells.filterAllRanges"}}</option>
+        {{#each rangeOptions}}<option value="{{value}}">{{label}}</option>{{/each}}
+      </select>
+    </label>
+    {{/if}}
+    {{!-- Properties are grouped rather than listed flat: the same five keys appear twice, once as
+          "only" and once as "without", and the group headings are what stop that reading as a
+          duplicated menu. --}}
+    {{#if propertyGroups.length}}
+    <label class="creator-spell-filter">
+      <i class="fa-solid fa-scroll"></i>
+      <select data-spell-filter-prop aria-label="{{localize 'sogrom-dnd5e-character-creator.levelup.step.spells.filterPropsAria'}}">
+        <option value="">{{localize "sogrom-dnd5e-character-creator.levelup.step.spells.filterAllProps"}}</option>
+        {{#each propertyGroups}}
+        <optgroup label="{{label}}">
+          {{#each options}}<option value="{{value}}">{{label}}</option>{{/each}}
+        </optgroup>
+        {{/each}}
+      </select>
+    </label>
+    {{/if}}
+  </div>
+  {{!-- Compare: the way out of "pick one, read it, pick the other, read that, and hold the first in
+        your head" — the same control the class and origin pickers carry, and the same reason it is
+        disabled rather than hidden below two pins. Its label and tooltip are patched in place as
+        pins change, so pinning never re-renders the list or clears the search above. --}}
+  {{#if compare}}
+  <button type="button" class="creator-btn creator-btn-ghost creator-compare-btn"
+          data-action="openCompare" data-category="{{compare.category}}"
+          data-tooltip="{{compare.hint}}" {{#unless compare.canCompare}}disabled{{/unless}}>
+    <i class="fa-solid fa-scale-balanced"></i>
+    <span class="creator-compare-btn-label">{{compare.label}}</span>
+  </button>
+  {{/if}}
+</div>

@@ -133,6 +133,10 @@ export const classStep = {
       // the comparison honest: it can only ever hold options the player could actually choose.
       app?.pins?.clear("species");
       app?.pins?.clear("background");
+      // Pinned spells go the same way, and for a stronger reason: the whole pool is about to be
+      // replaced by a different class's list, so a Wizard's pinned cantrips would sit in a Cleric's
+      // comparison counting toward a button whose rows no longer include them.
+      app?.pins?.clear("spell");
       // Refresh the cached choice requirements so the Choices step's completion gate
       // reflects the new class even before it is visited.
       state.choiceCache = await resolveChoices(state, source);

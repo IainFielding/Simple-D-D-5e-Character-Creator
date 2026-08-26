@@ -65,8 +65,14 @@ describe("PinSet", () => {
 
   it("rejects a category that has no picker", () => {
     const pins = new PinSet();
-    expect(pins.toggle("spell", "a")).toBe("invalid");
-    expect(pins.count("spell")).toBe(0);
+    expect(pins.toggle("feat", "a")).toBe("invalid");
+    expect(pins.count("feat")).toBe(0);
+  });
+
+  it("accepts spells, which pin from the spell steps", () => {
+    const pins = new PinSet();
+    expect(pins.toggle("spell", "a")).toBe("added");
+    expect(pins.has("spell", "a")).toBe(true);
   });
 
   it("needs two pins before comparing means anything", () => {

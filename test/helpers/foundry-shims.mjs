@@ -50,6 +50,40 @@ export function installFoundryShims() {
       actorSizes: {
         tiny: { label: "Tiny" }, sm: { label: "Small" }, med: { label: "Medium" },
         lg: { label: "Large" }, huge: { label: "Huge" }, grg: { label: "Gargantuan" }
+      },
+      // The spell-facing config, trimmed to the entries the spell steps read. Shapes are the real
+      // ones from dnd5e 5.3.3 (`module/config.mjs`) with the i18n keys already resolved, since
+      // Foundry pre-localizes these before anything here would see them.
+      spellLevels: { 0: "Cantrip", 1: "1st Level", 2: "2nd Level", 3: "3rd Level" },
+      spellSchools: {
+        abj: { label: "Abjuration" }, con: { label: "Conjuration" }, div: { label: "Divination" },
+        enc: { label: "Enchantment" }, evo: { label: "Evocation" }, ill: { label: "Illusion" },
+        nec: { label: "Necromancy" }, trs: { label: "Transmutation" }
+      },
+      // Only `spell` is populated: it is the only set this module filters on.
+      validProperties: { spell: new Set(["vocal", "somatic", "material", "concentration", "ritual"]) },
+      itemProperties: {
+        vocal: { label: "Verbal" }, somatic: { label: "Somatic" }, material: { label: "Material" },
+        concentration: { label: "Concentration" }, ritual: { label: "Ritual" }
+      },
+      // `scalar` marks the types that carry a count; the time ones also appear in timeUnits, which
+      // is what routes them through formatTime rather than a flat label.
+      activityActivationTypes: {
+        action: { label: "Action" }, bonus: { label: "Bonus Action" }, reaction: { label: "Reaction" },
+        minute: { label: "Minutes", scalar: true }, hour: { label: "Hours", scalar: true },
+        day: { label: "Days", scalar: true }
+      },
+      timeUnits: {
+        minute: { label: "Minute" }, hour: { label: "Hour" }, day: { label: "Day" }
+      },
+      movementUnits: { ft: { label: "Feet" }, mi: { label: "Miles" }, m: { label: "Meters" } },
+      // dnd5e builds this by merging movementUnits' labels with rangeTypes, so it is flat strings.
+      distanceUnits: {
+        ft: "Feet", mi: "Miles", m: "Meters",
+        self: "Self", touch: "Touch", spec: "Special", any: "Any"
+      },
+      damageTypes: {
+        fire: { label: "Fire" }, cold: { label: "Cold" }, radiant: { label: "Radiant" }
       }
     }
   };
@@ -120,6 +154,15 @@ export function installFoundryShims() {
   // dnd5e.documents.Trait: label/icon are identity/stub; wildcard expansion returns empty so
   // the resolver falls back to literal keys (tests that need expansion override this).
   globalThis.dnd5e = {
+    // The system's own formatters, which the spell card borrows so a row is worded exactly as the
+    // sheet words it. These stand in with the plain English forms.
+    utils: {
+      formatTime: (value, unit) => {
+        const label = CONFIG.DND5E.timeUnits?.[unit]?.label ?? unit;
+        return `${value} ${Number(value) === 1 ? label : `${label}s`}`;
+      },
+      formatLength: (value, unit) => `${value} ${unit}`
+    },
     documents: {
       Trait: {
         keyLabel: key => key,

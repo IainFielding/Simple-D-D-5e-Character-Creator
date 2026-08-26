@@ -331,23 +331,12 @@ export class LevelUpShell extends CreatorShellBase {
     if ( !this._stageRendered(options) ) return;
     this._wireStepChanges(this.element);
     this._wireOverlays(this.element);
-    // Client-side spell-list filters on the spell step — search box plus the level/school
-    // dropdowns. All filter in the DOM without a re-render, so the search field keeps focus
-    // while typing; their values live on the state so the re-render a spell click causes
-    // restores them (a rebuilt control would otherwise reset to "show everything").
-    const filters = [
-      [this.element.querySelector("[data-creator-search]"), "spellSearch", "input"],
-      [this.element.querySelector("[data-spell-filter-level]"), "spellLevelFilter", "change"],
-      [this.element.querySelector("[data-spell-filter-school]"), "spellSchoolFilter", "change"]
-    ].filter(([el]) => el);
-    for ( const [el, key, event] of filters ) {
-      el.value = this.state[key];
-      el.addEventListener(event, () => {
-        this.state[key] = el.value;
-        this._applySpellFilters();
-      });
-    }
-    if ( filters.length ) this._applySpellFilters();
+    // Client-side spell-list filters on the spell step — search box plus the dropdowns. All filter
+    // in the DOM without a re-render, so the search field keeps focus while typing; their values
+    // live on the state so the re-render a spell click causes restores them (a rebuilt control
+    // would otherwise reset to "show everything"). Shared with the creator, which needs exactly
+    // the same behaviour on exactly the same controls.
+    this._wireSpellFilters(this.element);
     this.#guideToNext();
   }
 
@@ -414,8 +403,11 @@ export class LevelUpShell extends CreatorShellBase {
   #warmSpellPool() {
     const plan = this.state.spellPlan();
     if ( !plan.isSpellcaster || !plan.hasDelta || !plan.castUuid ) return;
-    // Same arguments the step itself uses, so the warm and the step share one memoised load.
-    this.#spells.forClassAtLevel(plan.castUuid, plan.maxSpellLevel, plan.listType, { doc: plan.castItem })
+    // Same arguments the step itself uses, so the warm and the step share one memoised load — the
+    // chosen spell list included, since it is part of the memo key rather than a filter applied
+    // after, and warming without it would load a pool nobody goes on to read.
+    this.#spells.forClassAtLevel(plan.castUuid, plan.maxSpellLevel, plan.listType,
+      { doc: plan.castItem, listOverride: this.state.spellListOverride })
       .catch(err => log("level-up spell pool warm-up failed", err));
   }
 

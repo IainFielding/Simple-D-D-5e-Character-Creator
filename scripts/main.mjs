@@ -52,6 +52,11 @@ Hooks.once("init", () => {
     tpl("parts/abilities-panel.hbs"),
     tpl("parts/origin-abilities.hbs"),
     tpl("parts/source-details.hbs"),
+    // The spell toolbar — search plus the filter dropdowns — is one partial shared by the creation
+    // and level-up spell steps, so the two screens can't drift apart.
+    tpl("parts/spell-filters.hbs"),
+    tpl("parts/spell-row.hbs"),
+    tpl("parts/spell-list-notice.hbs"),
     // The comparison grid is included by stage.hbs alongside the book-page overlay, so it is a
     // partial for the same reason that one is: the stage is loaded as a PART, its includes are not.
     tpl("parts/compare.hbs"),

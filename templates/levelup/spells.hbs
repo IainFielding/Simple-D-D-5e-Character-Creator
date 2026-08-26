@@ -9,7 +9,13 @@
     <p class="levelup-spells-intro">{{intro}}</p>
     {{#if swapHint}}<p class="levelup-spells-swaphint"><i class="fa-solid fa-arrow-right-arrow-left"></i> {{swapHint}}</p>{{/if}}
     {{#if releasedHint}}<p class="levelup-spells-releasedhint"><i class="fa-solid fa-wand-sparkles"></i> {{releasedHint}}</p>{{/if}}
+    {{> "modules/sogrom-dnd5e-character-creator/templates/parts/spell-list-notice.hbs" this}}
 
+    {{!-- With no list to draw from there is nothing behind any of these: the tabs would count
+          toward a budget that cannot be spent, the filters would narrow an empty list, and the
+          "choose 2 more" tally would contradict the panel above saying nothing can be chosen. The
+          notice is the whole screen until it is answered. --}}
+    {{#unless listMissing}}
     <div class="creator-spell-tabs">
       {{#if hasCantrips}}
       <button type="button" class="creator-spell-tab {{#if isCantripsTab}}is-active{{/if}} {{#if cantripsFull}}is-full{{/if}}"
@@ -28,56 +34,19 @@
     </div>
 
     <div class="creator-toolbar creator-toolbar--stacked">
-      <div class="creator-spell-search-row">
-        <label class="creator-search">
-          <i class="fa-solid fa-magnifying-glass"></i>
-          <input type="search" data-creator-search autocomplete="off"
-                  aria-label="{{localize 'sogrom-dnd5e-character-creator.common.search'}}"
-                  placeholder="{{localize 'sogrom-dnd5e-character-creator.common.search'}}">
-        </label>
-        <div class="creator-spell-filters">
-          {{#if isSpellsTab}}
-          <label class="creator-spell-filter">
-            <i class="fa-solid fa-layer-group"></i>
-            <select data-spell-filter-level aria-label="{{localize 'sogrom-dnd5e-character-creator.levelup.step.spells.filterLevelAria'}}">
-              <option value="">{{localize "sogrom-dnd5e-character-creator.levelup.step.spells.filterAllLevels"}}</option>
-              {{#each levelOptions}}<option value="{{value}}">{{label}}</option>{{/each}}
-            </select>
-          </label>
-          {{/if}}
-          <label class="creator-spell-filter">
-            <i class="fa-solid fa-hat-wizard"></i>
-            <select data-spell-filter-school aria-label="{{localize 'sogrom-dnd5e-character-creator.levelup.step.spells.filterSchoolAria'}}">
-              <option value="">{{localize "sogrom-dnd5e-character-creator.levelup.step.spells.filterAllSchools"}}</option>
-              {{#each schoolOptions}}<option value="{{value}}">{{label}}</option>{{/each}}
-            </select>
-          </label>
-        </div>
-      </div>
+      {{> "modules/sogrom-dnd5e-character-creator/templates/parts/spell-filters.hbs" showLevel=isSpellsTab}}
       <span class="creator-count">{{needLabel}}</span>
     </div>
 
     <ul class="creator-picklist">
       {{#each list}}
-      <li>
-        <button type="button"
-                class="creator-pickrow {{#if active}}is-selected{{/if}} {{#if owned}}is-owned{{/if}} {{#if swapMarked}}is-swapping{{/if}} {{#if focused}}is-focused{{/if}} {{#if disabled}}is-disabled{{/if}}"
-                data-action="stepAction" data-step-action="focus-spell"
-                data-uuid="{{uuid}}" data-name="{{name}}" data-level="{{level}}" data-school="{{school}}"
-                data-tooltip="{{ccItemTooltip uuid}}">
-          <img class="creator-pickrow-img" src="{{img}}" alt="">
-          <span class="creator-pickrow-name">{{name}}</span>
-          {{#if levelLabel}}<span class="creator-pickrow-tag">{{levelLabel}}</span>{{/if}}
-          {{#if owned}}
-            {{#if swapMarked}}<i class="creator-pickrow-tick fa-solid fa-arrow-right-arrow-left"></i>
-            {{else}}<i class="creator-pickrow-tick fa-solid fa-bookmark"></i>{{/if}}
-          {{else if active}}<i class="creator-pickrow-tick fa-solid fa-check"></i>{{/if}}
-        </button>
-      </li>
+      {{> "modules/sogrom-dnd5e-character-creator/templates/parts/spell-row.hbs" this compareCategory=../compareCategory}}
       {{else}}
       <p class="creator-empty">{{localize "sogrom-dnd5e-character-creator.levelup.step.spells.empty"}}</p>
       {{/each}}
     </ul>
+    {{/unless}}
+
   </div>
 
   <!-- Sidebar: focused spell (scrolls), with the running tally pinned at the bottom -->

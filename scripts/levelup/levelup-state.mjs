@@ -150,19 +150,37 @@ export class LevelUpState {
   selectedCantrips = [];
   selectedSpells = [];
 
+  /**
+   * A class spell list the player named themselves, when the caster's own could not be worked out
+   * — see {@link module:data/spell-source.registeredClassLists}. Empty in every ordinary build:
+   * only a caster whose list resolves to nothing ever asks.
+   *
+   * Session state, deliberately. Persisting it would be a second place a spell list can be
+   * declared, able to disagree with the registry that is the real answer; the fix for a caster that
+   * needs this is for its content to register a list, and an override that outlived the window
+   * would quietly hide that.
+   * @type {string}
+   */
+  spellListOverride = "";
+
   /** Transient UI state for the spell step: the active tab and the focused spell's UUID. */
   spellTab = "cantrips";
   focusedSpellUuid = null;
 
   /**
-   * The spell list's client-side filters (name search, spell level, school). They filter the DOM
-   * directly, but every spell click re-renders the stage and rebuilds the controls — so the
-   * values live here and the shell restores them after each render rather than letting them
-   * reset. Cleared only with the window.
+   * The spell list's client-side filters. They filter the DOM directly, but every spell click
+   * re-renders the stage and rebuilds the controls — so the values live here and the shell restores
+   * them after each render rather than letting them reset. Cleared only with the window.
+   *
+   * One field per control in `SPELL_FILTER_CONTROLS`; `spellPropFilter` holds a `"<key>:yes|no"`
+   * pair ("Ritual only", "Without Concentration") rather than a bare key.
    */
   spellSearch = "";
   spellLevelFilter = "";
   spellSchoolFilter = "";
+  spellPropFilter = "";
+  spellCastingFilter = "";
+  spellRangeFilter = "";
 
   /**
    * Phase 4b spell swaps: an owned cantrip / leveled spell the player has marked to replace this
@@ -272,6 +290,16 @@ export class LevelUpState {
     this.swapSpell = null;
     this.spellTab = "cantrips";
     this.focusedSpellUuid = null;
+    // The filters narrowed the old class's list. A school or casting time that matched half of it
+    // can easily match none of the next one, leaving the player on an empty list with no clue why.
+    this.spellSearch = "";
+    this.spellLevelFilter = "";
+    this.spellSchoolFilter = "";
+    this.spellPropFilter = "";
+    this.spellCastingFilter = "";
+    this.spellRangeFilter = "";
+    // The override answered "which list does *this* caster use", so it dies with the caster.
+    this.spellListOverride = "";
     this.collapsedBlocks.clear();
   }
 

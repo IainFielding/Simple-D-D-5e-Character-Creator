@@ -30,7 +30,24 @@ import { advancementArray } from "../data/advancement-util.mjs";
  */
 
 /** The pick categories that can be compared. Each maps to a picker that renders a pin control. */
-export const COMPARE_CATEGORIES = new Set(["class", "species", "background", "subclass"]);
+export const COMPARE_CATEGORIES = new Set(["class", "species", "background", "subclass", "spell"]);
+
+/**
+ * Spells are the odd category, and worth saying why.
+ *
+ * The other four are *origin* items: everything worth comparing about them is an advancement, which
+ * {@link module:data/source-index} has already flattened for the detail pane, so those rows are a
+ * transpose of work done elsewhere. A spell has no advancements at all — what a player weighs is its
+ * casting time, range, duration, save and damage, which live on activities.
+ *
+ * dnd5e computes every one of those onto the document as `item.labels` and `activity.labels`. We
+ * never read them for a *list* — two hundred index entries would have to be loaded as documents
+ * first, which is exactly why {@link module:data/spell-source.buildSpellFromEntry} formats its own
+ * from index fields — but a comparison holds at most {@link MAX_PINS} of them. Four documents is
+ * nothing, so here we can let the system do the deriving and get a grid that cannot word a spell
+ * differently from the character sheet.
+ */
+const SPELL_CATEGORY = "spell";
 
 /**
  * The most columns a comparison may hold.
@@ -161,7 +178,11 @@ const LAYOUT = {
   class: ["traits", "spellcasting", "subclassLevel", "asiLevels"],
   subclass: ["parentClass", "spellcasting", "traits"],
   species: ["creatureType", "size", "speed", "senses", "originAsi", "traits"],
-  background: ["originAsi", "traits"]
+  background: ["originAsi", "traits"],
+  // No "traits" marker: a spell grants nothing, so there is nothing to expand. The order is the one
+  // a spell's own stat block uses, which is the order a player already reads these in.
+  spell: ["spellLevel", "school", "castingTime", "spellRange", "duration", "components", "properties",
+    "save", "damage"]
 };
 
 /** Row builders keyed by the names {@link LAYOUT} uses. Each returns a row, or null when empty. */
@@ -183,7 +204,30 @@ const ROWS = {
   senses: entries => textRow("senses", t("compare.row.senses"), "fa-eye",
     entries.map(e => sensesText(e.doc))),
   originAsi: entries => textRow("originAsi", t("compare.row.abilityIncrease"), "fa-dumbbell",
-    entries.map(e => asiText(e.asi)))
+    entries.map(e => asiText(e.asi))),
+
+  // The spell rows. Each reads one prepared label off the document, with a fallback to the raw
+  // system field for the handful a compendium document may not have prepared.
+  spellLevel: entries => textRow("spellLevel", t("compare.row.spellLevel"), "fa-layer-group",
+    entries.map(e => e.doc?.labels?.level
+      ?? CONFIG.DND5E?.spellLevels?.[e.doc?.system?.level ?? 0] ?? "")),
+  school: entries => textRow("school", t("compare.row.school"), "fa-hat-wizard",
+    entries.map(e => e.doc?.labels?.school
+      ?? CONFIG.DND5E?.spellSchools?.[e.doc?.system?.school]?.label ?? "")),
+  castingTime: entries => textRow("castingTime", t("compare.row.castingTime"), "fa-hourglass-half",
+    entries.map(e => e.doc?.labels?.activation ?? "")),
+  spellRange: entries => textRow("spellRange", t("compare.row.range"), "fa-ruler-horizontal",
+    entries.map(e => e.doc?.labels?.range ?? "")),
+  duration: entries => textRow("duration", t("compare.row.duration"), "fa-clock",
+    entries.map(e => e.doc?.labels?.concentrationDuration ?? e.doc?.labels?.duration ?? "")),
+  components: entries => textRow("components", t("compare.row.components"), "fa-hand-sparkles",
+    entries.map(e => e.doc?.labels?.components?.full ?? e.doc?.labels?.components?.vsm ?? "")),
+  properties: entries => textRow("properties", t("compare.row.properties"), "fa-scroll",
+    entries.map(e => spellPropertyText(e.doc))),
+  save: entries => textRow("save", t("compare.row.save"), "fa-shield-halved",
+    entries.map(e => spellSaveText(e.doc))),
+  damage: entries => textRow("damage", t("compare.row.damage"), "fa-burst",
+    entries.map(e => spellDamageText(e.doc)))
 };
 
 /**
@@ -209,7 +253,10 @@ export async function buildCompare(category, uuids, source) {
         log(`compare: ${uuid} no longer resolves — dropping the column`);
         continue;
       }
-      entries.push({
+      // A spell has no advancements and no detail card in the SourceIndex — both of those read an
+      // origin item's grants — so it skips straight to the document, whose own prepared labels are
+      // all its rows need. Everything else pays for the flattening the detail pane already did.
+      entries.push(category === SPELL_CATEGORY ? { uuid, doc } : {
         uuid,
         doc,
         detail: await source.detail(uuid, doc),
@@ -231,7 +278,9 @@ export async function buildCompare(category, uuids, source) {
       uuid: e.uuid,
       name: e.detail?.name ?? e.doc.name,
       img: e.detail?.img ?? e.doc.img,
-      source: e.detail?.source ?? ""
+      // A spell's book comes off the document itself; the origin categories read the one the detail
+      // pane already resolved.
+      source: e.detail?.source ?? sourceBookText(e.doc)
     })),
     rows: compareRows(category, entries),
     // The column count, handed to CSS as a custom property rather than baked into a class name, so
@@ -254,9 +303,10 @@ export async function buildCompare(category, uuids, source) {
 export function compareRows(category, entries) {
   const rows = [];
   // The book each option comes from, first. With both editions of the PHB enabled a world lists two
-  // Fighters, and this is the row that says which is which — often the reason to compare them.
+  // Fighters — and two Cure Wounds — and this is the row that says which is which, often the reason
+  // to compare them at all.
   rows.push(textRow("source", t("compare.row.source"), "fa-book",
-    entries.map(e => e.detail?.source ?? "")));
+    entries.map(e => e.detail?.source ?? sourceBookText(e.doc))));
 
   for ( const name of LAYOUT[category] ?? ["traits"] ) {
     if ( name === "traits" ) rows.push(...traitRows(entries));
@@ -264,11 +314,23 @@ export function compareRows(category, entries) {
   }
 
   // The granted items last: they are the longest cells, and everything above is the summary a
-  // reader wants before wading into a feature list.
-  rows.push(itemRow("features", t("compare.row.features"), "fa-sparkles", entries, "features"));
-  rows.push(itemRow("spells", t("compare.row.spells"), "fa-wand-sparkles", entries, "spells"));
+  // reader wants before wading into a feature list. A spell grants neither, so it stops here.
+  if ( category !== SPELL_CATEGORY ) {
+    rows.push(itemRow("features", t("compare.row.features"), "fa-sparkles", entries, "features"));
+    rows.push(itemRow("spells", t("compare.row.spells"), "fa-wand-sparkles", entries, "spells"));
+  }
 
   return rows.filter(Boolean);
+}
+
+/**
+ * The book an item names as its source, for a document the SourceIndex has not already described.
+ * `system.source.label` is dnd5e's own resolved wording (book name plus page); the raw book code is
+ * the fallback for content that never set one.
+ */
+function sourceBookText(doc) {
+  const source = doc?.system?.source;
+  return source?.label || source?.book || source?.custom || "";
 }
 
 /**
@@ -314,6 +376,53 @@ function traitRows(entries) {
 /* -------------------------------------------- */
 
 const abilityLabel = key => CONFIG.DND5E?.abilities?.[key]?.label ?? key.toUpperCase();
+
+/**
+ * The tags dnd5e itself puts under a spell's name — Concentration, Ritual, and any property a
+ * package has added — as one cell. `labels.components.tags` is the system's own list; the fallback
+ * translates the raw property keys the same way, for a document whose labels were never prepared.
+ */
+function spellPropertyText(doc) {
+  const tags = doc?.labels?.components?.tags;
+  if ( tags?.length ) return tags.join(", ");
+  const props = doc?.system?.properties;
+  const keys = props instanceof Set ? [...props] : Array.isArray(props) ? props : [];
+  return keys
+    .filter(k => (k !== "vocal") && (k !== "somatic") && (k !== "material"))   // those are the components row
+    .map(k => CONFIG.DND5E?.itemProperties?.[k]?.label ?? k)
+    .join(", ");
+}
+
+/**
+ * The saving throw a spell forces — "Dexterity" — or "" when it forces none.
+ *
+ * Read from the spell's *save* activities rather than a field, because since dnd5e 4 that is where
+ * it lives; a spell can carry more than one, and a spell that offers a save alongside an attack roll
+ * is exactly the difference a comparison is being asked about.
+ */
+function spellSaveText(doc) {
+  const abilities = new Set();
+  for ( const activity of (doc?.system?.activities ?? []) ) {
+    for ( const key of (activity?.save?.ability ?? []) ) abilities.add(key);
+  }
+  return [...abilities].map(abilityLabel).join(" / ");
+}
+
+/**
+ * A spell's damage — "8d6 Fire" — from its activities' own prepared damage labels, which carry the
+ * simplified formula and the localized damage type together. Several activities (or several parts)
+ * are joined rather than picking one: a spell that rolls two kinds of damage is not summarised by
+ * either half.
+ */
+function spellDamageText(doc) {
+  const parts = [];
+  for ( const activity of (doc?.system?.activities ?? []) ) {
+    for ( const damage of (activity?.labels?.damages ?? []) ) {
+      if ( damage?.label && !parts.includes(damage.label) ) parts.push(damage.label);
+    }
+  }
+  return parts.join(" + ");
+}
 
 /**
  * A text row, or null when no column had anything to say.

@@ -1,0 +1,59 @@
+{{!--
+  Where this caster's spells are coming from. Shared by the creation and level-up spell steps, and
+  silent in the ordinary case — a Wizard drawing from the Wizard list has nothing to explain.
+
+  Two things it does say:
+
+  - **Borrowed.** An Eldritch Knight prepares from the Wizard list, and without a line saying so the
+    grid just reads as "why is my Fighter being offered wizard spells". Once the player has picked
+    the list themselves the wording changes to acknowledge that, with a control to change their mind.
+
+  - **Missing.** Every registry lookup and both pack scans came back empty. For a caster that is
+    never a true answer, only an unanswerable one — dnd5e's subclass schema has no field naming the
+    list a caster borrows, so third-party content that registers none leaves nothing to find. Rather
+    than show an empty list, ask: the dropdown holds every class list the world *has* registered.
+
+  Data from spellFilterOptions()'s siblings on the step context: `listBorrowed`, `listChosen`,
+  `listLabel`, and `listOptions` (from registeredClassLists()).
+--}}
+{{#if listMissing}}
+<div class="creator-spell-listmissing">
+  <p class="creator-spell-listmissing-lead">
+    <i class="fa-solid fa-triangle-exclamation" aria-hidden="true"></i>
+    {{localize "sogrom-dnd5e-character-creator.levelup.step.spells.listMissing" class=className}}
+  </p>
+  {{#if listOptions.length}}
+  <label class="creator-spell-listpick">
+    <span>{{localize "sogrom-dnd5e-character-creator.levelup.step.spells.listChoose"}}</span>
+    {{!-- A <select> fires change, not click, so it goes through data-step-change rather than the
+          click action map — see CreatorShellBase#_wireStepChanges. --}}
+    <select data-step-change="choose-spell-list"
+            aria-label="{{localize 'sogrom-dnd5e-character-creator.levelup.step.spells.listChooseAria'}}">
+      <option value="">{{localize "sogrom-dnd5e-character-creator.levelup.step.spells.listNone"}}</option>
+      {{#each listOptions}}
+      <option value="{{id}}" {{#if selected}}selected{{/if}}>{{label}}</option>
+      {{/each}}
+    </select>
+  </label>
+  {{else}}
+  {{!-- No class list registered anywhere: the world has no spell content enabled at all, so there is
+        nothing to offer and the player needs their GM, not a dropdown. --}}
+  <p class="creator-spell-listmissing-none">
+    {{localize "sogrom-dnd5e-character-creator.levelup.step.spells.listNoneAvailable"}}
+  </p>
+  {{/if}}
+</div>
+{{else if listBorrowed}}
+<p class="creator-spell-listnote">
+  <i class="fa-solid fa-book-open-reader" aria-hidden="true"></i>
+  {{#if listChosen}}
+  {{localize "sogrom-dnd5e-character-creator.levelup.step.spells.listChosen" list=listLabel}}
+  <button type="button" class="creator-linkbtn"
+          data-action="stepAction" data-step-action="clear-spell-list">
+    {{localize "sogrom-dnd5e-character-creator.levelup.step.spells.listReset"}}
+  </button>
+  {{else}}
+  {{localize "sogrom-dnd5e-character-creator.levelup.step.spells.listBorrowed" list=listLabel}}
+  {{/if}}
+</p>
+{{/if}}

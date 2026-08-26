@@ -2715,6 +2715,114 @@ body:has(.sogrom-creator-fullscreen) .application.compendium-browser {
 .creator-pickrow.is-swapping .creator-pickrow-name { color: var(--cc-text); text-decoration: line-through; opacity: 0.75; }
 .creator-pickrow.is-swapping .creator-pickrow-tick { color: var(--cc-danger, #c66); }
 
+/* Where this caster's spells come from. The borrowed note is a quiet aside — it answers a question
+   the player may not have asked yet ("why is my Fighter seeing wizard spells"), so it must not
+   compete with the list. The missing panel is the opposite: nothing can be chosen until it is
+   answered, so it takes the accent border a blocking message earns. */
+.creator-spell-listnote {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  margin: -0.35rem 0 0.75rem;
+  color: var(--cc-muted);
+  font-size: 0.82rem;
+  line-height: 1.35;
+}
+.creator-spell-listnote i { color: var(--cc-accent); }
+.creator-spell-listmissing {
+  margin: 0 0 0.85rem;
+  padding: 0.7rem 0.85rem;
+  background: var(--cc-panel);
+  border: 1px solid var(--cc-line);
+  border-left: 3px solid var(--cc-accent);
+  border-radius: var(--cc-radius);
+}
+.creator-spell-listmissing-lead {
+  margin: 0;
+  color: var(--cc-text);
+  font-size: 0.85rem;
+  line-height: 1.45;
+}
+.creator-spell-listmissing-lead i { color: var(--cc-accent); margin-right: 0.35rem; }
+.creator-spell-listmissing-none { margin: 0.5rem 0 0; color: var(--cc-muted); font-size: 0.8rem; }
+.creator-spell-listpick {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem;
+  margin-top: 0.6rem;
+  color: var(--cc-muted);
+  font-size: 0.82rem;
+}
+.creator-spell-listpick select {
+  flex: 1 1 12rem;
+  min-width: 0;
+  padding: 0.35rem 0.5rem;
+  background: var(--cc-panel-2, var(--cc-panel));
+  border: 1px solid var(--cc-line);
+  border-radius: var(--cc-radius);
+  color: var(--cc-text);
+  font-size: 0.85rem;
+  cursor: pointer;
+}
+.creator-spell-listpick select option { background: var(--cc-panel); color: var(--cc-text); }
+/* An inline "Change" beside the note: a link in behaviour, so it must not look like a button
+   competing with the pick controls below it. */
+.creator-linkbtn {
+  padding: 0;
+  background: none;
+  border: none;
+  color: var(--cc-accent);
+  font: inherit;
+  text-decoration: underline;
+  cursor: pointer;
+}
+.creator-linkbtn:hover { color: var(--cc-text); }
+
+/* A spell row's second line: everything a player would otherwise have to click each spell to read.
+   The name and the meta share a column so the row stays one flex line with the image and the tick,
+   and the meta truncates rather than wrapping — a list is scanned, and a row that grows to two lines
+   on some spells and not others is harder to scan than one that ends in an ellipsis. */
+.creator-spellrow-text {
+  display: flex;
+  flex: 1 1 auto;
+  flex-direction: column;
+  gap: 0.15rem;
+  min-width: 0;
+  text-align: left;
+}
+.creator-spellrow-meta {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  min-width: 0;
+  overflow: hidden;
+  white-space: nowrap;
+  font-size: 0.72rem;
+  line-height: 1.2;
+  color: var(--cc-muted);
+}
+/* Separators between the plain facts, drawn rather than typed so no cell has to know whether it is
+   the last one present. The tags opt out: they carry their own outline. */
+.creator-spellrow-meta > span + span:not(.creator-spellrow-tag)::before {
+  content: "·";
+  margin-right: 0.4rem;
+}
+.creator-spellrow-level { color: var(--cc-accent); font-weight: 600; }
+.creator-spellrow-tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.2rem;
+  padding: 0 0.35rem;
+  border: 1px solid var(--cc-line);
+  border-radius: var(--cc-radius-pill);
+}
+.creator-spellrow-tag i { font-size: 0.62rem; }
+/* The swap states dim or strike the whole label block, not just the name, so a marked row reads as
+   one struck-through thing rather than a struck name over live metadata. */
+.creator-pickrow.is-owned .creator-spellrow-meta { opacity: 0.75; }
+.creator-pickrow.is-swapping .creator-spellrow-meta { text-decoration: line-through; opacity: 0.7; }
+
 /* The description column scrolls its detail, with the picked-spell tally pinned beneath it. */
 .creator-spells .creator-pick-desc { display: flex; flex-direction: column; overflow: hidden; }
 /* Flat fill on the focused-spell detail card — no panel gradient on the spell pages. */
@@ -2842,9 +2950,12 @@ body:has(.sogrom-creator-fullscreen) .application.compendium-browser {
 
 /* Two tabs do not need the whole width of a wide stage. */
 .creator-spells .creator-spell-tabs .creator-spell-tab { flex: 0 1 18rem; }
-.creator-spell-filters { display: flex; flex: 1 1 260px; gap: 0.5rem; }
+/* Five dropdowns will not sit on one line on a narrow stage, so the group wraps and each control
+   takes a share of whatever row it lands on. A zero flex-basis made five equal slivers on a wide
+   stage; the basis below is what keeps each one wide enough to read its own longest option. */
+.creator-spell-filters { display: flex; flex: 1 1 260px; flex-wrap: wrap; gap: 0.5rem; }
 .creator-spell-filter {
-  flex: 1 1 0;
+  flex: 1 1 9rem;
   min-width: 0;
   display: flex;
   align-items: center;

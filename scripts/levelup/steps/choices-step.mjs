@@ -26,10 +26,11 @@ import { choiceBlurb, findRestrictedItems, evalItemPrereq, groupRecommended } fr
  * the grid ourselves is what keeps the decision inside the wizard.
  *
  * `restriction.list` names the list(s) as `class:<id>`; `restriction.level` fixes the spell level —
- * 0 for cantrips, 1 for first-level spells, which is the shape {@link SpellSource#forSpellList}
- * serves (and the creation feat-spells step already relies on). Anything else the system allows
- * ("available", a higher level) has no list bucket to draw from, so it yields nothing here and the
- * block falls back to whatever the authored pool and drop-scan provide.
+ * 0 for cantrips, 1 for first-level spells, and on up: {@link SpellSource#forSpellList} indexes the
+ * list by level, so a feature offering a choice of 2nd-level Cleric spells draws from the same
+ * place a Blessed Warrior does. Anything the system allows that *isn't* a level ("available", or a
+ * blank) has no bucket to draw from, so it yields nothing here and the block falls back to whatever
+ * the authored pool and drop-scan provide.
  * @param {object} cfg                                          The advancement configuration.
  * @param {import("../../data/spell-source.mjs").SpellSource} spells
  * @returns {Promise<Map<string, {name: string, img: string}>>}  uuid -> option metadata.
@@ -44,17 +45,19 @@ async function spellListOptions(cfg, spells) {
     log("spell choice: no spell source on this session, so its class list can't be offered");
     return out;
   }
-  if ( !Number.isInteger(level) || (level < 0) || (level > 1) ) {
+  if ( !Number.isInteger(level) || (level < 0) || (level > 9) ) {
     log(`spell choice: no list pool for restriction level "${raw}"`);
     return out;
   }
+  // Fetch the level-≤1 payload whenever the restriction allows it, and pick the bucket out of it:
+  // that is the key the session warm-up already fills for the Magic Initiate lists
+  // (cleric/druid/wizard), so a Blessed Warrior or Druidic Warrior pick reads a warm cache instead
+  // of opening a second, level-0-only one. Only a choice above 1st level pays for its own load.
+  const fetchLevel = Math.max(1, level);
   for ( const listId of lists ) {
     try {
-      // Always fetch the level-≤1 payload and pick the bucket: that is the key the session warm-up
-      // already fills for the Magic Initiate lists (cleric/druid/wizard), so a Blessed Warrior or
-      // Druidic Warrior pick reads a warm cache instead of opening a second, level-0-only one.
-      const { cantrips, level1 } = await spells.forSpellList(listId, 1);
-      for ( const spell of (level === 0 ? cantrips : level1) ) {
+      const { byLevel } = await spells.forSpellList(listId, fetchLevel);
+      for ( const spell of (byLevel?.[level] ?? []) ) {
         if ( spell?.uuid ) out.set(spell.uuid, { name: spell.name, img: spell.img });
       }
     } catch ( err ) {

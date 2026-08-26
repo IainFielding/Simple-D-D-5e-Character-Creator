@@ -1,7 +1,10 @@
 import { t } from "../../config.mjs";
-import { cantripsKnownAtLevel, buildSpellFromEntry, spellMethodFor } from "../../data/spell-source.mjs";
+import { cantripsKnownAtLevel, buildSpellFromEntry, spellFilterOptions, spellListNotice, spellMethodFor }
+  from "../../data/spell-source.mjs";
 import { ownedSpellKeys, spellKey } from "../../data/spell-identity.mjs";
 import { planSpellReconciliation } from "../../build/spell-reconcile.mjs";
+import { swapAllowance } from "../../data/spell-swap.mjs";
+import { pinContext } from "../../app/compare.mjs";
 
 /**
  * @typedef {object} SpellPlan
@@ -113,10 +116,16 @@ export function computeSpellPlan(actorLike, classItem) {
   const addCantrips = Math.max(0, cantripTarget - cantripHave) + releasedCantrips;
   const addSpells = maxSpellLevel > 0 ? Math.max(0, spellTarget - spellHave) + releasedSpells : 0;
 
+  // What the edition lets this caster replace. Read from the casting item rather than the actor
+  // because a multiclassed character can hold a 2014 class beside a 2024 one, and only the class
+  // gaining the level has a say in what it may trade.
+  const swap = swapAllowance(castItem);
+
   return {
     isSpellcaster: true, listId, listType, sourceTag, castUuid, castItem, classLevel, method,
     cantripTarget, cantripHave, spellTarget, spellHave, maxSpellLevel,
     releasedSpells, releasedCantrips,
+    canSwapCantrip: swap.cantrip, canSwapSpell: swap.spell, swapLabelKey: swap.labelKey,
     addCantrips, addSpells, hasDelta: (addCantrips > 0) || (addSpells > 0)
   };
 }
@@ -172,20 +181,33 @@ export const lvlSpellsStep = {
     }
     if ( action === "pick-spell" ) return pickSpell(el, ctx);
     if ( action === "swap-spell" ) return toggleSwap(el, ctx);
+    // The player naming the list this caster draws from, when nothing could work it out for them,
+    // and taking it back again. Either way the pool changes, so picks staged against the old one go.
+    if ( (action === "choose-spell-list") || (action === "clear-spell-list") ) {
+      state.spellListOverride = (action === "choose-spell-list") ? (el.value ?? "") : "";
+      state.focusedSpellUuid = null;
+      state.selectedCantrips = [];
+      state.selectedSpells = [];
+      state.swapCantrip = null;
+      state.swapSpell = null;
+    }
   },
 
-  async context({ state, spells }) {
+  async context({ state, spells, app }) {
     const plan = state.spellPlan();
     if ( !plan.isSpellcaster ) return { isSpellcaster: false, hint: t("levelup.step.spells.noneNeeded") };
 
     const pool = await spells.forClassAtLevel(plan.castUuid, plan.maxSpellLevel, plan.listType,
-      { doc: plan.castItem });
+      { doc: plan.castItem, listOverride: state.spellListOverride });
     const tab = bucketFor(state, plan);
     const isCantrips = tab === "cantrips";
 
-    // Effective add budgets: a marked swap frees one extra slot in its bucket (Phase 4b).
-    const effCantrips = plan.addCantrips + (state.swapCantrip ? 1 : 0);
-    const effSpells = plan.addSpells + (state.swapSpell ? 1 : 0);
+    // Effective add budgets: a marked swap frees one extra slot in its bucket (Phase 4b). The
+    // allowance is re-checked here as well as at the rows, so a mark left behind by an earlier
+    // render (the leveled class can change mid-session) can never widen a budget the edition
+    // has since closed.
+    const effCantrips = plan.addCantrips + ((plan.canSwapCantrip && state.swapCantrip) ? 1 : 0);
+    const effSpells = plan.addSpells + ((plan.canSwapSpell && state.swapSpell) ? 1 : 0);
 
     const picked = new Set([...state.selectedCantrips, ...state.selectedSpells].map(s => s.uuid));
     const ownedItems = ownedSpells(state.actor, plan.sourceTag, isCantrips);
@@ -211,9 +233,12 @@ export const lvlSpellsStep = {
     const atLimit = chosen.length >= budget;
     const decorate = s => ({ ...s, levelLabel: s.level === 0 ? "" : t("levelup.step.spells.levelTag", { level: s.level }) });
 
-    // Owned spells the player may swap out (only when this bucket has add capacity — you replace a
-    // spell in the same breath as learning one). Shown selected until marked, then struck.
-    const ownedRows = plan[isCantrips ? "addCantrips" : "addSpells"] > 0
+    // Owned spells the player may swap out — offered only when this bucket has add capacity (you
+    // replace a spell in the same breath as learning one) *and* the edition grants that class the
+    // replacement at all. Under the 2014 rules no class trades a cantrip on level-up, so those rows
+    // simply don't appear; see {@link module:data/spell-swap}. Shown selected until marked, then struck.
+    const canSwap = isCantrips ? plan.canSwapCantrip : plan.canSwapSpell;
+    const ownedRows = (canSwap && (plan[isCantrips ? "addCantrips" : "addSpells"] > 0))
       ? ownedItems.map(o => ({
           ...decorate(o), owned: true, swapMarked: swapMark?.id === o.id,
           focused: state.focusedSpellUuid === o.uuid
@@ -243,19 +268,21 @@ export const lvlSpellsStep = {
 
     // Filter options drawn from the spells actually in the list, so the dropdowns only ever offer
     // values that can match. Level filtering is meaningful only on the leveled tab (cantrips are all
-    // level 0); the school filter applies to both. The <select> values mirror the row data-attributes
-    // the client-side filter compares against ({@link CreatorShellBase#_applySpellFilters}).
-    const levelOptions = [...new Set(list.filter(s => s.level > 0).map(s => s.level))]
-      .sort((a, b) => a - b)
-      .map(level => ({ value: level, label: t("levelup.step.spells.levelTag", { level }) }));
-    const schoolOptions = [...new Set(list.map(s => s.school).filter(Boolean))]
-      .sort((a, b) => a.localeCompare(b, game.i18n.lang))
-      .map(school => ({ value: school, label: school }));
+    // level 0); the rest apply to both. The <select> values mirror the row data-attributes the
+    // client-side filter compares against ({@link CreatorShellBase#_applySpellFilters}).
+    const filters = spellFilterOptions(list, t);
+    // Pin/compare, as the creation spell step and the origin pickers do. Owned swap-out rows are
+    // pinnable too: "is the spell I already know still better than this one" is the same question.
+    const pinned = pinContext(app?.pins, "spell", list);
 
+    const className = state.classItem?.name ?? "";
     return {
       isSpellcaster: true,
-      intro: t("levelup.step.spells.intro", { class: state.classItem?.name ?? "" }),
-      swapHint: ownedRows.length ? t("levelup.step.spells.swapHint") : "",
+      ...spellListNotice(pool, state.spellListOverride, className),
+      intro: t("levelup.step.spells.intro", { class: className }),
+      // The wording follows the class: a 2014 prepared caster is changing what it has prepared,
+      // not trading a spell it knows forever.
+      swapHint: ownedRows.length ? t(plan.swapLabelKey ?? "levelup.step.spells.swapHint") : "",
       // Why there is an extra pick this level: a spell chosen earlier is about to become always
       // prepared, so the selection it was occupying comes back.
       releasedHint: released > 0 ? t("levelup.step.spells.releasedHint", { count: released }) : "",
@@ -271,9 +298,10 @@ export const lvlSpellsStep = {
       spellsFull: effSpells > 0 && state.selectedSpells.length >= effSpells,
       needLabel: t("levelup.step.spells.need", { count: Math.max(0, budget - chosen.length) }),
       atLimit,
-      list,
-      levelOptions,
-      schoolOptions,
+      list: pinned.cards,
+      compareCategory: pinned.compareCategory,
+      compare: pinned.compare,
+      ...filters,
       count: list.length,
       focused,
       selectedCantrips: [...state.selectedCantrips].sort(byName).map(toChip),
@@ -293,7 +321,8 @@ async function pickSpell(el, { state }) {
   const idx = bucket.findIndex(s => s.uuid === uuid);
   if ( idx >= 0 ) { bucket.splice(idx, 1); return; }
 
-  const swap = isCantrip ? state.swapCantrip : state.swapSpell;
+  const allowed = isCantrip ? plan.canSwapCantrip : plan.canSwapSpell;
+  const swap = allowed && (isCantrip ? state.swapCantrip : state.swapSpell);
   const max = (isCantrip ? plan.addCantrips : plan.addSpells) + (swap ? 1 : 0);
   if ( bucket.length >= max ) return;   // ignore the click once the budget is spent
   const doc = await fromUuid(uuid).catch(() => null);
@@ -308,6 +337,9 @@ async function pickSpell(el, { state }) {
 async function toggleSwap(el, { state }) {
   const plan = state.spellPlan();
   const isCantrip = Number(el.dataset.level) === 0;
+  // The rows this fires from are only rendered when the edition allows the replacement, so this is
+  // belt-and-braces against a stale click landing after the leveled class changed.
+  if ( !(isCantrip ? plan.canSwapCantrip : plan.canSwapSpell) ) return;
   const key = isCantrip ? "swapCantrip" : "swapSpell";
   const bucket = isCantrip ? state.selectedCantrips : state.selectedSpells;
   const addBudget = isCantrip ? plan.addCantrips : plan.addSpells;
