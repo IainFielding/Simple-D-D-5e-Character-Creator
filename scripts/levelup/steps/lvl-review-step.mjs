@@ -1,6 +1,7 @@
 import { ABILITIES, formatMod, t, log, storeConfig } from "../../config.mjs";
 import { summarizeOption } from "../../data/equipment-source.mjs";
 import { cartTotalCp, formatCp } from "../../data/store-source.mjs";
+import { pdfExportContext } from "../../build/pdf-export.mjs";
 
 /**
  * Final review for a level-up, laid out like the creation review: the character portrait and
@@ -199,6 +200,16 @@ export const lvlReviewStep = {
   isComplete() { return true; },
 
   summary() { return ""; },
+
+  /**
+   * The export switch — the one control on an otherwise read-only screen. It changes nothing about
+   * the level-up; it decides whether a sheet is printed once the level-up has actually been
+   * applied, since until then the character on the sheet would be the old one.
+   */
+  handle(action, _el, { state }) {
+    if ( action !== "toggle-pdf" ) return;
+    state.exportPdf = !state.exportPdf;
+  },
 
   async context({ state, driver, source, equipment }) {
     // Starting gear is chosen on the Ember hand-off's equipment step but isn't folded onto the
@@ -412,6 +423,10 @@ export const lvlReviewStep = {
         };
       }),
       purchases: reviewPurchases(state),
+      // No switch in the Ember hand-off: our Apply isn't the end of that build — Ember finishes
+      // the character afterwards — so a sheet printed here would be of a character still a step
+      // from done. The same reason the hand-off posts no chat card.
+      pdf: state.emberCreation ? null : pdfExportContext(state.exportPdf, "pdfExport.noteLevelUp"),
       sections
     };
   }

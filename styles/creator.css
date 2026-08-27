@@ -2242,6 +2242,23 @@ body:has(.sogrom-creator-fullscreen) .application.compendium-browser {
   border-radius: var(--cc-radius);
   color: var(--cc-text);
 }
+
+/* Manual entry: a plain number box where the stepper or the pool select sits in the other
+   methods, sized to match the score box beside it so the three panels share one silhouette. */
+.creator-manual-note { margin: 0 0 0.9rem; color: var(--cc-muted); font-size: 0.9rem; }
+.creator-manual-score {
+  width: 4.5rem;
+  padding: 0.35rem 0.5rem;
+  text-align: center;
+  font-size: 1.1rem;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  background: var(--cc-panel-2);
+  border: 1px solid var(--cc-line);
+  border-radius: var(--cc-radius);
+  color: var(--cc-text);
+}
+.creator-manual-score:focus { border-color: var(--cc-accent); outline: none; }
 .creator-ability-actions { display: flex; flex-wrap: nowrap; gap: 0.6rem; margin-top: 1.25rem; }
 /* Keep both buttons on one row inside the narrow aside: shrink padding and let them
    share the width rather than wrapping Reset onto a second line. */
@@ -5162,3 +5179,23 @@ body:has(.sogrom-creator-fullscreen) .application.compendium-browser {
   color: var(--sc-brass);
   text-decoration-color: var(--sc-brass);
 }
+
+/* ---------------------------------------------- Sheet PDF export
+
+   The switch on both review screens (creation and level-up). It sits in the same block frame the
+   review's other panels use, so it reads as one more section of the summary rather than a stray
+   control — but its note line is muted, because it describes something that happens later rather
+   than part of the character.
+
+   There is no disabled state to style: with no module able to print a sheet the block is not
+   rendered at all. */
+.creator-pdf-export {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem 1rem;
+}
+.creator-pdf-toggle { gap: 0.55rem; }
+/* The tick box leads the label; the accent marks it as chosen the same way a picked card is. */
+.creator-pdf-toggle.is-active { border-color: var(--cc-select); color: var(--cc-text); }
+.creator-pdf-note { margin: 0; color: var(--cc-muted); font-size: 0.9rem; }

@@ -34,6 +34,14 @@
     </div>
     <p class="hint">{{localize "sogrom-dnd5e-character-creator.settings.rollFormula.hint"}}</p>
   </div>
+
+  <div class="form-group">
+    <label for="sogrom-hr-manual">{{localize "sogrom-dnd5e-character-creator.settings.allowManualAbilities.name"}}</label>
+    <div class="form-fields">
+      <input id="sogrom-hr-manual" type="checkbox" name="manualAbilities" {{#if manualAbilities}}checked{{/if}}>
+    </div>
+    <p class="hint">{{localize "sogrom-dnd5e-character-creator.settings.allowManualAbilities.hint"}}</p>
+  </div>
 </fieldset>
 {{/if}}
 

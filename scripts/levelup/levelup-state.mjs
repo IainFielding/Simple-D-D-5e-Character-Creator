@@ -218,6 +218,18 @@ export class LevelUpState {
   creationState = null;
 
   /**
+   * Whether the player asked for a character-sheet PDF once this level-up is applied. Set from the
+   * review screen's export control and acted on by {@link module:levelup/levelup-shell} after the
+   * commit — see {@link module:build/pdf-export}.
+   *
+   * Seeded from the creator's answer on a creation climb, so a player who ticked the box in the
+   * creator sees it already ticked here rather than being asked the same question twice about the
+   * same character.
+   * @type {boolean}
+   */
+  exportPdf = false;
+
+  /**
    * @param {Actor5e} actor
    * @param {import("./manager-driver.mjs").LevelUpDriver|null} [driver]  Prepared driver, or null
    *   to open on the Class step and adopt one later.
@@ -238,6 +250,7 @@ export class LevelUpState {
     this.needsClassChoice = chooseClass;
     this.emberCreation = emberCreation;
     this.creationState = creationState;
+    this.exportPdf = !!creationState?.exportPdf;
     // The Ember hand-off announces nothing by default: Ember's builder finishes the character
     // *after* our Apply (it owns the final write and the sheet swap), so a card posted here could
     // describe a character that is still a step from done. Ember owns that moment, not us.

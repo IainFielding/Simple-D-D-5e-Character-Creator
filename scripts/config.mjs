@@ -187,6 +187,7 @@ export const SETTINGS = {
   levelUpSummary: "levelUpSummary",
   levelUpReadyNotice: "levelUpReadyNotice",
   multiclass: "allowMulticlass",
+  manualAbilities: "allowManualAbilities",
   bannedAlignments: "bannedAlignments",
   storeEnabled: "storeEnabled",
   storeConfig: "storeConfig",
@@ -212,6 +213,9 @@ export const DEFAULTS = {
   // Whispered to the GM by default: this is a nudge about one character, not table news.
   levelUpReadyNotice: "gm",
   multiclass: "off",
+  // Off by default: typing six numbers straight in bypasses every ability-score economy the other
+  // three methods enforce, so a table gets it only by asking for it.
+  manualAbilities: false,
   bannedAlignments: [],
   storeEnabled: true,
   storeConfig: {
@@ -319,6 +323,24 @@ export const MULTICLASS_MODES = ["off", "prereq", "free"];
 export function multiclassMode() {
   const raw = game.settings.get(MODULE_ID, SETTINGS.multiclass);
   return MULTICLASS_MODES.includes(raw) ? raw : DEFAULTS.multiclass;
+}
+
+/**
+ * Whether players may type their ability scores in directly, instead of choosing from the three
+ * standard methods.
+ *
+ * A home rule, and off unless the GM says otherwise: manual entry answers to no budget, no array
+ * and no dice, so a world that has it on has decided the scores are settled somewhere other than
+ * this window — rolled at the table, carried over from another game, or handed out by the GM.
+ * @returns {boolean}
+ */
+export function manualAbilitiesEnabled() {
+  try {
+    return !!game.settings.get(MODULE_ID, SETTINGS.manualAbilities);
+  } catch {
+    // Reachable only before the setting is registered; "off" is the right answer either way.
+    return false;
+  }
 }
 
 /**

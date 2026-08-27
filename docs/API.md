@@ -152,6 +152,8 @@ Installed during `init`, so it is available from any `setup` or `ready` handler.
 | `triggerLevelUp` | `(actor) => Promise<void>` | Opens the level-up wizard, as the sheet button does. |
 | `canLevelUp` | `(actor) => boolean` | Whether this actor could be levelled right now — owned, a character, below the level cap. |
 | `isCreatorCharacter` | `(actor) => boolean` | Whether this actor was built by the creator. Reads a flag, so it works long after the fact. |
+| `exportPdf` | `(actor) => Promise<boolean>` | Produces a character-sheet PDF, matching the layout to the rules edition the character's class was written for. Resolves `false` when no module able to print one is installed. Never throws. |
+| `pdfExportAvailable` | `() => boolean` | Whether a sheet could be produced right now. Ask before offering an export control of your own. |
 | `settings` | `object` | Read-only config readers — see below. |
 | `internal` | `object` | **Unstable.** See below. |
 

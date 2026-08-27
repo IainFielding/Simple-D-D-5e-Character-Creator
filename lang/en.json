@@ -57,12 +57,34 @@
       "title": "Discard unsaved choices?",
       "body": "Nothing you've picked has been saved yet. If you close now, those choices will be discarded — you'll have to make them again."
     },
+    "draft": {
+      "title": "Unfinished character",
+      "body": "You have an unfinished character — <strong>{name}</strong>, last worked on {when}. Pick up where you left off, or start something new?",
+      "resume": "Resume",
+      "fresh": "Start Fresh",
+      "cancel": "Not Now",
+      "close": {
+        "title": "Keep this character for later?",
+        "body": "Nothing you've picked has been saved to the world yet. Keep it as a draft and the creator will offer it back the next time you open it.",
+        "keep": "Keep Draft",
+        "discard": "Discard",
+        "stay": "Keep Building"
+      },
+      "unknownTime": "recently"
+    },
     "quickBuild": {
       "button": "Quick Build",
       "confirmTitle": "Overwrite current choices?",
       "confirmBody": "Quick Build replaces your background, species, name, ability scores, spells, and other choices with the recommended set. Continue?",
       "partial": "Quick Build finished with some gaps — check the remaining steps.",
       "failed": "Quick Build failed; your choices were left as they were."
+    },
+    "pdfExport": {
+      "label": "Export Character Sheet PDF",
+      "tooltip": "Fill in an official character sheet PDF and download it.",
+      "noteCreation": "The sheet is produced once the character has been created.",
+      "noteLevelUp": "The sheet is produced once this level-up has been applied.",
+      "failed": "The character sheet PDF could not be produced."
     },
     "compare": {
       "open": "Compare",
@@ -285,7 +307,8 @@
     "notify": {
       "noPermission": "You do not have permission to create actors.",
       "indexFailed": "Could not read the compendiums. Check that the dnd5e content packs are enabled.",
-      "buildFailed": "Character creation failed. See the console for details."
+      "buildFailed": "Character creation failed. See the console for details.",
+      "draftPruned": "Some of your saved choices are no longer available in this world and have been cleared: {steps}."
     },
     "chat": {
       "creation": {
@@ -529,7 +552,11 @@
         "hintRoll": "Roll your ability scores, then assign them.",
         "spentOf": "of {budget} spent ·",
         "raise": "Raise {ability}",
-        "lower": "Lower {ability}"
+        "lower": "Lower {ability}",
+        "manual": "Manual Entry",
+        "manualNote": "Type each score in directly. Anything from {min} to {max} is accepted — no budget, no array, no dice.",
+        "manualEntry": "{ability} score",
+        "hintManual": "Give every ability a score from {min} to {max}."
       },
       "originAbilities": {
         "label": "Ability Increase",
@@ -709,6 +736,10 @@
         "name": "Level-Up Options",
         "label": "Configure Level-Up",
         "hint": "Everything about levelling: where players can start a level-up from, what it offers for hit points, and what it announces in chat."
+      },
+      "allowManualAbilities": {
+        "name": "Allow Manual Ability Scores",
+        "hint": "Adds a fourth method to the Ability Scores panel where players type the six numbers in themselves. Off by default: manual entry ignores the point-buy budget, the standard array and the roll formula, so turn it on only where the scores are decided away from this window."
       }
     },
     "storeConfig": {

@@ -4,11 +4,17 @@ import {
 import { CreatorShellBase, shellOptions, dossierStageParts, SHELL_ACTIONS } from "./shell-base.mjs";
 import { illuminatePages } from "./page-illumination.mjs";
 import { CreatorState } from "../state/creator-state.mjs";
+import {
+  applyDraft, cancelDraftSave, clearDraft, flushDraftSave, pruneMissingOrigins, scheduleDraftSave
+} from "../state/draft-store.mjs";
 import { STEPS, REQUIRED_STEPS } from "../steps/registry.mjs";
 import { getSources, warmSources, onWarmProgress, isStale, invalidateSources } from "../data/source-cache.mjs";
 import { assembleActor } from "../build/actor-assembler.mjs";
 import { postCreationSummary } from "../build/chat-summary.mjs";
+import { exportCharacterPdf } from "../build/pdf-export.mjs";
 import { launchLevelUpTo } from "../levelup/intercept.mjs";
+
+const { DialogV2 } = foundry.applications.api;
 
 /**
  * The creator window. Deliberately thin: it owns which step is active and what is reachable, then
@@ -68,6 +74,17 @@ export class CreatorShell extends CreatorShellBase {
   #finished = false;     // set once Create succeeds, so close() won't warn about a discard
   /** Set once the player has made any choice, so closing early can warn before discarding it. */
   #dirty = false;
+  /** Whether this window opened on a restored draft, so the load can report what didn't survive. */
+  #resumed = false;
+  /**
+   * Whether this window's work belongs in a draft.
+   *
+   * False when the creator was opened on an actor that already exists. That character is its own
+   * persistence — every answer was read back off it and will be written back to it — so storing a
+   * draft alongside would be a second copy of one character, and the next fresh launch would offer
+   * to build a duplicate of it.
+   */
+  #draftable = true;
   /** Live loading caption; null falls back to the initial "reading compendiums" label. */
   #loadingLabel = null;
   /**
@@ -77,11 +94,21 @@ export class CreatorShell extends CreatorShellBase {
    */
   #focusAfterRender = null;
 
-  constructor(actor, options = {}) {
+  constructor(actor, options = {}, draft = null) {
     super(options);
     // `state` is the single source of truth for what the player has chosen so far. Passing an
     // existing actor resumes it; passing null starts a fresh, unsaved draft.
     this.state = new CreatorState(actor);
+    this.#draftable = !actor;
+    // A draft the player chose to pick up (see {@link module:api.launchCreator}). Applied over the
+    // fresh state rather than instead of it, so anything the draft doesn't carry keeps its default.
+    if ( draft ) {
+      applyDraft(this.state, draft);
+      // Restored answers are unsaved work like any other: closing must offer to keep them, and the
+      // autosave has to stay current from here rather than waiting for the first fresh click.
+      this.#dirty = true;
+      this.#resumed = true;
+    }
     // Reuse the shared, warm-once compendium index (warmed in the background at `ready`).
     // `#loadStage` re-grabs these after any staleness check, in case the cache was rebuilt.
     const { source, spells, equipment, store } = getSources();
@@ -150,6 +177,10 @@ export class CreatorShell extends CreatorShellBase {
     } finally {
       off();
     }
+    // A restored draft names its origins by uuid, and the world may have changed since it was
+    // written. Now — with the index warm, so "missing" means missing rather than not-yet-loaded —
+    // is the only moment those can be checked before a step tries to render one.
+    if ( this.#resumed ) this.#reportPrunedOrigins(pruneMissingOrigins(this.state, this.source));
     this.#loading = false;
     // Resuming an in-progress actor: jump to the first step still needing input.
     this._stepIndex = this.#firstIncompleteIndex();
@@ -435,14 +466,62 @@ export class CreatorShell extends CreatorShellBase {
 
   /** @override */
   async close(options = {}) {
-    // Nothing the player picks is written to the world until Create, so closing early throws the
-    // whole draft away. Once they've made a choice, confirm before discarding it — every exit path
-    // (Cancel, the frame's close, a programmatic close) funnels through here. A finished build, or
-    // an explicit `force`, skips the prompt.
+    // Nothing the player picks is written to the world until Create, so closing early ends the
+    // build — but it no longer has to lose it. Once they've made a choice, ask what should happen
+    // to it: every exit path (Cancel, the frame's close, a programmatic close) funnels through
+    // here. A finished build, or an explicit `force`, skips the question.
     if ( !this.#finished && !options.force && this.#dirty ) {
-      if ( !await this._confirmDiscard("cancel.title", "cancel.body") ) return this;
+      // Editing an existing character has nowhere to be kept but that character, so the question
+      // there is the plain one it always was: discard these edits, or carry on?
+      if ( !this.#draftable ) {
+        if ( !await this._confirmDiscard("cancel.title", "cancel.body") ) return this;
+        return super.close(options);
+      }
+      const choice = await this.#confirmClose();
+      if ( choice === "cancel" ) return this;
+      // Keeping means settling the debounced save now rather than letting a timer race the close;
+      // discarding means dropping both the stored draft and any save still queued for it.
+      if ( choice === "keep" ) await flushDraftSave();
+      else await clearDraft();
     }
     return super.close(options);
+  }
+
+  /**
+   * Ask what to do with an unfinished build.
+   *
+   * Three answers rather than the usual two, because there are genuinely three things a player
+   * closing this window might mean: keep it for later (the default, and the reason drafts exist),
+   * throw it away, or "I didn't mean to click that". Collapsing the first two into one — as a
+   * plain confirm would — makes the safe answer and the destructive one share a button.
+   * @returns {Promise<"keep"|"discard"|"cancel">}
+   */
+  async #confirmClose() {
+    return DialogV2.wait({
+      window: { title: t("draft.close.title"), icon: "fa-solid fa-floppy-disk" },
+      content: `<p>${t("draft.close.body")}</p>`,
+      modal: true,
+      buttons: [
+        { action: "keep", label: t("draft.close.keep"), icon: "fa-solid fa-floppy-disk", default: true },
+        { action: "discard", label: t("draft.close.discard"), icon: "fa-solid fa-trash" },
+        { action: "cancel", label: t("draft.close.stay"), icon: "fa-solid fa-xmark" }
+      ],
+      // Dismissing the question is not an answer to it: leave the window, and the draft, alone.
+      close: () => "cancel"
+    });
+  }
+
+  /**
+   * Tell the player which restored picks the world could no longer resolve, once, as a warning
+   * rather than in silence. A draft that quietly comes back missing its class is far more
+   * confusing than one that says the class is gone — the player would otherwise be looking for a
+   * mistake they didn't make.
+   * @param {string[]} dropped   Origin keys from {@link pruneMissingOrigins}.
+   */
+  #reportPrunedOrigins(dropped) {
+    if ( !dropped.length ) return;
+    const names = dropped.map(key => t(`step.${key}.label`)).join(", ");
+    ui.notifications?.warn(t("notify.draftPruned", { steps: names }));
   }
 
   /* -------------------------------------------- */
@@ -677,6 +756,9 @@ export class CreatorShell extends CreatorShellBase {
   /** @override Any step interaction counts as progress worth confirming before a discard. */
   _onDispatch(action) {
     this.#dirty = true;
+    // Keep the stored draft current. Debounced, so a run of clicks costs one write — and skipped
+    // once the build has started, when the draft is about to be thrown away anyway.
+    if ( this.#draftable && !this.#finished ) scheduleDraftSave(this.state);
     // Choosing an option answers the question the drawer was opened to ask, so it closes itself.
     // Re-clicking the chosen row clears the selection instead, and #drawerOpen() reopens it on the
     // next render — a step with nothing chosen always shows its options.
@@ -750,6 +832,10 @@ export class CreatorShell extends CreatorShellBase {
     if ( this.#finished ) return;
     if ( !REQUIRED_STEPS.every(s => s.isComplete(this.state)) ) return;
     this.#finished = true;
+    // Stop the autosave before the build starts. It would otherwise be racing a flow that ends by
+    // deleting the very draft it is writing — and on a failed build the state is restored below,
+    // so nothing is lost by holding off until then.
+    cancelDraftSave();
     // Tell the player work is happening, and make the button un-clickable for real (the latch above
     // already blocks re-entry; this is the visible half of the same guard).
     if ( target ) {
@@ -798,6 +884,9 @@ export class CreatorShell extends CreatorShellBase {
       this.#reopenForRetry(target);
       return;
     }
+    // The draft has become a character, so it has nothing left to protect. Cleared before the
+    // close so the close's own prompt — which `force` skips anyway — can never re-save it.
+    if ( this.#draftable ) await clearDraft();
     await this.close();
     actor?.sheet?.render(true);
     // The build above always produces a level-1 character. When the player asked for more on the
@@ -821,6 +910,9 @@ export class CreatorShell extends CreatorShellBase {
     if ( !climbing ) {
       fireHook(HOOKS.characterCreated, { actor, state: this.state, targetLevel });
       await postCreationSummary(actor);
+      // The sheet PDF, when it was asked for. Same rule as the card: a climb isn't finished here,
+      // and that wizard prints it at the level the player actually asked for.
+      if ( this.state.exportPdf ) await exportCharacterPdf(actor);
     }
   }
 
@@ -835,6 +927,8 @@ export class CreatorShell extends CreatorShellBase {
    */
   #reopenForRetry(target) {
     this.#finished = false;
+    // The build stopped, so the choices are unsaved work again and worth keeping.
+    if ( this.#draftable ) scheduleDraftSave(this.state);
     if ( target ) {
       target.disabled = false;
       target.textContent = t("nav.create");

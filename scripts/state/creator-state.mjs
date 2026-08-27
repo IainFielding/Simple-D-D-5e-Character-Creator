@@ -45,6 +45,13 @@ export class CreatorState {
   targetLevel = 1;
 
   /**
+   * Whether the player asked for a character-sheet PDF once the build is finished. Set from the
+   * Review step's export control, and honoured after the character reaches the level that was
+   * asked for — see {@link module:build/pdf-export}. Nothing is generated while the wizard is open.
+   */
+  exportPdf = false;
+
+  /**
    * Identity & biography fields. `name` mirrors the actor name (the only mandatory
    * field); the rest are optional and written to `actor.system.details` on build.
    */
@@ -225,7 +232,7 @@ export class CreatorState {
    */
   choiceCache;
 
-  /** "point-buy" | "standard-array" | "roll" */
+  /** "point-buy" | "standard-array" | "roll" | "manual" (the last only where the GM allows it). */
   abilityMethod = "point-buy";
 
   /** Point-buy working values (8..15 per ability). */
@@ -236,6 +243,16 @@ export class CreatorState {
 
   /** Dice results for the "roll" method, in roll order. */
   rolledPool = [];
+
+  /**
+   * The "manual" method's typed scores: ability key -> the number in the box, or null while it is
+   * empty. Only reachable when the GM has turned manual entry on.
+   *
+   * Held separately from `pointBuy` rather than reusing it, for the same reason the pool methods
+   * keep their own `assignment`: each method owns its working values, so flipping between them
+   * loses nothing. A typed 18 must not become a point-buy score the budget then declares illegal.
+   */
+  manualScores = { str: null, dex: null, con: null, int: null, wis: null, cha: null };
 
   /**
    * Player-allocated ability increases granted by an origin, on top of any that origin fixes
@@ -288,6 +305,12 @@ export class CreatorState {
    */
   resolvedScores() {
     if ( this.abilityMethod === "point-buy" ) return { ...this.pointBuy };
+    // Manual entry resolves to whatever was typed, with an empty box reading as 8 — the same floor
+    // the pool methods use for a slot nobody has filled in yet, so a half-finished set of scores
+    // reads consistently wherever it is shown.
+    if ( this.abilityMethod === "manual" ) {
+      return Object.fromEntries(ABILITIES.map(k => [k, this.manualScores[k] ?? 8]));
+    }
     const pool = this.abilityPool() ?? [];
     const out = {};
     for ( const key of ABILITIES ) {

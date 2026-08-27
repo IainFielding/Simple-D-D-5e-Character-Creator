@@ -54,6 +54,7 @@ export class HouseRulesApp extends HandlebarsApplicationMixin(ApplicationV2) {
       showAbilities: !emberActive(),
       pointBuyBudget: game.settings.get(MODULE_ID, SETTINGS.pointBuyBudget),
       rollFormula: game.settings.get(MODULE_ID, SETTINGS.rollFormula),
+      manualAbilities: game.settings.get(MODULE_ID, SETTINGS.manualAbilities),
       // `selected` is computed here rather than compared in the template, matching how every other
       // <select> in this module is built (see parts/abilities-panel.hbs and store-config.hbs).
       multiclassOptions: MULTICLASS_MODES.map(value => ({
@@ -73,7 +74,7 @@ export class HouseRulesApp extends HandlebarsApplicationMixin(ApplicationV2) {
   }
 
   /**
-   * Write the four settings.
+   * Write the five settings.
    *
    * Each value is guarded rather than trusted: these are number and string inputs a GM can empty or
    * mistype, and a blank point-buy budget or roll formula reaching the Abilities step would break
@@ -87,12 +88,21 @@ export class HouseRulesApp extends HandlebarsApplicationMixin(ApplicationV2) {
   static async #onSubmit(_event, _form, formData) {
     const data = foundry.utils.expandObject(formData.object);
 
-    const budget = Number(data.pointBuyBudget);
-    await game.settings.set(MODULE_ID, SETTINGS.pointBuyBudget,
-      Number.isFinite(budget) && (budget > 0) ? Math.round(budget) : DEFAULTS.pointBuyBudget);
+    // Only when the fieldset was actually on screen. Under Ember it isn't rendered at all, so its
+    // fields arrive absent — and writing them anyway would quietly reset a budget, a formula and a
+    // home rule the GM never saw, let alone changed.
+    if ( !emberActive() ) {
+      const budget = Number(data.pointBuyBudget);
+      await game.settings.set(MODULE_ID, SETTINGS.pointBuyBudget,
+        Number.isFinite(budget) && (budget > 0) ? Math.round(budget) : DEFAULTS.pointBuyBudget);
 
-    const formula = String(data.rollFormula ?? "").trim();
-    await game.settings.set(MODULE_ID, SETTINGS.rollFormula, formula || DEFAULTS.rollFormula);
+      const formula = String(data.rollFormula ?? "").trim();
+      await game.settings.set(MODULE_ID, SETTINGS.rollFormula, formula || DEFAULTS.rollFormula);
+
+      // An unchecked checkbox is absent from the form data entirely, so this reads as false rather
+      // than falling back to the default — which is what makes turning the rule back off work.
+      await game.settings.set(MODULE_ID, SETTINGS.manualAbilities, !!data.manualAbilities);
+    }
 
     await game.settings.set(MODULE_ID, SETTINGS.multiclass,
       MULTICLASS_MODES.includes(data.multiclass) ? data.multiclass : DEFAULTS.multiclass);

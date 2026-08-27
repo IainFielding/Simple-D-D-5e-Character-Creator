@@ -5,6 +5,7 @@ import { advancementArray } from "../data/advancement-util.mjs";
 import { resolveChoices, traitChoiceTitle, traitKeyLabel } from "../data/choice-resolver.mjs";
 import { resolveFeatSpells, grantedSpellCards } from "./feat-spells-step.mjs";
 import { summarizeOption } from "../data/equipment-source.mjs";
+import { pdfExportContext } from "../build/pdf-export.mjs";
 
 /*
  * The Review step (the step module itself is at the bottom of the file). It's read-only: it gathers
@@ -266,10 +267,10 @@ async function fixedGrants(doc) {
 }
 
 /**
- * Final review. Read-only: it surfaces every pick and the resolved ability scores
- * so the player can confirm before the actor is built. The "Create" control lives
- * on the shell (it closes the app and runs the assembler), so this step exposes no
- * actions of its own.
+ * Final review. It surfaces every pick and the resolved ability scores so the player can confirm
+ * before the actor is built. The "Create" control lives on the shell (it closes the app and runs
+ * the assembler); the one control this step owns is the sheet-PDF switch, which decides what
+ * happens *after* Create rather than changing anything about the character.
  */
 export const reviewStep = {
   id: "review",
@@ -282,6 +283,17 @@ export const reviewStep = {
 
   summary() { return ""; },
 
+  /**
+   * The export switch. Nothing is generated here — the character doesn't exist yet, and at a
+   * higher starting level it isn't finished until the level-up wizard has climbed to it. All this
+   * records is the answer; {@link module:app/creator-shell} acts on it once there is a finished
+   * character to print.
+   */
+  handle(action, _el, { state }) {
+    if ( action !== "toggle-pdf" ) return;
+    state.exportPdf = !state.exportPdf;
+  },
+
   async context({ state, source, equipment }) {
     const scores = state.resolvedScores();
     // Merged across both origins, with the contributing source(s) kept so the pill can name them:
@@ -293,7 +305,8 @@ export const reviewStep = {
     const methodKeys = {
       "point-buy": "step.abilities.pointBuy",
       "standard-array": "step.abilities.standardArray",
-      "roll": "step.abilities.roll"
+      "roll": "step.abilities.roll",
+      "manual": "step.abilities.manual"
     };
     const name = state.details.name?.trim() || state.actor?.name || "";
     return {
@@ -317,6 +330,7 @@ export const reviewStep = {
         };
       }),
       details: reviewDetails(state),
+      pdf: pdfExportContext(state.exportPdf, "pdfExport.noteCreation"),
       purchases: reviewPurchases(state),
       sections: await reviewSections(state, source, equipBySource, spells, featSpellsBySource)
     };

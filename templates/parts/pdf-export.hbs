@@ -1,0 +1,26 @@
+{{!--
+  The sheet-PDF switch, shared by the creation and level-up review screens.
+
+  A toggle rather than a "do it now" button, because at review time there is nothing to print yet:
+  creation hasn't built the actor, and a level-up hasn't been applied. It records the answer, and
+  the shell acts on it the moment the character is actually finished.
+
+  Rendered only when something can actually produce a sheet — pdfExportContext() in
+  scripts/build/pdf-export.mjs returns null otherwise, and a step with no finishing moment of its
+  own to print at (the Ember hand-off) supplies no `pdf` either. Both fall out of the one guard
+  below, and nothing appears.
+--}}
+{{#if pdf}}
+<div class="creator-review-block creator-pdf-export">
+  <button type="button"
+          class="creator-btn creator-btn-ghost creator-pdf-toggle {{#if pdf.active}}is-active{{/if}}"
+          data-action="stepAction" data-step-action="toggle-pdf"
+          aria-pressed="{{#if pdf.active}}true{{else}}false{{/if}}"
+          data-tooltip="{{pdf.tooltip}}">
+    <i class="fa-solid {{#if pdf.active}}fa-square-check{{else}}fa-square{{/if}}"></i>
+    <i class="fa-solid fa-file-pdf"></i>
+    {{localize "sogrom-dnd5e-character-creator.pdfExport.label"}}
+  </button>
+  <p class="creator-pdf-note">{{pdf.note}}</p>
+</div>
+{{/if}}

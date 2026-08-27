@@ -4,10 +4,21 @@ import {
 } from "./config.mjs";
 import { CreatorShell } from "./app/creator-shell.mjs";
 import { CreatorState } from "./state/creator-state.mjs";
+import { clearDraft, readDraft } from "./state/draft-store.mjs";
 import { LevelUpShell } from "./levelup/levelup-shell.mjs";
 import { LevelUpState } from "./levelup/levelup-state.mjs";
 import { LevelUpDriver } from "./levelup/manager-driver.mjs";
 import { triggerLevelUp, canLevelUp } from "./levelup/intercept.mjs";
+import { exportCharacterPdf, pdfExportAvailable } from "./build/pdf-export.mjs";
+
+const { DialogV2 } = foundry.applications.api;
+
+/**
+ * What {@link offerDraft} returns when the player backed out of the question entirely — distinct
+ * from `null`, which means "open a fresh window". A symbol rather than a string so it can never be
+ * confused with draft data.
+ */
+const DRAFT_CANCELLED = Symbol("draft-cancelled");
 
 /**
  * The module's public API — everything another module is invited to call.
@@ -57,9 +68,48 @@ export async function launchCreator(actor) {
   // Last gate before the window exists, so a listener can refuse a build outright (a table that
   // vets characters, a module that wants its own creator for certain users).
   if ( !fireCancellableHook(HOOKS.preOpenCreator, { actor: actor ?? null, options }) ) return null;
-  const app = new CreatorShell(actor ?? null, options);
+  // Only a fresh build can pick up a draft. Resuming a real actor reads its answers back off the
+  // actor itself, and dropping a stored draft on top of that would mix two different characters.
+  const draft = actor ? null : await offerDraft();
+  if ( draft === DRAFT_CANCELLED ) return null;
+  const app = new CreatorShell(actor ?? null, options, draft);
   app.render(true);
   return app;
+}
+
+/**
+ * Offer the player their unfinished build back, when they have one.
+ *
+ * Asked rather than restored silently. A window that opens onto someone else's half-made half-elf
+ * — or your own from a fortnight ago that you had forgotten about — is a worse start than an empty
+ * one, and the answer is one click either way. Declining discards the draft then and there, so the
+ * question isn't asked again about a build the player has already dismissed.
+ * @returns {Promise<object|null|symbol>}  The draft's answers, null to start fresh, or
+ *   {@link DRAFT_CANCELLED} when the player wants no window at all.
+ */
+async function offerDraft() {
+  const draft = readDraft();
+  if ( !draft ) return null;
+  const name = draft.name || t("common.newCharacter");
+  const when = draft.savedAt ? new Date(draft.savedAt).toLocaleString() : t("draft.unknownTime");
+  const choice = await DialogV2.wait({
+    window: { title: t("draft.title"), icon: "fa-solid fa-pen-ruler" },
+    content: `<p>${t("draft.body", { name, when })}</p>`,
+    modal: true,
+    buttons: [
+      { action: "resume", label: t("draft.resume"), icon: "fa-solid fa-play", default: true },
+      { action: "fresh", label: t("draft.fresh"), icon: "fa-solid fa-trash" },
+      { action: "cancel", label: t("draft.cancel"), icon: "fa-solid fa-xmark" }
+    ],
+    // Dismissing the question means "not now" — the draft survives and nothing opens.
+    close: () => "cancel"
+  });
+  if ( choice === "resume" ) return draft.data;
+  if ( choice === "fresh" ) {
+    await clearDraft();
+    return null;
+  }
+  return DRAFT_CANCELLED;
 }
 
 /**
@@ -130,6 +180,22 @@ export function registerApi() {
 
     /** Whether this actor was built by the creator. */
     isCreatorCharacter,
+
+    /**
+     * Produce a character-sheet PDF for an actor, choosing the layout that matches the rules
+     * edition its class was written for.
+     *
+     * This module does not generate the PDF itself — it asks a companion module that does, and
+     * resolves `false` when none capable is installed. {@link pdfExportAvailable} answers that
+     * question up front, so a consumer can hide its own control rather than offering one that
+     * can't work.
+     * @param {Actor5e} actor
+     * @returns {Promise<boolean>}  Whether a sheet was produced.
+     */
+    exportPdf: exportCharacterPdf,
+
+    /** Whether a character-sheet PDF could be produced right now. @returns {boolean} */
+    pdfExportAvailable,
 
     /* ---------- Read-only configuration ---------- */
 
