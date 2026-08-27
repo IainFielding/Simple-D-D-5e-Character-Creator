@@ -9,6 +9,7 @@ import { forEachLimit, WARM_CONCURRENCY } from "../data/concurrency.mjs";
 import { applyLevelUpSpells, spellChanges } from "./steps/lvl-spells-step.mjs";
 import { reconcileGrantedSpells } from "../build/spell-reconcile.mjs";
 import { captureLevelUpSummary, postLevelUpSummary, postCreationSummary } from "../build/chat-summary.mjs";
+import { exportCharacterPdf } from "../build/pdf-export.mjs";
 import { stageEmberGear, abandonEmberCreation } from "./ember-creation.mjs";
 
 /**
@@ -537,6 +538,10 @@ export class LevelUpShell extends CreatorShellBase {
       });
       await postLevelUpSummary(actor, summary);
     }
+
+    // Last of all, and only if asked: the sheet on the PDF has to be the one the player just
+    // finished, so this waits until every write above has landed on the real actor.
+    if ( this.state.exportPdf ) await exportCharacterPdf(actor);
   }
 
   /**
@@ -578,6 +583,10 @@ export class LevelUpShell extends CreatorShellBase {
         targetLevel: this.state.actor?.system?.details?.level ?? this.state.fromLevel
       });
       await postCreationSummary(this.state.actor);
+      // The climb was abandoned but the character was not: the creator built and handed over a
+      // valid character, and a player who asked for its sheet is owed one at whatever level it
+      // actually reached.
+      if ( this.state.exportPdf ) await exportCharacterPdf(this.state.actor);
     } else if ( !this.state.committed && !this.#cancelAnnounced ) {
       // An ordinary level-up thrown away. Worth announcing precisely because nothing happened:
       // a listener that opened something on `levelUpStarted` needs to know to close it again.

@@ -1,6 +1,6 @@
 import {
   abilitiesContext, abilitiesHandle, abilitiesComplete, abilitiesHint,
-  ABILITY_ACTIONS, POINT_BUY_LIVE_ACTIONS, patchPointBuy
+  ABILITY_ACTIONS, POINT_BUY_LIVE_ACTIONS, patchPointBuy, patchManual
 } from "./abilities-step.mjs";
 import { spellInfoFor } from "./spells-step.mjs";
 import { resolveChoices } from "../data/choice-resolver.mjs";
@@ -94,12 +94,17 @@ export const classStep = {
     }
     if ( ABILITY_ACTIONS.has(action) ) {
       await abilitiesHandle(action, el, state);
-      // Point-buy steppers fire in rapid succession; a full stage re-render would rebuild
-      // the drawer's class icons and flicker them on every press. Patch the panel and the
-      // Next gate in place, refresh only the image-free parts, and skip the default re-render.
-      if ( POINT_BUY_LIVE_ACTIONS.has(action) && state.abilityMethod === "point-buy" ) {
+      // Two ability interactions patch the panel in place rather than re-rendering the stage:
+      // point-buy steppers (which fire in rapid succession, and a re-render rebuilds the drawer's
+      // class icons and flickers them on every press) and a typed manual score (where the
+      // re-render would destroy the very box the player is tabbing towards). Both then refresh the
+      // Next gate and the image-free parts by hand, and skip the default re-render.
+      const livePointBuy = POINT_BUY_LIVE_ACTIONS.has(action) && (state.abilityMethod === "point-buy");
+      const liveManual = (action === "ability-set") && (state.abilityMethod === "manual");
+      if ( livePointBuy || liveManual ) {
         const stage = el.closest(".creator-stage");
-        patchPointBuy(stage, state);
+        if ( livePointBuy ) patchPointBuy(stage, state);
+        else patchManual(stage, state);
         const next = stage?.querySelector('.creator-stage-foot [data-action="navNext"]');
         if ( next ) next.disabled = !(state.classUuid && abilitiesComplete(state));
         // Refresh only the two image-free parts: the dossier's score plates and completion tick,

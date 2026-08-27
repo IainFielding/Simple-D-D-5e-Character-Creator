@@ -22,6 +22,7 @@ If you can pick from a menu, you can build a character.
 - **One thing at a time.** Instead of juggling sheets, compendiums, and drag-and-drop, you make one decision per screen and click **Next**.
 - **In a hurry? Quick Build has your back.** Pick a class, hit one button, and the wizard fills in a sensible, ready-to-play character you can tweak or run with as-is.
 - **Torn between two options? Put them side by side.** Pin the classes, species, backgrounds or subclasses you are weighing up and read them as a comparison table — hit dice, proficiencies, features and all — instead of clicking back and forth trying to remember the last one.
+- **Close it and come back later.** Half-built characters aren't lost. Close the window and the creator offers to keep what you've done as a draft; open it next time — tomorrow, or on another computer — and it asks whether you'd like to pick up where you left off.
 - **It does the bookkeeping for you.** Proficiencies, starting equipment, hit points, and class features are all applied automatically when your character is created.
 - **Your table, your rules.** Prefer point buy? Standard array? Rolling for stats? It's your choice, and your Game Master can set the house rules.
 
@@ -68,6 +69,9 @@ Choose what your character *does*: fighter, wizard, rogue, and the rest. You'll 
 - **Point Buy** lets you spend a budget of points to customise your scores.
 - **Standard Array** assigns a fixed set of solid numbers.
 - **Roll** lets the dice decide.
+- **Manual Entry** lets you type the six numbers straight in — for scores rolled at the table, carried over from another game, or handed out by your GM. Your GM has to turn this one on.
+
+Whichever you use, switching between them keeps what you had under the others, so you can try point buy, roll a set, and go back without losing either.
 
 Starting above 1st level? If your GM allows it, pick a **Starting Level** here. You'll build level 1 in the creator, then finish the climb to your chosen level in the level-up wizard.
 
@@ -123,6 +127,8 @@ Took the gold instead of a gear pack? Spend it here. Browse the shelves your GM 
 
 **10. Review**
 A final summary of everything you've built. Happy with it? Click **Create Character** and your new hero is ready to play.
+
+Want it on paper? If you have the companion [Simple D&D PDF Character sheet](https://foundryvtt.com/packages/sogrom-dnd5e-character-sheet-pdf) module (2.2.0 or later), an **Export Character Sheet PDF** tick box appears here — leave it ticked and a filled-in official character sheet is produced the moment your character is finished, in the 2014 or the 2024 layout to match the edition your class was written for. The same tick box sits on the level-up review, so you can print a fresh sheet each time your character grows. Without that module the tick box simply isn't there, and the review screen reads exactly as it always did.
 
 ![Reviewing the finished character](docs/screenshots/review.png)
 *Screenshot: the review screen.*
@@ -204,6 +210,7 @@ The **Configure House Rules** button holds what a player is allowed to build.
 
 - **Point-buy budget.** Change how many points players get when building stats (the standard rules use 27).
 - **Ability roll formula.** Set the dice rolled for each ability (the standard rules use `4d6kh3`, four d6 keeping the highest three).
+- **Allow manual ability scores.** Off by default. Turn it on to add a fourth method where players type the six numbers in themselves. It ignores the point-buy budget, the standard array and the roll formula entirely, so it's for tables where the scores are decided somewhere other than this window. Turn it back off and any character mid-build simply reverts to point buy.
 - **Multiclassing.** Off by default. When enabled, players can add a whole new class from the level-up flow. Choose whether the standard ability prerequisites (13+ in the primary ability of both classes) are enforced or waived.
 - **Alignments.** Tick any alignment you don't want at your table and it disappears from the Details step. Characters already using it keep it, and players can still write their own with the **Other…** option.
 
@@ -258,6 +265,7 @@ This module is designed to sit quietly alongside the rest of your world. Where a
 | [Tasha's Cauldron of Everything](https://foundryvtt.com/packages/dnd-tashas-cauldron) | Yes | Its subclasses build on the 2014 classes the system still ships. Its **optional class features** are offered on their own level-up screen, and its **replacement features** let you choose between the original and the Tasha's version. |
 | 2014-rules classes and subclasses | Yes | Supported alongside 2024 content in the same world. Classes that choose a subclass at 1st level (Cleric, Sorcerer, Warlock) get that choice during character creation rather than at level 3. |
 | Homebrew compendiums and content modules | Yes | Anything that follows the standard 5e item and advancement format is picked up automatically. Advancement types added by other modules are handled as whichever standard type they extend, rather than being skipped. |
+| [Simple D&D PDF Character sheet](https://foundryvtt.com/packages/sogrom-dnd5e-character-sheet-pdf) | Yes, enhanced | Optional. With version 2.2.0 or later installed, an **Export Character Sheet PDF** tick box appears on the creation and level-up review screens; it fills in an official sheet and downloads it, choosing the 2014 or 2024 layout to match your character's edition. Without that module the tick box is not shown at all. |
 | Alternative character sheets (Tidy 5e Sheet and similar) | Yes | This module builds the character; your sheet module displays it. They don't overlap. |
 | Automation modules (Midi-QOL, DAE, and similar) | Yes | They act on characters during play, after this module has finished creating them. |
 

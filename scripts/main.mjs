@@ -61,6 +61,9 @@ Hooks.once("init", () => {
     // partial for the same reason that one is: the stage is loaded as a PART, its includes are not.
     tpl("parts/compare.hbs"),
     tpl("parts/rules-link.hbs"),
+    // The sheet-PDF switch, included by both review screens so the two can't offer the export on
+    // different terms.
+    tpl("parts/pdf-export.hbs"),
     // The chat cards themselves are rendered on demand rather than loaded as PARTS, but the
     // partial they include still has to be registered up front — a partial is resolved at render
     // time from the registry, not fetched.
@@ -144,7 +147,7 @@ function registerSettings() {
   // Both dead under Ember: they are read only by the creator's Abilities step, and Ember decides
   // ability scores in its own builder before the hand-off ever reaches us. The hand-off's rail has
   // no Abilities step to spend a budget or roll a formula on (see levelup/registry.mjs).
-  // The three below, plus bannedAlignments, are the "what may a player build" rules, and they are
+  // The four below, plus bannedAlignments, are the "what may a player build" rules, and they are
   // edited through the House Rules menu rather than the flat settings list — hence `config: false`
   // on all four. They keep their original setting keys, so every existing accessor and stored world
   // value carries over untouched; only where they are *edited* changed.
@@ -156,6 +159,9 @@ function registerSettings() {
   });
   game.settings.register(MODULE_ID, SETTINGS.multiclass, {
     scope: "world", config: false, type: String, default: DEFAULTS.multiclass
+  });
+  game.settings.register(MODULE_ID, SETTINGS.manualAbilities, {
+    scope: "world", config: false, type: Boolean, default: DEFAULTS.manualAbilities
   });
   game.settings.register(MODULE_ID, SETTINGS.bannedAlignments, {
     scope: "world", config: false, type: Array, default: DEFAULTS.bannedAlignments

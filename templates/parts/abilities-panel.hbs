@@ -60,6 +60,26 @@
     {{/each}}
   </ul>
 
+  {{else if isManual}}
+  {{!-- Manual entry: six plain number boxes. No budget, no pool, no dice — the scores were
+        settled somewhere this window can't see, so the panel only records them. --}}
+  <p class="creator-manual-note">
+    {{localize "sogrom-dnd5e-character-creator.step.abilities.manualNote" min=min max=max}}
+  </p>
+
+  <ul class="creator-ability-list">
+    {{#each rows}}
+    <li class="creator-ability-row creator-ability-row--manual {{#if assigned}}is-assigned{{/if}}">
+      <span class="creator-ability-name">{{label}}</span>
+      <input class="creator-manual-score" type="number" inputmode="numeric"
+             data-step-change="ability-set" data-ability="{{key}}"
+             min="{{../min}}" max="{{../max}}" step="1" value="{{value}}"
+             aria-label="{{localize 'sogrom-dnd5e-character-creator.step.abilities.manualEntry' ability=label}}">
+      <span class="creator-ability-mod">{{modifier}}</span>
+    </li>
+    {{/each}}
+  </ul>
+
   {{else}}
     {{#if hasPool}}
     <ul class="creator-pool" data-step-drop="ability-unassign">

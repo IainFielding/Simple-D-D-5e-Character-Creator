@@ -141,7 +141,7 @@ export function installFoundryShims() {
           /** Foundry's own default: the class's static PARTS, cloned so a caller can mutate it. */
           _configureRenderParts() { return structuredClone(this.constructor.PARTS ?? {}); }
         },
-        DialogV2: { confirm: async () => false }
+        DialogV2: { confirm: async () => false, wait: async () => "cancel" }
       },
       ux: { TextEditor: { implementation: { enrichHTML: async html => html } } },
       // The chat cards render a real .hbs file in Foundry. Here the template is never the thing
