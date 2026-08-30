@@ -62,12 +62,18 @@ rights are assigned to anyone; you are simply asserting, per commit, that the co
 yours to give. It matters particularly for AI-assisted changes: whichever tool you used,
 the sign-off is you taking responsibility for the licensing of what you submitted.
 
-If you would rather not remember the `-s` flag on every commit, git can add the trailer
-for you in this repository:
+If you would rather not remember the `-s` flag on every commit, this repository ships a
+hook that adds the trailer for you — including on commits made from an editor's
+source-control panel, which never pass `-s`:
 
 ```sh
-git config format.signOff true
+git config core.hooksPath .githooks
 ```
+
+Note that `git config format.signOff true` does **not** do this, despite how it reads:
+that setting is honoured only by `git format-patch` and `git send-email`, and git has no
+`commit.signOff` equivalent. Setting it and expecting signed-off commits is the usual way
+to arrive at a red DCO check.
 
 If you forget, CI will tell you. To fix it:
 
@@ -89,7 +95,8 @@ Please do **not** include AI tool attribution in commit messages. Remove trailer
 and similar tool sign-offs before opening a pull request. Co-author trailers are reserved
 for human contributors.
 
-A local hook is available to catch this before you commit:
+A local hook catches this before you commit — the same `core.hooksPath` setting as the
+sign-off hook above turns both on, so you only need it once:
 
 ```sh
 git config core.hooksPath .githooks

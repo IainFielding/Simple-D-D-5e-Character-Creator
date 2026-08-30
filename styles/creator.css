@@ -2083,8 +2083,21 @@ body:has(.sogrom-creator-fullscreen) .application.compendium-browser {
    by the six ability rows where scores are assigned. */
 
 .creator-method-tabs { display: flex; gap: 0.5rem; margin-bottom: 1.5rem; }
+/* All four method pills are the same size, each on one line.
+
+   The labels are wildly uneven — "Roll" against "Standard Array" — so pills sized to their own
+   text came out ragged, and once House Rules adds Manual Entry as a fourth, three of the four
+   wrapped to two lines while "Roll" stayed on one. `flex: 1 1 0` makes the row divide evenly, so
+   every pill takes the width of the widest label; `nowrap` keeps each label on its single line.
+   The slightly smaller type and tighter side padding buy back the width that costs. */
 .creator-tab {
-  padding: 0.55rem 1.1rem;
+  flex: 1 1 0;
+  min-width: 0;
+  padding: 0.55rem 0.9rem;
+  font-size: 0.9rem;
+  line-height: 1.2;
+  white-space: nowrap;
+  text-align: center;
   background: var(--cc-panel);
   border: 1px solid var(--cc-line);
   border-radius: var(--cc-radius-pill);
