@@ -896,7 +896,7 @@ export async function findRestrictedItems(cfg, maxLevel = null, rules = null) {
     if ( !pack.visible || !isUsableItemPack(pack, enabled) ) continue;
     try {
       const index = await pack.getIndex({
-        fields: ["type", "system.type.value", "system.type.subtype", "system.source.rules",
+        fields: ["type", "system.type.value", "system.type.subtype", "system.source",
           "system.prerequisites.level", "system.prerequisites.items"]
       });
       for ( const e of index ) {

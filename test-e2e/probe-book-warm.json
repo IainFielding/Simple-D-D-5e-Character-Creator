@@ -1,0 +1,32 @@
+{
+  "uuid": "Compendium.dnd-players-handbook.classes.Item.phbbrdBard000000",
+  "name": "Bard",
+  "toObjectBeforeWarm": {
+    "book": null,
+    "riders": null
+  },
+  "prepared": {
+    "book": "PHB 2024",
+    "riders": null
+  },
+  "_source": {
+    "book": "PHB 2024",
+    "riders": null
+  },
+  "toObject": {
+    "book": "PHB 2024",
+    "riders": null
+  },
+  "fromCompendium": {
+    "book": "PHB 2024",
+    "riders": null
+  },
+  "cloneRoundTrip": {
+    "book": "PHB 2024",
+    "riders": null
+  },
+  "afterCreate": {
+    "book": "PHB 2024",
+    "riders": null
+  }
+}

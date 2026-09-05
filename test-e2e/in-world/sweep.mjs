@@ -97,7 +97,7 @@ async function classesByIdentifier() {
   const out = new Map();
   const found = [];
   for ( const pack of game.packs.filter(p => p.documentName === "Item") ) {
-    const index = await pack.getIndex({ fields: ["system.identifier", "system.source.rules"] });
+    const index = await pack.getIndex({ fields: ["system.identifier", "system.source"] });
     for ( const entry of index ) {
       if ( entry.type !== "class" ) continue;
       const identifier = entry.system?.identifier;
@@ -243,7 +243,7 @@ async function resolveAxisClass(spec) {
 async function allSpecies() {
   const out = [];
   for ( const pack of game.packs.filter(p => p.documentName === "Item") ) {
-    const index = await pack.getIndex({ fields: ["system.source.rules"] });
+    const index = await pack.getIndex({ fields: ["system.source"] });
     for ( const entry of index ) {
       // dnd5e's item type for a species is historically "race".
       if ( entry.type !== "race" ) continue;
@@ -329,7 +329,7 @@ const FEAT_AXIS = { classIdentifier: "fighter", subclass: "Champion" };
 async function allBackgrounds() {
   const out = [];
   for ( const pack of game.packs.filter(p => p.documentName === "Item") ) {
-    const index = await pack.getIndex({ fields: ["system.source.rules"] });
+    const index = await pack.getIndex({ fields: ["system.source"] });
     for ( const entry of index ) {
       if ( entry.type !== "background" ) continue;
       out.push({

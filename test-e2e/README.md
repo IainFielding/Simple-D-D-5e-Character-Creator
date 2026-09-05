@@ -143,7 +143,7 @@ alone and counts an item at each level. The module stays junction-linked into `D
 harness's own files are still served: Foundry's static routes come from the filesystem, not from the
 world's module list.
 
-Both run dnd5e 5.3.3 on Foundry 14.367, on port 30099 (not 30000).
+Both run dnd5e **6.0.0** on Foundry 14.367, on port 30099 (not 30000) — see "dnd5e 6.0.0 (early release)" below for what that changed. The recorded baselines above were taken on 5.3.3.
 
 **Foundry locks its data directory**, so the harness cannot run while the Foundry desktop app is
 open. A crashed run leaves a lock that goes stale after ~10s; `startFoundry` retries through that.
@@ -1627,6 +1627,248 @@ node compare-baseline.mjs sweep-results.jsonl sweep-results-final-2.4.0.jsonl
 Baselines remain mode-specific (see "One jump, or one level at a time") and are now also **core-version
 specific**. `sweep-results-14367-shard1of20.jsonl` / `console-shard1-14367.log` and
 `sweep-results-14367-shard1of4.jsonl` / `console-shard1of4-14367.log` hold these runs.
+
+## dnd5e 6.0.0 (early release): what changed, and what it cost
+
+Measured 2026-09-04/05 on Foundry **14.367**, from the early-release source at
+`C:\CODE\dnd5e-release-6.0.0`, on branch `6_0_0_Preview`. This machine had **no system installed at
+all** beforehand — `Data/systems/` held only Foundry's README — so 6.0.0 is not an upgrade over
+5.3.3 here, it is the only system present. Worlds recorded against 5.3.x (`the-forgotten-realms`,
+`ddbi`, `test`) will migrate if opened; they were left alone.
+
+### Building and installing it
+
+The release is a source tree, not a packaged system, and **`utils/dist.mjs` is not usable for it**:
+it pulls a fresh git clone at a release tag and wants a path to the free-rules content. Neither
+exists here. The manual equivalent:
+
+```bash
+cd /c/CODE/dnd5e-release-6.0.0
+npm install          # postinstall runs build:css and build:db — packs/ is compiled from packs/_source
+npm run build:code   # rollup -> dnd5e-compiled.mjs (+ .map)
+```
+
+Then copy into `Data/systems/dnd5e`: everything `foundryvtt.json`'s `includes` names, plus
+`system.json`, `dnd5e.css(.map)`, `lang/` and `packs/` — with two details that are easy to get wrong.
+**`dnd5e-compiled.mjs` is installed as `dnd5e.mjs`** (that is what `system.json`'s `esmodules` names,
+and what `dist.mjs` renames), while **the map keeps its original name** `dnd5e-compiled.mjs.map`,
+because the `sourceMappingURL` comment inside the bundle still points at it. `packs/_source` is the
+YAML the packs are compiled *from* and is not shipped.
+
+`module.json` declared `dnd5e` `"maximum": "5.9.9"`. **Foundry enforces that**, so the module was
+simply unloadable on 6.0.0 — not degraded, absent. Widened to `6.9.9`; `verified` deliberately left
+at `5.3.3` until a full sweep says otherwise.
+
+### The breaking change: `system.source` became an index field
+
+6.0.0 adds this at registration:
+
+```js
+compendiumIndexFields.push("system.container", "system.identifier", "system.source")
+```
+
+Foundry builds an index projection one field at a time (`dist/database/backend/server-backend.mjs`):
+
+```js
+for ( const field of indexFields ) setProperty(projection, field, 1);
+```
+
+So once `system.source` has been set to the number `1`, **any request for a sub-path of it throws**:
+
+```
+Error: Cannot create property 'rules' on number '1'
+    at setProperty (common/utils/helpers.mjs:865)
+    at ServerDatabaseBackend._getDocuments
+```
+
+Asking for `system.source.rules` — which is how this module and this harness have always scoped
+content to a rules edition — is now a hard error on **every Item pack**. A probe that tries the
+projection pack by pack reported **34** of them. dnd5e's own packs appear to survive only because
+their indexes are already cached by the time anything asks; the defect is universal, not
+content-specific.
+
+**Fixed by requesting the parent object instead of the sub-path**, at seven sites:
+
+| File | Sites |
+| --- | --- |
+| `scripts/data/source-index.mjs` | 3 — subclass fetch, per-type index, direct pack scan |
+| `scripts/data/choice-resolver.mjs` | 1 — the pool scan that scopes fighting styles to the edition |
+| `test-e2e/in-world/sweep.mjs` | 3 |
+
+Every read was already `entry.system?.source?.rules`, so nothing downstream changed, and asking for
+the parent is correct on 5.3.x too — which matters while `module.json` still declares 5.3.0 as the
+minimum.
+
+**Worth knowing for its own sake:** this failed *silently*. Both `#scanPacks` and the Compendium
+Browser fetch above it catch and `log()` per-pack failures, so on 6.0.0 the class, species and
+background grids would have degraded to **empty** rather than raising anything. The eight-scenario
+base suite passed straight through it, because those scenarios drive the wizard by explicit UUIDs
+and never consult a grid. The sweep enumerates subclasses from the packs, so it was the first
+caller to meet the error head-on — and only because, unlike the module's own paths, it does not
+swallow it.
+
+### `system.identifier` on actors
+
+6.0.0 gives actors a `system.identifier`, slugified from the actor name. The harness names its two
+builds `…-native` and `…-creator` on purpose, so this reported one row on **every** scenario.
+Dropped in `normalize.mjs` for the same reason `name` is already in `DROP_ACTOR`.
+
+### Where 6.0.0 leaves the module
+
+`node run.mjs playwright`, with the identifier row normalised out, reproduces the recorded 5.3.3
+status **exactly** — same scenarios identical, same two carrying rows, same counts:
+
+| Scenario | 5.3.3 (recorded) | 6.0.0 |
+| --- | --- | --- |
+| `human-fighter-sage` | identical | **identical** |
+| `human-wizard-sage` | identical | **identical** |
+| `human-wizard-sage-l3` | identical | **identical** |
+| `human-wizard-sage-l4-halffeat` | 1 (`decision.raised`) | **1**, the same one |
+| `human-wizard-sage-featspells` | 11 | **11** |
+| `fighter-multiclass-wizard` | identical | **identical** |
+| `hill-dwarf-wizard-2014` | identical | **identical** |
+| `half-elf-wizard-2014` | identical | **identical** |
+
+No `source.book` rows and no `riders` rows anywhere in the base suite, and neither 2014 scenario
+showed the intermittent `details.background` race this time.
+
+### The 14.367 delete-batch defect looks fixed
+
+Only two sweep scenarios completed before the run was stopped, so this is a *lead*, not a result —
+but it is the lead worth chasing first. Both reported:
+
+```
+deleteErrors: { total: 0, first: null, byLevel: [] }
+```
+
+Against 14.365 to 14.367, where the clean-room Alchemist probe counted **1064** delete errors in a
+single build and the capstone genuinely granted twice. Zero, twice, is the first evidence that
+6.0.0 resolves it. **Confirm with `playwright-clean --probe-native` before believing it** — that is
+the measurement the original finding rests on, and it is cheap.
+
+The Bard is the useful one of the two:
+
+```
+Sweep: Bard 20 — College of Valor — diverges at level 1
+  native: 24 items / 143 hp    creator: 24 items / 143 hp
+  15 differences, all of one path: source.items.<item>.system.source.book
+```
+
+Every feature, every level, and hit points agree across a full 1 to 20 incremental build. The only
+divergence is one metadata field, below.
+
+`Sweep: Artificer 20 — Alchemist` **errored** — *timed out waiting for the advancement manager to
+close*, on the **native** side, after 382 s. Alchemist is precisely the subclass the 14.367 section
+caught duplicating its capstone, so this may be the same defect wearing a new face rather than a
+new one. Unresolved; it errored before any comparison happened.
+
+### `source.book`: the warm pollutes the compendium cache. Reproduced, and the mechanism found
+
+The older note above left this open with **two probes disagreeing** — `--probe --warm` blaming
+`warmAll()`, `--probe-warm` finding nothing — and cautioned against treating the warm as the
+culprit. On 6.0.0, `--probe --warm` reproduces cleanly and the disagreement should now be re-read in
+its favour:
+
+```
+                        book
+toObjectBeforeWarm      null
+       -- SourceIndex.warmAll() --
+prepared                "PHB 2024"
+_source                 "PHB 2024"
+toObject                "PHB 2024"
+fromCompendium          "PHB 2024"
+cloneRoundTrip          "PHB 2024"
+afterCreate             "PHB 2024"
+```
+
+`_source` is clean before the warm and carries the derived value after it, and from there it
+survives every copy the build makes. That is why the sweep's creator side commits
+`system.source.book: "PHB 2024"` where native has no `book` key at all.
+
+Two pieces of 6.0.0 explain it. First, the value is *invented*, not stored — `SourceField.prepareData`
+back-fills an empty book from the **module manifest**:
+
+```js
+this.bookPlaceholder = collection?.metadata?.flags?.dnd5e?.sourceBook ?? SourceField.getModuleBook(pkg) ?? "";
+if ( !this.book ) this.book = this.bookPlaceholder;
+```
+
+```
+dnd-players-handbook  flags.dnd5e.sourceBooks = {"PHB 2024": …}
+dnd-tashas-cauldron                            {"TCoE": …}
+dnd-forge-artificer                            {"EFA": …}
+```
+
+**dnd5e's own packs declare no `sourceBooks`**, so `book` stays empty there — which is exactly why
+the base suite (SRD content) is clean and the sweep (module content) is not. Expect this on
+essentially every sweep scenario and on no base-suite one.
+
+Second, `CompendiumBrowser.fetch` runs that preparation **over the pack's cached index entries, in
+place** (`module/applications/compendium-browser.mjs:1157`):
+
+```js
+const source = foundry.utils.getProperty(i, "system.source");
+if ( (foundry.utils.getType(source) === "Object") && i.uuid ) SourceField.prepareData.call(source, i.uuid);
+```
+
+`i` is the cached index entry, not a copy, so the derived value is written into shared state that
+outlives the call. `SourceIndex.warmAll()` reaches this through `browser.fetch`, and every consumer
+afterwards sees a polluted cache. Native never warms, so native's items stay clean — the asymmetry
+is *ours*, in the sense that we trigger it, even though neither the writing nor the caching is.
+
+**Still open, and the next experiment.** The chain from "a mutated *index entry*" to "a mutated
+*document* `_source`" is not established. `warmAll()` also calls `fromUuid()` on every card and
+prepares the resulting documents, so either could be the writer. What splits it:
+
+- Re-run `--probe-warm` on 6.0.0 (each warm call against a separate untouched document). It
+  disagreed with `--probe --warm` on 5.3.3; if it now agrees, the earlier disagreement was a stale
+  reading and the case is closed.
+- Call `browser.fetch` alone, without `fromUuid`, and re-read `_source`. If that alone pollutes,
+  the leak is index to document inside Foundry's compendium cache and belongs upstream.
+- If instead the document prepare is the writer, the fix is ours and is small: warm against clones,
+  so nothing prepared is the cached instance.
+
+Do **not** re-derive `SchemaField.initialize` from first principles to argue this cannot happen —
+it builds a fresh object, the reasoning looks airtight, and the measurement says otherwise. Trust
+the probe.
+
+### Timings on this machine, and what the sweep costs
+
+Slower than the machine the recorded baselines come from, by a lot:
+
+| | recorded | here |
+| --- | --- | --- |
+| Sweep scenario, incremental L20 | ~70 s | **~9 min** (College of Valor: 541 s) |
+| Subclass enumeration (once per run) | — | **~12 min** |
+| Base-suite scenario (L1 to L4) | — | 73–120 s, first 520 s (boot + pack warm) |
+
+At 9 min a scenario, the full 122-subclass sweep is **~18 hours**, not the recorded 2½. Budget for
+that before starting one, or pick `--jump` or `--level 6` and accept that neither is comparable to
+the incremental baselines.
+
+Two practical notes for driving long runs: **do not pipe the run through `tee`** — Node block-buffers
+stdout to a pipe, so the log stays empty for minutes and then arrives all at once; redirect straight
+to a file. And `sweep-results.jsonl` is the honest progress signal, one record per scenario as it
+completes.
+
+### Provisioning a machine, start to finish
+
+```bash
+cp config.example.mjs config.mjs   # FOUNDRY_ROOT, DATA_PATH, MODULE_SOURCE; SYSTEM_VERSION 6.0.0, CORE_VERSION 14.367
+npm install && npx playwright install chromium
+npm run link-module
+npm run provision
+```
+
+Two things bit here:
+
+- **`dnd-ravenloft-horrors-within` must be installed first.** `provision.mjs` throws if any module
+  in `BASE_MODULES` fails to activate, and it was the one absent from this machine's `Data/modules`.
+- **`npm run link-module` failed** with `Invalid switch - "CODE"`: `mklink /J` will not take the
+  forward slashes `MODULE_SOURCE` is written with. Now wrapped in `path.resolve()`.
+
+Every content module's dnd5e relationship declares only a `minimum` (5.1 to 5.3), so they all
+activate on 6.0.0 unchanged.
 
 ## Ember
 

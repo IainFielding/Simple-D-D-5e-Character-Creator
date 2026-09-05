@@ -212,7 +212,11 @@ export class SourceIndex {
       try {
         entries = await browser.fetch(Item, {
           types: new Set(["subclass"]),
-          indexFields: new Set(["system.classIdentifier", "system.source.rules"])
+          // The parent object, not `system.source.rules`. dnd5e 6.0.0 indexes `system.source`
+          // itself, and Foundry builds the projection with `setProperty(spec, field, 1)` — so a
+          // request for a sub-path of an already-indexed field tries to create a key on the
+          // number 1 and throws for every pack. Asking for the parent reads the same on 5.3.x.
+          indexFields: new Set(["system.classIdentifier", "system.source"])
         });
       } catch ( err ) {
         log("Compendium Browser fetch failed for subclasses, scanning packs directly", err);
@@ -260,7 +264,7 @@ export class SourceIndex {
       try {
         entries = await browser.fetch(Item, {
           types: new Set([type]),
-          indexFields: new Set(["system.identifier", "system.source.rules"])
+          indexFields: new Set(["system.identifier", "system.source"])
         });
       } catch ( err ) {
         log(`Compendium Browser fetch failed for "${type}", scanning packs directly`, err);
@@ -279,7 +283,7 @@ export class SourceIndex {
       if ( pack.metadata.type !== "Item" ) continue;
       try {
         const index = await pack.getIndex({
-          fields: ["type", "system.identifier", "system.classIdentifier", "system.source.rules"]
+          fields: ["type", "system.identifier", "system.classIdentifier", "system.source"]
         });
         for ( const e of index ) if ( e.type === type ) out.push(e);
       } catch ( err ) {

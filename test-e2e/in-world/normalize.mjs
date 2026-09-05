@@ -278,6 +278,12 @@ export function sourceSnapshot(actor) {
   if ( actorData.flags ) delete actorData.flags[MODULE_FLAG];
   for ( const key of DROP_DETAILS ) delete actorData.system?.details?.[key];
 
+  // dnd5e 6.0.0 gives actors their own `system.identifier`, slugified from the actor name. The two
+  // builds are deliberately named `…-native` and `…-creator` so they can be told apart in the
+  // world, so this is a restatement of the name `DROP_ACTOR` already drops — it would otherwise
+  // report one row on every scenario, saying nothing about advancement output.
+  delete actorData.system?.identifier;
+
   return { actor: actorData, items };
 }
 
