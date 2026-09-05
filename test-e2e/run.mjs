@@ -91,7 +91,15 @@ try {
           + ` advOrigin=${c.advancementOrigin ?? "-"}`).join(""));
     }
   } else if ( flag("probe-replflow") ) {
-    console.log(JSON.stringify(await harness("probeReplacementFlow", { level: Number(value("level") ?? 3) }), null, 2));
+    console.log(JSON.stringify(await harness("probeReplacementFlow", {
+      scenarioId: value("probe-replflow") || undefined, level: Number(value("level") ?? 3)
+    }), null, 2));
+  } else if ( flag("probe-minbook") ) {
+    console.log(JSON.stringify(await harness("probeMinimalBookRepro"), null, 2));
+  } else if ( flag("probe-warmsources") ) {
+    console.log(JSON.stringify(await harness("probeWarm"), null, 2));
+  } else if ( flag("probe-bookwriter") ) {
+    console.log(JSON.stringify(await harness("probeBookWriter"), null, 2));
   } else if ( flag("probe-books") ) {
     console.log(JSON.stringify(await harness("probeBuildBooks"), null, 2));
   } else if ( flag("probe-pollution") ) {

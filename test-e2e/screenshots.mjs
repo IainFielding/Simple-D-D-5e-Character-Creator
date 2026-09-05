@@ -244,7 +244,7 @@ console.log(`Foundry up with world "${worldId}"`);
 let session;
 let exitCode = 0;
 try {
-  session = await Session.open({ viewport: VIEWPORT, deviceScaleFactor: SCALE });
+  session = await Session.open({ viewport: VIEWPORT, deviceScaleFactor: SCALE, canvas: true });
   const call = await load(session);
 
   const shots = SHOTS[worldId];

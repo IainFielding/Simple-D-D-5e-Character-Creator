@@ -32,11 +32,17 @@ it (see *Baseline comparability* below).
 
 ### The result
 
-| | raw | with volatile ids set aside |
+| | first run (before fixes) | **re-run, 2026-09-05 12:14** |
 | --- | --- | --- |
 | Identical | 88 | **113** |
 | Differing | 34 | **9** |
 | Errored | 0 | **0** |
+| `changes[]._id` noise rows | 114 across 28 subclasses | **0** |
+
+The re-run's *raw* numbers now equal the first run's adjusted ones, which is the confirmation that
+`normaliseEffectChanges` removed noise rather than hiding differences. Archived as
+`sweep-results-600-verified.jsonl`; it supersedes `sweep-results-600-reference.jsonl`, which was
+recorded before the fixes.
 
 **Zero errors across 122 full 1-to-20 incremental builds** — the first sweep to complete without one.
 The nine real divergences are **four causes**, not nine problems:
@@ -44,7 +50,7 @@ The nine real divergences are **four causes**, not nine problems:
 | Cause | Scenarios | Whose | Status |
 | --- | --- | --- | --- |
 | Pack first-touch `source.book` | #1 Alchemist, #69 Aberrant Mind | ours (we trigger it) | open, mechanism known |
-| 2014 Ranger replacement grant | #80 Fey Wanderer, #92 Swarmkeeper, #120 Hunter | harness — `native.mjs` | **regression vs 5.3.3** |
+| 2014 Ranger replacement grant | #80 Fey Wanderer, #92 Swarmkeeper, #120 Hunter | **dnd-tashas-cauldron 3.0.0** | external; creator is correct |
 | 2014 Rogue Thieves' Cant | #85 Phantom, #89 Soulknife, #115 Thief | neither — by design | documented, unchanged |
 | Non-empty `riders.effect` | #70 Alchemist (TCoE) | undiagnosed | 1 row, needs triage |
 
@@ -102,7 +108,52 @@ bites. A pack is polluted once, on first touch, not once per run. Whether the wr
 entry or the document is still the open question, and the experiments listed there are still the ones
 that split it.
 
-### 3. The 2014 Ranger: `native.mjs` has stopped driving Tasha's replacement flow
+### 3. The 2014 Ranger: **Tasha's Cauldron is broken on 6.0.0**, and the creator is the correct side
+
+**Resolved 2026-09-05, and it is neither ours nor the harness's.** The earlier reading in this
+section — that `native.mjs` had stopped driving the replacement flow — was wrong. It drives it
+correctly: `--probe-replflow` shows the flow rendered, the radio group present, the base ticked.
+
+`dnd5e` 6.0.0 removed a compatibility shim from `ItemGrantAdvancement#apply`, on the schedule it
+announced:
+
+```js
+// 5.3.3 — legacy shape accepted
+async apply(level, { ability, retainedData={}, selected=Object.keys(retainedData), ...data }={}, options={}) {
+  if ( !foundry.utils.isEmpty(data) ) {
+    logCompatibilityWarning("The properties passed to `ItemGrantAdvancement#apply` have changed…",
+      { since: "DnD5e 5.2", until: "DnD5e 5.4" });
+    selected = filteredKeys(data);          // ← what made the legacy shape work
+  }
+
+// 6.0.0 — shim gone
+async apply(level, { ability, retainedData={}, selected, skipExisting=true }={}, options={}) {
+```
+
+`TCOEReplacementFlow#_updateObject` (dnd-tashas-cauldron 3.0.0,
+`scripts/modules/replacement-grant.mjs`) passes `formData` in exactly that legacy shape —
+`{ "<uuid>": true, … }`. On 6.0.0 those keys match no parameter and are dropped, `selected` stays
+undefined, and `selected ??= Object.keys(retainedData)` resolves to `[]`. **Nothing is granted.**
+
+The consequence reaches real users, not just this harness: with Tasha's installed, levelling *any*
+2014 class through dnd5e's own advancement flow silently drops every replacement-grant feature — a
+2014 Ranger loses Favored Enemy, Natural Explorer, Ranger Archetype, Primeval Awareness and Hide in
+Plain Sight. All three 2014 Rangers in the sweep reproduce it.
+
+**This module is unaffected and produces the correct character.** `LevelUpDriver` resolves the
+third-party type through `baseType` and applies the advancement itself, passing the modern
+`{ selected: [...] }` shape. Every `apply` call in `manager-driver.mjs` was audited against this: none
+uses the legacy shape.
+
+So the three Ranger rows in the reference baseline are a **correct** result — the creator keeps the
+features, native (with Tasha's) does not. They are not a defect to fix here, and the harness has
+deliberately **not** been taught to hide them. Worth reporting to the Tasha's maintainers.
+
+### 3b. Superseded: the earlier reading of this finding
+
+Kept because the reasoning shows how to *mis*-diagnose this, and the same trap is still open for the
+next third-party advancement type. Everything below this line was written before `--probe-replflow`
+and is **wrong in its conclusion**, though right that native was the empty side.
 
 **The regression this sweep exists to have caught.** All three 2014 Rangers report the same eleven rows
 from level 1 — the creator populates three `value.added` maps on the 2014 Ranger and carries five class
@@ -159,12 +210,29 @@ the base suite, so the normalize fix does not change this table.
 clean (10.4 s, 11.3 s, 9.9 s), so the creation hand-off, the pact progression and the no-spellcasting
 martial are all unaffected by 6.0.0. Unchanged from the 5.3.3 record.
 
+### The species and background axes on 6.0.0
+
+Both run 2026-09-05, archived as `sweep-results-600-species.jsonl` and
+`sweep-results-600-background.jsonl`.
+
+**Species axis — 22 identical, 2 differing, 0 errored (of 24).** Both differences are already known:
+
+| Scenario | Rows | Cause |
+| --- | --- | --- |
+| `species:changeling` | 4 × `source.book` | The pack-first-touch write, finding 2 above — this is the run's first touch of `dnd-forge-artificer` |
+| `species:dwarf` | 1 × `hp.value` | Dwarven Toughness, documented below: `hp.max` is 142 on **both** sides; only stored *current* HP differs, and it is **native** that ends at 143 — above its own maximum. Ours sits at maximum. |
+
+**Background axis — unusable, and not because of 6.0.0.** 42 of 55 scenarios error with *timed out
+waiting for step "Potent Dragonmark" to advance*, which is exactly the pre-existing blocker "The feat
+axis: two bugs fixed, still not usable" already records: *"The axis still does not complete, and
+should not be trusted yet."* Reproduced unchanged on 6.0.0. It tells us nothing new about the system
+upgrade and remains the one axis without a usable baseline on any version.
+
 ### What this run does not cover
 
-The subclass axis only. The **species** and **background** axes (`--sweep --axis species` /
-`--axis background`) were not run on 6.0.0, so the feat-axis problems recorded historically are
-neither confirmed nor cleared here. Nor was `--sidekicks`, `--granted-spells`, `--hooks`, or a
-`playwright-clean` probe.
+`playwright-clean --probe-native` was not re-run, so the clean-room confirmation the delete-batch
+finding asks for is still outstanding — the 0/122 result above is from the instrumented world, not a
+module-free one. The feat axis remains blocked as above.
 
 ### Baseline comparability
 
@@ -198,13 +266,40 @@ wrong file is worth fixing together (open item 5).
 
 ### Open, in priority order
 
-1. Confirm the 2014 Ranger regression against `playwright-clean --probe-native`, then fix `native.mjs`.
-2. Re-run the sweep with `normaliseEffectChanges` in place and confirm it reports 113/122 directly.
-3. Triage the single `riders.effect` row on TCoE Alchemist (#70).
-4. Split the `source.book` writer — index entry or document — with the experiments in the historical
-   section.
+1. ~~2014 Ranger~~ — **closed**: Tasha's Cauldron 3.0.0 passes a legacy `apply` shape that dnd5e 6.0.0 no longer accepts. Not ours; report upstream.
+2. ~~Re-run the sweep with `normaliseEffectChanges` in place~~ — **done**: 113 identical, 9 differing,
+   0 errored, raw. See the result table above.
+3. ~~Triage the `riders.effect` row on TCoE Alchemist (#70)~~ — **closed**: one row, both sides 47
+   items and 143 hp with no `effects[]` difference, so the effects themselves match and only the flag
+   recording them differs. Bookkeeping; if anything the creator is the better-behaved side, since
+   `riders` is what dnd5e uses to clean effects up on level-down.
+4. ~~Split the `source.book` writer — index entry or document~~ — **closed**, and neither half was
+   the right frame: they are the *same object*, and the writer is dnd5e's own
+   `CompendiumBrowser.fetch`. See finding 2 above.
 5. Decide whether `describeDrift` should compare system versions, given that the baselines it would
    most need to guard are headerless.
+6. ~~`--hooks` has never completed on 6.0.0~~ — **closed, and it was the harness's own doing.**
+
+   `api.launchCreator()` calls `offerDraft()` before constructing the shell, and a stored draft is
+   offered back through a **modal** `DialogV2` that waits for a click. In a headless run nobody
+   clicks, so the case stalls inside `launchCreator` before the shell exists. The failure was
+   self-perpetuating: the first stalled run left a half-filled build in the draft flag, which
+   stalled the next, and so on. Only this suite was affected because only it opens the creator
+   through the public API — every other path constructs `CreatorShell` directly and never reaches
+   `offerDraft`.
+
+   Clearing the draft once per run was not enough either: the cases *write* drafts as they go (the
+   veto case abandons a half-filled build by design), so case 3 met one that case 2 had just saved.
+   `openCreator()` now drops the flag before every open.
+
+   Four environmental theories were wrong along the way and each is recorded where it was tried —
+   the canvas, the JS heap, `warmSources`, and image decoding. The useful lesson is the one this
+   file already preaches: the ungated `[hooks]` progress markers found in one run what a day of
+   inference had not. **`--hooks` now passes all seven cases**, so the public hook and API surface
+   is verified on 6.0.0.
+
+   `offerDraft` itself is behaving correctly throughout — it found an unfinished build and asked.
+   Nothing in the module needed changing.
 
 ## Layout
 

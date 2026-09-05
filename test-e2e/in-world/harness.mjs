@@ -928,6 +928,107 @@ export async function probeReplacementFlow({ scenarioId = "sweep:ranger/hunter",
   }
 }
 
+/**
+ * Who writes `system.source.book` into a cached compendium document's `_source`, with a stack.
+ *
+ * Three rounds of narrowing by elimination each found *a* writer and none of them the one that
+ * matters, so this stops inferring and traps the write itself: the target documents'
+ * `_source.system.source.book` is replaced with an accessor that records a stack trace on every
+ * write, and then the creator builds. Whatever appears in those traces is the call site, with no
+ * reasoning in between.
+ */
+/**
+ * Run the creator's full warm-up on its own, and time each phase.
+ *
+ * `--hooks` is the only suite that reaches `warmSources`, and it is the only suite that crashes the
+ * renderer. Everything else — the sweep, the base suite, every probe — drives `LevelUpDriver`
+ * directly and never pays for it. That makes `warmSources` the prime suspect, but it is also exactly
+ * what a real player's creator does on open, so if it is pathological on 6.0.0 that matters well
+ * beyond the harness. Isolated here so the answer is not entangled with the hooks suite's own work.
+ */
+/**
+ * The smallest reproduction of the `source.book` write, in the shape a bug report can paste.
+ *
+ * Deliberately uses nothing from this module: one `fromUuid` read, one `CompendiumBrowser.fetch`,
+ * one more read. If the second read differs from the first, dnd5e has written a derived value into
+ * a cached document's `_source`.
+ */
+export async function probeMinimalBookRepro() {
+  const uuid = "Compendium.dnd5e.classes24.Item.phbftrFighter000";
+  const read = async () => (await fromUuid(uuid))?.toObject()?.system?.source?.book ?? null;
+
+  const before = await read();
+  await dnd5e.applications.CompendiumBrowser.fetch(Item, {
+    types: new Set(["class"]),
+    indexFields: new Set(["system.source"])
+  });
+  const after = await read();
+  return { uuid, before, after, changed: before !== after };
+}
+
+export async function probeWarm() {
+  const t0 = performance.now();
+  const marks = [];
+  const mark = label => marks.push({ label, ms: Math.round(performance.now() - t0),
+    heapMB: performance.memory ? Math.round(performance.memory.usedJSHeapSize / 1048576) : null });
+
+  mark("start");
+  const { warmSources, invalidateSources } = await import(
+    "/modules/sogrom-dnd5e-character-creator/scripts/data/source-cache.mjs");
+  mark("imported source-cache");
+  try {
+    invalidateSources?.();
+    mark("invalidated");
+  } catch { /* not exported on this build */ }
+
+  await warmSources();
+  mark("warmSources resolved");
+
+  return { totalMs: Math.round(performance.now() - t0), marks };
+}
+
+export async function probeBookWriter() {
+  const targets = {
+    Fighter: "Compendium.dnd5e.classes24.Item.phbftrFighter000",
+    SecondWind: "Compendium.dnd5e.classes24.Item.phbftrSecondWind",
+    Resourceful: "Compendium.dnd5e.origins24.Item.phbsptResourcefu"
+  };
+  const writes = [];
+  const armed = [];
+
+  for ( const [label, uuid] of Object.entries(targets) ) {
+    const doc = await fromUuid(uuid);
+    const src = doc?._source?.system?.source;
+    if ( !src ) { writes.push({ label, error: "no _source.system.source" }); continue; }
+    let held = src.book;
+    try {
+      Object.defineProperty(src, "book", {
+        configurable: true, enumerable: true,
+        get: () => held,
+        set(v) {
+          if ( v !== held ) {
+            writes.push({ label, from: held, to: v, stack: (new Error().stack ?? "").split("\n").slice(1, 9).join("\n") });
+          }
+          held = v;
+        }
+      });
+      armed.push(label);
+    } catch ( err ) {
+      writes.push({ label, error: `could not arm: ${err.message}` });
+    }
+  }
+
+  const scenario = SCENARIOS.find(s => s.id === "human-fighter-sage");
+  await cleanup();
+  try {
+    const book = new AnswerBook({ overrides: scenario.answers ?? {} });
+    await buildCreator({ ...scenario, name: `${PREFIX}bookwriter [creator]` }, { book, unofferable: [] });
+  } finally {
+    await cleanup();
+  }
+  return { armed, writeCount: writes.length, writes: writes.slice(0, 12) };
+}
+
 export async function probeBuildBooks() {
   const targets = {
     Human: "Compendium.dnd5e.origins24.Item.phbspHuman000000",
