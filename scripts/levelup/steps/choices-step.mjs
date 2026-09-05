@@ -1,4 +1,5 @@
 import { t, log } from "../../config.mjs";
+import { advancementTitle } from "../../data/advancement-util.mjs";
 import { atLevel, advancementHint } from "../levelup-state.mjs";
 import { choiceBlurb, findRestrictedItems, evalItemPrereq, groupRecommended } from "../../data/choice-resolver.mjs";
 
@@ -173,7 +174,7 @@ export const choicesStep = {
       record.exhausted = !st.full && !options.some(o => !o.owned && !o.selected && !o.disabled);
       const section = {
         index: state.choiceSteps.indexOf(record),
-        title: record.advancement.title || t("levelup.step.choices.choose"),
+        title: advancementTitle(record.advancement) || t("levelup.step.choices.choose"),
         count: t("levelup.step.choices.count", { current: st.current, max: st.max }),
         complete: st.full || record.exhausted,
         // The authored description when there is one; otherwise the creator's generated blurb, so

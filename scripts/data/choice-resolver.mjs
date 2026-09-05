@@ -1,5 +1,5 @@
 import { t, log } from "../config.mjs";
-import { advancementArray, appliesToClass } from "./advancement-util.mjs";
+import { advancementArray, appliesToClass, advancementTitle} from "./advancement-util.mjs";
 import { matchesRules } from "./source-index.mjs";
 import { getEnabledPacks, isUsableItemPack } from "./compendium-util.mjs";
 import { toolCategoryKey, toolChoices } from "./tool-source.mjs";
@@ -410,7 +410,7 @@ async function parseAdvancementChoice(adv, ctx) {
     if ( !cards.length ) return;
     reqs.push(buildChoiceReq({
       advId: adv._id, source, ownerUuid, type: "Subclass", level,
-      title: adv.title || t("advancement.subclass"), hint: adv.hint, count: 1,
+      title: advancementTitle(adv) || t("advancement.subclass"), hint: adv.hint, count: 1,
       options: cards.map(c => ({ key: c.uuid, label: c.name, img: c.img })),
       sel, crossTaken
     }));
@@ -425,7 +425,7 @@ async function parseAdvancementChoice(adv, ctx) {
       const options = sizes.map(s => ({ key: s, label: CONFIG.DND5E.actorSizes?.[s]?.label ?? s }));
       reqs.push(buildChoiceReq({
         advId: adv._id, source, ownerUuid, type: "Size", level,
-        title: adv.title || t("advancement.size"), hint: adv.hint, count: 1, options, sel, crossTaken
+        title: advancementTitle(adv) || t("advancement.size"), hint: adv.hint, count: 1, options, sel, crossTaken
       }));
     }
     return;
@@ -462,7 +462,7 @@ async function parseAdvancementChoice(adv, ctx) {
         if ( sel[selKey] ) sel[selKey] = sel[selKey].filter(k => valid.has(k));
         const req = buildChoiceReq({
           advId: adv._id, choiceIndex: ci, source, ownerUuid, type: "Trait", level,
-          title: adv.title || t("advancement.expertise"), hint: adv.hint, count, options, sel, crossTaken,
+          title: advancementTitle(adv) || t("advancement.expertise"), hint: adv.hint, count, options, sel, crossTaken,
           mode
         });
         req.isExpertise = true;
@@ -481,7 +481,7 @@ async function parseAdvancementChoice(adv, ctx) {
       }
       reqs.push(buildChoiceReq({
         advId: adv._id, choiceIndex: ci, source, ownerUuid, type: "Trait", level,
-        title: adv.title || traitChoiceTitle(pool), hint: adv.hint,
+        title: advancementTitle(adv) || traitChoiceTitle(pool), hint: adv.hint,
         count, options, sel, crossDedupe: true, dedupeGroup: mode, crossTaken,
         mode, poolType: (pool[0] ?? "").split(":")[0]
       }));
@@ -546,7 +546,7 @@ async function parseAdvancementChoice(adv, ctx) {
         count,
         classList: Array.from(cfg.restriction?.list ?? []).map(k => String(k).replace(/^class:/, "")),
         abilityKeys: Array.from(cfg.spell?.ability ?? []),
-        title: adv.title || t("advancement.chooseItems"),
+        title: advancementTitle(adv) || t("advancement.chooseItems"),
         chosenCount: chosen.length,
         complete: chosen.length >= count
       });
@@ -608,7 +608,7 @@ async function parseAdvancementChoice(adv, ctx) {
     options.sort((a, b) => a.label.localeCompare(b.label, game.i18n.lang));
     const req = buildChoiceReq({
       advId: adv._id, source, ownerUuid, type: "ItemChoice", level,
-      title: adv.title || t("advancement.chooseItems"), hint: adv.hint, count, options, sel, crossTaken
+      title: advancementTitle(adv) || t("advancement.chooseItems"), hint: adv.hint, count, options, sel, crossTaken
     });
     // Split into a "Recommended" + "Other" panel when the build unlocked any option (an item
     // prerequisite it satisfies); otherwise leaves the single ungrouped grid untouched.

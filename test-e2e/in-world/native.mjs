@@ -176,7 +176,29 @@ async function fillReplacementGrant(flow, adv, moved) {
 
   const root = await flowElement(flow);
   if ( moved?.() ) return;
-  for ( const input of root.querySelectorAll("input[type=checkbox], input[type=radio]") ) {
+
+  const inputs = [...root.querySelectorAll("input[type=checkbox], input[type=radio]")];
+  // Diagnostics only, and only when something has asked for them. The 2014 Ranger applies nothing
+  // on 6.0.0 despite this function being reached with a correct `wanted`, and the two candidate
+  // explanations — no controls found, or controls whose value/name does not resolve to a uuid in
+  // `wanted` — are indistinguishable from the outside. Recorded rather than logged so a probe can
+  // read it back without parsing the console.
+  const diag = globalThis.__replacementDiag;
+  if ( diag ) {
+    diag.push({
+      advId: adv.id, advType: adv.type, level: adv.level ?? null,
+      bases: [...bases], wanted: [...wanted],
+      inputCount: inputs.length,
+      inputs: inputs.map(i => ({
+        type: i.type, name: i.name, value: i.value, checked: i.checked,
+        resolved: withItem(i.value || i.name.split(".").slice(-1)[0])
+      })),
+      rootTag: root?.tagName ?? null,
+      rootHtmlHead: (root?.innerHTML ?? "").slice(0, 400)
+    });
+  }
+
+  for ( const input of inputs ) {
     const uuid = withItem(input.value || input.name.split(".").slice(-1)[0]);
     const want = wanted.has(uuid);
     if ( input.checked !== want ) {

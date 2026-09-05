@@ -1,4 +1,5 @@
 import { t } from "../../config.mjs";
+import { advancementTitle } from "../../data/advancement-util.mjs";
 import { atLevel, advancementHint } from "../levelup-state.mjs";
 
 /**
@@ -33,7 +34,7 @@ export const grantStep = {
       const st = driver.grantState(record);
       return {
         index: state.grantSteps.indexOf(record),
-        title: record.advancement.title || record.item?.name || t("levelup.step.grant.label"),
+        title: advancementTitle(record.advancement) || record.item?.name || t("levelup.step.grant.label"),
         hint: await advancementHint(record),
         prompt: t("levelup.step.grant.prompt"),
         spells: st.spells,

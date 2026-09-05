@@ -1,7 +1,7 @@
 import { ABILITIES, formatMod, storeConfig, t } from "../config.mjs";
 import { cartTotalCp, formatCp } from "../data/store-source.mjs";
 import { DETAIL_FIELDS, DETAIL_TEXT_FIELDS } from "./details-step.mjs";
-import { advancementArray } from "../data/advancement-util.mjs";
+import { advancementArray, advancementTitle} from "../data/advancement-util.mjs";
 import { resolveChoices, traitChoiceTitle, traitKeyLabel } from "../data/choice-resolver.mjs";
 import { resolveFeatSpells, grantedSpellCards } from "./feat-spells-step.mjs";
 import { summarizeOption } from "../data/equipment-source.mjs";
@@ -253,7 +253,7 @@ async function fixedGrants(doc) {
       continue;
     }
     if ( adv.type === "ScaleValue" ) {
-      const title = adv.title || adv.configuration?.identifier || t("advancement.scaleValue");
+      const title = advancementTitle(adv) || adv.configuration?.identifier || t("advancement.scaleValue");
       let display;
       try { const v = adv.valueForLevel?.(1); display = v?.display ?? v?.value ?? v; } catch { /* fall through */ }
       if ( display == null ) {

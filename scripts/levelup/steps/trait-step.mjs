@@ -1,4 +1,5 @@
 import { t } from "../../config.mjs";
+import { advancementTitle } from "../../data/advancement-util.mjs";
 import { atLevel, advancementHint } from "../levelup-state.mjs";
 import { choiceBlurb } from "../../data/choice-resolver.mjs";
 
@@ -63,7 +64,7 @@ export const traitStep = {
       record.exhausted = !st.full && !options.some(o => !o.owned && !o.selected && !o.disabled);
       const section = {
         index: state.traitSteps.indexOf(record),
-        title: record.advancement.title || t("levelup.step.traits.choose"),
+        title: advancementTitle(record.advancement) || t("levelup.step.traits.choose"),
         // The authored description when there is one; otherwise the creator's generated blurb, so
         // every decision reads with a sentence (Weapon Mastery ships without a hint, for example).
         hint: (await advancementHint(record)) || choiceBlurb({

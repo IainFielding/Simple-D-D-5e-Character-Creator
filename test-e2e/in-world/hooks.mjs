@@ -101,12 +101,28 @@ function inOrder(names, subset, label) {
 
 const pause = ms => new Promise(r => setTimeout(r, ms));
 
-/** Close every application this module may have left open, so cases cannot bleed into each other. */
+/**
+ * Close every application this module may have left open, so cases cannot bleed into each other.
+ *
+ * **Scoped to windows that are not part of the core interface.** Foundry v14 registers the whole UI
+ * in `foundry.applications.instances` alongside module windows — on this world it holds 22 entries
+ * of which 20 are core: the sidebar, chat, hotbar, scene navigation, the directories, the combat
+ * tracker. Closing those tears down the interface the suite is driving, and one of them never
+ * resolving hung the entire hooks run for 93 minutes with no server traffic at all, past its own
+ * `waitForStage` ceiling, because nothing here has a timeout.
+ *
+ * `ui` is the register of what is core, so anything reachable from it is left alone. A close is also
+ * only awaited when there is one to await — `app.close?.(…).catch(…)` reads a property of `undefined`
+ * and throws synchronously for anything without the method.
+ */
 async function closeAll() {
-  for ( const app of Object.values(ui.windows ?? {}) ) await app.close?.({ force: true }).catch(() => {});
-  for ( const app of foundry.applications.instances?.values() ?? [] ) {
-    await app.close?.({ force: true }).catch(() => {});
-  }
+  const core = new Set(Object.values(ui).filter(v => v && (typeof v === "object")));
+  const closeOne = async app => {
+    if ( !app || core.has(app) || (typeof app.close !== "function") ) return;
+    await Promise.resolve(app.close({ force: true })).catch(() => {});
+  };
+  for ( const app of Object.values(ui.windows ?? {}) ) await closeOne(app);
+  for ( const app of [...(foundry.applications.instances?.values() ?? [])] ) await closeOne(app);
   await pause(200);
 }
 

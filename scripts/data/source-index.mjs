@@ -327,15 +327,30 @@ export class SourceIndex {
   async #resolveDetail(uuid, doc) {
     doc ??= await fromUuid(uuid);
     if ( !doc ) return null;
-    const raw = doc.system?.description?.value ?? "";
+
+    // Work on a clone, never the cached compendium document. `enrichHTML` prepares whatever it is
+    // handed as `relativeTo`, and dnd5e's `SourceField.prepareData` back-fills an empty
+    // `system.source.book` from the pack's `flags.dnd5e.sourceBook` when it does — writing a
+    // *derived* value into shared state we do not own. Measured: enriching the cached document
+    // flips `book` from "" to "SRD 5.2"; enriching a clone does not. `keepId` preserves the uuid,
+    // so relative links inside the description still resolve.
+    //
+    // Hygiene, not a bug fix. This is **not** what puts `source.book` on a built character — a
+    // full sweep with this in place reported the same rows. The warm's own writes are transient
+    // (`warmAll`'s document load replaces the polluted cache entries), so the write that reaches
+    // the actor happens during the build itself and is still open. Do not read this comment as
+    // having closed that.
+    const safe = doc.clone({}, { keepId: true });
+
+    const raw = safe.system?.description?.value ?? "";
     const enriched = await foundry.applications.ux.TextEditor.implementation.enrichHTML(raw, {
-      relativeTo: doc, secrets: false
+      relativeTo: safe, secrets: false
     });
     // The originating sourcebook (e.g. "Player's Handbook 2024"), for a source badge in the UI.
     // dnd5e prepares `system.source.value` to the book name (falling back to the package title);
     // empty when the item declares no source.
-    const source = doc.system?.source?.value ?? "";
-    return { name: doc.name, img: doc.img, enriched, source };
+    const source = safe.system?.source?.value ?? "";
+    return { name: safe.name, img: safe.img, enriched, source };
   }
 
   /**

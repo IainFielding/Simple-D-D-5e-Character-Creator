@@ -859,6 +859,231 @@ export async function compareItem({ scenarioId, itemName, level = 20, incrementa
  *   trace at all. A consumption target that cannot resolve is exactly that shape: the actor's stored
  *   data is identical either way, and the complaint only arrives when the sheet asks for it.
  */
+/**
+ * What `foundry.applications.instances` actually holds, and which of those `hooks.mjs`'s `closeAll`
+ * would try to close.
+ *
+ * `closeAll` awaits `close({force: true})` on every registered ApplicationV2. That was written when
+ * the registry held module windows; if Foundry v14 also registers the core UI singletons — sidebar,
+ * chat, hotbar, scene navigation — then `closeAll` is closing the interface out from under itself,
+ * and one of those closes not resolving is enough to hang the whole hooks suite with no server
+ * traffic, which is the symptom. Reports the registry rather than assuming either way.
+ */
+/**
+ * Which half of `SourceIndex.#resolveDetail` writes the derived book back into a cached document.
+ *
+ * `--probe-warm` narrows the writer to `detail()`, which does exactly two things to the document it
+ * is handed: enriches its description with `relativeTo: doc`, and reads `system.source.value`. Those
+ * need different fixes — an enrich that mutates is Foundry's, a read that mutates is dnd5e's
+ * `SourceField` back-filling a placeholder on access — so they are run against separate untouched
+ * documents here. The clone case tests the fix the README proposes.
+ */
+/**
+ * Which *stage* of the real creator path pollutes, rather than which call does in isolation.
+ *
+ * `--probe-detail` proves `enrichHTML(relativeTo: cachedDoc)` can write the derived book, and the
+ * clone stops it. But the base suite still reports the rows after that fix, and the polluted items
+ * include granted features that `detail()` never touches — so isolation testing has found *a*
+ * writer, not the one that matters. This walks the real sequence and reads the same three documents
+ * after each stage: whichever stage flips them is the one to fix.
+ */
+/**
+ * Where the `source.book` a built character stores actually comes from.
+ *
+ * `--probe-pollution` shows the compendium documents are *clean* by the time a build starts —
+ * `warmAll`'s document load replaces the entries `SourceIndex.load()` polluted — yet the creator's
+ * items still store "SRD 5.2" while native's store "". So the value is not being read from the
+ * documents at build time. This reports, for the same scenario built both ways: the documents'
+ * books at each stage, and every stored `_source.system.source.book` on each finished actor. If the
+ * documents are clean and the creator's items are not, the creator is copying from something cached
+ * while the documents *were* polluted, and the cache is the thing to fix.
+ */
+/**
+ * What `native.mjs`'s `fillReplacementGrant` actually sees for the 2014 Ranger.
+ *
+ * It is reached (`probe-replacement` shows `dispatchesToDefault: true`, `hasReplacements: true`) and
+ * computes the right `wanted`, yet native ends the build with none of the base features. That leaves
+ * the DOM: either the flow renders no controls this selector matches, or it renders controls whose
+ * `value`/`name` does not normalise to a uuid in `wanted`. Builds natively to `level` with the
+ * recorder armed and returns one record per replacement flow driven.
+ * @param {object} [options]
+ * @param {string} [options.scenarioId]  Defaults to the 2014 Ranger sweep scenario.
+ * @param {number} [options.level]
+ */
+export async function probeReplacementFlow({ scenarioId = "sweep:ranger/hunter", level = 3 } = {}) {
+  const scenario = SCENARIOS.find(s => s.id === scenarioId)
+    ?? (await getSweep(level, true)).scenarios.find(s => s.id === scenarioId);
+  if ( !scenario ) throw new Error(`unknown scenario "${scenarioId}"`);
+  await cleanup();
+
+  globalThis.__replacementDiag = [];
+  try {
+    const book = new AnswerBook({ overrides: scenario.answers ?? {}, generate: !!scenario.generate });
+    const actor = await buildNative({ ...scenario, name: `${PREFIX}replprobe [native]`, level }, { book });
+    const granted = actor.items.map(i => i.name).sort();
+    return { scenario: scenarioId, level, flows: globalThis.__replacementDiag, grantedItems: granted };
+  } finally {
+    delete globalThis.__replacementDiag;
+    await cleanup();
+  }
+}
+
+export async function probeBuildBooks() {
+  const targets = {
+    Human: "Compendium.dnd5e.origins24.Item.phbspHuman000000",
+    Fighter: "Compendium.dnd5e.classes24.Item.phbftrFighter000",
+    SecondWind: "Compendium.dnd5e.classes24.Item.phbftrSecondWind"
+  };
+  const read = async () => {
+    const out = {};
+    for ( const [k, uuid] of Object.entries(targets) ) {
+      out[k] = (await fromUuid(uuid))?.toObject()?.system?.source?.book ?? null;
+    }
+    return out;
+  };
+  const books = actor => actor.items
+    .map(i => ({ name: i.name, book: i._source?.system?.source?.book ?? null }))
+    .filter(i => i.book);
+
+  const scenario = SCENARIOS.find(s => s.id === "human-fighter-sage");
+  if ( !scenario ) throw new Error("human-fighter-sage scenario missing");
+  await cleanup();
+
+  const stages = [{ step: "before any build", docs: await read() }];
+  try {
+    const nBook = new AnswerBook({ overrides: scenario.answers ?? {} });
+    const native = await buildNative({ ...scenario, name: `${PREFIX}bookprobe [native]` }, { book: nBook });
+    stages.push({ step: "after native build", docs: await read(), itemsWithBook: books(native) });
+
+    const cBook = new AnswerBook({ overrides: scenario.answers ?? {} });
+    const creator = await buildCreator({ ...scenario, name: `${PREFIX}bookprobe [creator]` },
+      { book: cBook, unofferable: [] });
+    stages.push({ step: "after creator build", docs: await read(), itemsWithBook: books(creator) });
+  } finally {
+    await cleanup();
+  }
+  return stages;
+}
+
+export async function probeBuildPollution() {
+  const targets = {
+    "Human (card)": "Compendium.dnd5e.origins24.Item.phbspHuman000000",
+    "Fighter (card)": "Compendium.dnd5e.classes24.Item.phbftrFighter000",
+    "Second Wind (granted)": "Compendium.dnd5e.classes24.Item.phbftrSecondWind",
+    "Resourceful (granted)": "Compendium.dnd5e.origins24.Item.phbsptResourcefu"
+  };
+  const read = async () => {
+    const out = {};
+    for ( const [label, uuid] of Object.entries(targets) ) {
+      out[label] = (await fromUuid(uuid))?.toObject()?.system?.source?.book ?? null;
+    }
+    return out;
+  };
+
+  const steps = [{ step: "start (nothing touched)", books: await read() }];
+  const index = new SourceIndex();
+  await index.load();
+  steps.push({ step: "after SourceIndex.load()", books: await read() });
+  await index.warmAll();
+  steps.push({ step: "after warmAll()", books: await read() });
+  return steps;
+}
+
+export async function probeDetailWriter() {
+  const book = async uuid => (await fromUuid(uuid))?.toObject()?.system?.source?.book ?? null;
+  const out = [];
+
+  const run = async (label, uuid, fn) => {
+    const before = await book(uuid);
+    try { await fn(await fromUuid(uuid)); } catch ( err ) { out.push({ label, uuid, error: String(err) }); return; }
+    const after = await book(uuid);
+    out.push({ label, uuid, before, after, changed: before !== after });
+  };
+
+  await run("enrichHTML(relativeTo: doc)", "Compendium.dnd5e.classes24.Item.phbbrbBarbarian0", async doc => {
+    await foundry.applications.ux.TextEditor.implementation.enrichHTML(
+      doc.system?.description?.value ?? "", { relativeTo: doc, secrets: false });
+  });
+
+  await run("read system.source.value", "Compendium.dnd5e.classes24.Item.phbbrdBard000000", async doc => {
+    void doc.system?.source?.value;
+  });
+
+  // The proposed fix: enrich against a clone so the cached instance is never the thing prepared.
+  // Reports the clone's own uuid too — `relativeTo` resolves relative links against it, so a clone
+  // that has lost its identity would fix the pollution by breaking the enrichment.
+  const cloneUuid = "Compendium.dnd5e.classes24.Item.phbrgrRanger0000";
+  {
+    const before = await book(cloneUuid);
+    const doc = await fromUuid(cloneUuid);
+    let clonedUuid = null;
+    if ( doc ) {
+      const copy = doc.clone({}, { keepId: true });
+      clonedUuid = copy?.uuid ?? null;
+      await foundry.applications.ux.TextEditor.implementation.enrichHTML(
+        copy.system?.description?.value ?? "", { relativeTo: copy, secrets: false });
+    }
+    out.push({ label: "enrich against a clone", uuid: cloneUuid, before, after: await book(cloneUuid),
+      changed: before !== await book(cloneUuid), clonedUuid, originalUuid: doc?.uuid ?? null });
+  }
+
+  await run("toObject() only (control)", "Compendium.dnd5e.classes24.Item.phbdrdDruid00000", async doc => {
+    void doc.toObject();
+  });
+
+  return out;
+}
+
+export async function probeOpenApps() {
+  const instances = [...(foundry.applications.instances?.entries() ?? [])].map(([id, app]) => ({
+    id,
+    ctor: app?.constructor?.name ?? null,
+    rendered: app?.rendered ?? null,
+    hasClose: typeof app?.close === "function",
+    // The core singletons hang off `ui`; anything found there is interface, not a module window.
+    isCoreUi: Object.entries(ui).some(([, v]) => v === app)
+  }));
+  const uiKeys = Object.entries(ui)
+    .filter(([, v]) => v && (typeof v === "object"))
+    .map(([k, v]) => ({ key: k, ctor: v?.constructor?.name ?? null,
+      inInstances: [...(foundry.applications.instances?.values() ?? [])].includes(v) }));
+
+  return {
+    instanceCount: instances.length,
+    coreUiInInstances: instances.filter(i => i.isCoreUi).length,
+    instances,
+    ui: uiKeys
+  };
+}
+
+export async function probeReplacement(uuid) {
+  const item = await fromUuid(uuid);
+  if ( !item ) throw new Error(`no item at ${uuid}`);
+
+  const named = ["HitPoints", "Size", "Trait", "ItemChoice", "ItemGrant",
+    "AbilityScoreImprovement", "Subclass"];
+  const out = [];
+  for ( const adv of item.system.advancement ?? [] ) {
+    const replacements = adv.configuration?.replacements;
+    const hasReplacements = replacements && !foundry.utils.isEmpty(replacements);
+    if ( (adv.type !== "ItemGrant") && !hasReplacements ) continue;
+    out.push({
+      id: adv.id,
+      type: adv.type,
+      ctor: adv.constructor?.name ?? null,
+      // Whether `native.mjs`'s `switch (adv.type)` sends this to a named case rather than to
+      // `default`, which is the only branch that drives a replacement grant.
+      dispatchesToDefault: !named.includes(adv.type),
+      level: adv.level ?? adv.levels ?? null,
+      hasReplacements: !!hasReplacements,
+      replacements: hasReplacements ? replacements : null,
+      items: Array.from(adv.configuration?.items ?? [])
+        .map(i => (typeof i === "string") ? { uuid: i } : { uuid: i.uuid, optional: i.optional })
+    });
+  }
+  return { uuid, name: item.name, advancements: out };
+}
+
 export async function probeNative({
   scenarioId, itemName, level = 20, incremental = true, render = false
 }) {

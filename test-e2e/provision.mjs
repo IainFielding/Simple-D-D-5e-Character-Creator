@@ -64,6 +64,21 @@ async function provision(worldId) {
     // stranded flow or a swallowed resolver error explains itself through those lines, and
     // `run.mjs --console` captures the page console to read them back. Turned on per world, after
     // the reload, because the setting only exists once the module has registered it.
+    // Canvas off, for every world including the clean one.
+    //
+    // Nothing in this harness looks at the board — the suites drive documents, and `screenshots.mjs`
+    // captures the creator's own DOM. Under headless Chromium the canvas is served by SwiftShader,
+    // a *software* WebGL implementation, and drawing 24 canvas groups plus the FogExtractor's
+    // texture-compression worker is comfortably the largest memory consumer in the session. It was
+    // enough to lose the GL context outright — four `CONTEXT_LOST_WEBGL` warnings followed by
+    // `page.evaluate: Target crashed` — which killed the hooks suite during world load, before any
+    // of its own code ran. `core.noCanvas` is a per-user client setting stored in the world, so
+    // setting it once here is inherited by every later join.
+    await session.eval(async () => {
+      try { await game.settings.set("core", "noCanvas", true); } catch { /* older core */ }
+    });
+    console.log("  canvas disabled (nothing here renders the board)");
+
     if ( spec.modules.includes(MODULE_ID) ) {
       await session.eval(async id => {
         try { await game.settings.set(id, "debugLogging", true); } catch { /* module not active */ }

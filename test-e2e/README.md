@@ -11,6 +11,201 @@ packs under test.
 
 Copy `config.example.mjs` to `config.mjs` and edit the paths before the setup steps below.
 
+> **Where to start.** *Master findings* below is the authoritative record of what this harness
+> currently says. Everything from **Historical reference** onward is kept for the reasoning and the
+> mechanisms it documents, not as a statement of current state — where the two disagree, this section
+> wins.
+
+## Master findings — dnd5e 6.0.0, 2026-09-05
+
+The first full sweep on dnd5e **6.0.0**, run on this machine (Foundry 14.367, packaged 6.0.0 system
+installed through the setup UI — *not* the source build the historical 6.0.0 section was measured on).
+
+```
+subclass axis, incremental, level 20 · 122 scenario(s) · 14.367 / dnd5e 6.0.0
+6_0_0_Preview@f31d56c+dirty · 2026-09-05 01:42 → 03:54 · ~65 s/scenario
+```
+
+Archived as `sweep-results-600-reference.jsonl`. **This is the 6.0.0 reference baseline.** It carries a
+full `_meta` header; every older baseline on this machine was taken on 5.3.3 and none is comparable to
+it (see *Baseline comparability* below).
+
+### The result
+
+| | raw | with volatile ids set aside |
+| --- | --- | --- |
+| Identical | 88 | **113** |
+| Differing | 34 | **9** |
+| Errored | 0 | **0** |
+
+**Zero errors across 122 full 1-to-20 incremental builds** — the first sweep to complete without one.
+The nine real divergences are **four causes**, not nine problems:
+
+| Cause | Scenarios | Whose | Status |
+| --- | --- | --- | --- |
+| Pack first-touch `source.book` | #1 Alchemist, #69 Aberrant Mind | ours (we trigger it) | open, mechanism known |
+| 2014 Ranger replacement grant | #80 Fey Wanderer, #92 Swarmkeeper, #120 Hunter | harness — `native.mjs` | **regression vs 5.3.3** |
+| 2014 Rogue Thieves' Cant | #85 Phantom, #89 Soulknife, #115 Thief | neither — by design | documented, unchanged |
+| Non-empty `riders.effect` | #70 Alchemist (TCoE) | undiagnosed | 1 row, needs triage |
+
+Both 2014-base-class clusters are **complete sets** — every 2014 Rogue and every 2014 Ranger in the
+world — and neither depends on where the subclass came from: Thief and Hunter are dnd5e's own, the
+rest Tasha's. That is what makes each one cause rather than three.
+
+### 1. `changes[]._id`: 6.0.0 mints a random id per effect change — **fixed in the harness**
+
+Every entry in an effect's `system.changes` now carries its own `_id`, minted when the effect is
+created, so both sides mint different ones for identical content:
+
+```
+…phbsplHuntersMar.effects[1].system.changes[0]._id
+   native : "uTUrMB01wDPI5uqb"
+   creator: "s911FFLVyNzVDnjD"
+```
+
+Volatile identity, exactly like the activity `_id` and the item `_id` already in `DROP_ITEM` — not a
+difference in the character. It landed on every enchantment-carrying granted spell (Hunter's Mark,
+Chill Touch, Blade Ward, Lesser Restoration, Tasha's Bubbling Cauldron): **114 rows across 28
+subclasses**, three of which failed on nothing else.
+
+`normaliseEffectChanges` in `in-world/normalize.mjs` now drops it. **The reference baseline above was
+recorded before that fix**, which is why its raw line reads 88/34 and its true verdict is 113/9; a
+re-run should report 113 identical directly. The fix was deliberately made *after* the sweep — editing
+in-world code mid-run would leave a results file whose early and late scenarios were measured
+differently.
+
+### 2. `source.book`: a pack pays this once, on **first touch** — and two older claims were wrong
+
+The creator commits `system.source.book` where native has no `book` key. Two things the historical
+sections say about this do not survive contact with a full run:
+
+- **"dnd5e's own packs declare no `sourceBooks`, so the base suite is clean."** False. That checked
+  the plural *package* flag; `bookPlaceholder` reads the singular *pack* flag first, and dnd5e 6.0.0
+  sets it:
+
+  ```
+  classes24  {"sourceBook":"SRD 5.2", …}      origins24  {"sourceBook":"SRD 5.2", …}
+  feats24    {"sourceBook":"SRD 5.2", …}      spells24   {"sourceBook":"SRD 5.2", …}
+  ```
+
+  `human-fighter-sage` accordingly carries 9 such rows on this machine, deterministically across two
+  consecutive base-suite runs.
+
+- **"Expect this on essentially every sweep scenario."** False, and the opposite of what happens. Only
+  **two** of 122 scenarios carry these rows, and they are the first scenario to touch each pack:
+  scenario 1 is first to reach `dnd-forge-artificer` and dnd5e's own packs (28 rows); scenario 69,
+  Aberrant Mind, is first to reach `dnd-tashas-cauldron` (3 rows, valued `TCoE`). Every later scenario
+  against those same packs is clean.
+
+The mechanism in *the warm pollutes the compendium cache* still stands — this refines **when** it
+bites. A pack is polluted once, on first touch, not once per run. Whether the writer is the index
+entry or the document is still the open question, and the experiments listed there are still the ones
+that split it.
+
+### 3. The 2014 Ranger: `native.mjs` has stopped driving Tasha's replacement flow
+
+**The regression this sweep exists to have caught.** All three 2014 Rangers report the same eleven rows
+from level 1 — the creator populates three `value.added` maps on the 2014 Ranger and carries five class
+features the native build has no trace of:
+
+```
+Favored Enemy · Natural Explorer · Ranger Archetype · Primeval Awareness · Hide in Plain Sight
+                     native: <missing>        creator: present
+```
+
+**The creator is the correct side.** *Third-party advancement types* below says the 2014 Ranger
+*should* keep these — silently losing them was the original `TCOEReplacementGrant` bug — and records
+that after the `baseType` fix "the 2014 Ranger is down to one row". It is at eleven.
+
+That same section names this exact failure mode on the native side: *"the native reference was empty
+here, because `fillStep` could not drive Tasha's custom flow and submitted it with nothing selected."*
+It was fixed by teaching `native.mjs` to drive the replacement flow. Native is empty again, which
+points at that driving having broken under 6.0.0 rather than at the creator.
+
+**Not yet confirmed.** Settle it with `playwright-clean --probe-native` before changing anything.
+
+### 4. The 14.367 delete-batch defect does not fire on 6.0.0
+
+```
+deleteErrors: { total: 0, first: null, byLevel: [] }
+```
+
+**Zero, across all 122 scenarios** — every one a full 1-to-20 incremental build. Against 14.365–14.367,
+where the clean-room Alchemist probe counted **1064** delete errors in a single build and the capstone
+genuinely granted twice. The historical section called this a *lead* on two scenarios; at 122 it is a
+result. Alchemist itself, the subclass that defect was caught on, now completes in 104 s where the
+laptop's 6.0.0 run errored out after 382 s.
+
+Still worth the clean-room confirmation that section asks for, since the original finding rests on it.
+
+### Base suite on 6.0.0
+
+`node run.mjs playwright` — **5 of 8 identical**, byte-identical across two consecutive runs.
+
+| Scenario | 5.3.3 recorded | 6.0.0 here |
+| --- | --- | --- |
+| `human-fighter-sage` | identical | **9 × `source.book`** (see 2 above) |
+| `human-wizard-sage-l4-halffeat` | 1 `decision.raised` | **1, the same one** |
+| `human-wizard-sage-featspells` | 11 | **11** |
+| the other five | identical | **identical** |
+
+Both known carrying scenarios reproduce their recorded counts exactly; 6.0.0 neither improved nor
+worsened them. The one deviation is the `source.book` cause above. No `changes[]._id` rows appear in
+the base suite, so the normalize fix does not change this table.
+
+### Ember on 6.0.0
+
+`node run.mjs playwright-ember` — **3 of 3 identical**. Sorcerer, Fighter and Warlock all come back
+clean (10.4 s, 11.3 s, 9.9 s), so the creation hand-off, the pact progression and the no-spellcasting
+martial are all unaffected by 6.0.0. Unchanged from the 5.3.3 record.
+
+### What this run does not cover
+
+The subclass axis only. The **species** and **background** axes (`--sweep --axis species` /
+`--axis background`) were not run on 6.0.0, so the feat-axis problems recorded historically are
+neither confirmed nor cleared here. Nor was `--sidekicks`, `--granted-spells`, `--hooks`, or a
+`playwright-clean` probe.
+
+### Baseline comparability
+
+**No archived baseline is comparable to this run, and the tooling will not say so.** `describeDrift`
+compares mode, level and axis — not system version. The former reference,
+`sweep-results-preaudit-1002.jsonl`, is headerless, so `deriveMeta` reconstructs it with no `versions`
+field at all: even a version check would find nothing on that side to compare against. Diffed naively,
+5.3.3-to-6.0.0 drift reads as code regressions — the same shape as the jump-vs-incremental trap that
+has already cost this project once.
+
+Use `sweep-results-600-reference.jsonl` as the baseline for 6.0.0 work. Do not diff it against a
+5.3.3 file.
+
+**`node baselines.mjs` will not promote it, and still nominates the 5.3.3 file.** It disqualifies the
+6.0.0 run as *"built from a dirty tree"* — correctly: the tree carried the `SYSTEM_VERSION` change the
+run needed. So the manifest's "Reference baseline:" line currently names
+`sweep-results-preaudit-1002.jsonl`, a 5.3.3 file, which is precisely the wrong answer for 6.0.0 work.
+Until a clean-tree 6.0.0 sweep exists, read that line as advisory and take the reference from this
+section instead. That the dirty-tree guard and the system-version blindness point the same tool at the
+wrong file is worth fixing together (open item 5).
+
+### Environment notes for 6.0.0
+
+- `config.mjs` / `config.example.mjs` need `SYSTEM_VERSION = "6.0.0"`; `CORE_VERSION` stays `14.367`.
+- Every content module declares only a `minimum` for dnd5e (5.1–5.3.3), so all activate on 6.0.0
+  unchanged. Ember 0.6.1 needs core ≥ 14.366.
+- A world provisioned before the system change keeps its old `systemVersion` — `ensureWorld` does not
+  rewrite an existing manifest without `--force`. Delete the world directory or pass `--force`.
+- The harness cannot start while any Foundry holds the same user-data directory, whatever port it is
+  on. This is the data-directory lock, not a port clash.
+
+### Open, in priority order
+
+1. Confirm the 2014 Ranger regression against `playwright-clean --probe-native`, then fix `native.mjs`.
+2. Re-run the sweep with `normaliseEffectChanges` in place and confirm it reports 113/122 directly.
+3. Triage the single `riders.effect` row on TCoE Alchemist (#70).
+4. Split the `source.book` writer — index entry or document — with the experiments in the historical
+   section.
+5. Decide whether `describeDrift` should compare system versions, given that the baselines it would
+   most need to guard are headerless.
+
 ## Layout
 
 | Path | Role |
@@ -707,7 +902,24 @@ flow, and `--resume` reads that file back to decide what is left. The console ge
 scenario; the full difference list goes to the file. Triage by grouping on difference path — one root
 cause spans many subclasses.
 
-## Current status
+## Historical reference
+
+**Everything from here to the end of the document is historical.** It records the 5.3.3 and
+14.365–14.367 era, plus the first 6.0.0 measurements taken on a different machine against a
+source-built system. It is kept because the mechanisms, the wrong turns and the reasoning are worth
+having — several sections are the only written account of *why* a thing behaves as it does, and the
+master findings above lean on them by name.
+
+It is **not** a statement of current state. Where it and *Master findings* disagree, the master
+findings win. Three specific claims below are now known to be wrong and are corrected there: that the
+base suite cannot carry `source.book` rows, that the sweep will carry them on essentially every
+scenario, and that the 2014 Ranger is down to one row.
+
+One exception: **`## Ember`, the last section of the file, is current** — it describes how the Ember
+hand-off is staged and what the three Ember scenarios do, which 6.0.0 did not change. It sits down
+here because it always has.
+
+## Current status (5.3.3 era)
 
 `node run.mjs playwright` runs eight scenarios:
 
@@ -1628,7 +1840,7 @@ Baselines remain mode-specific (see "One jump, or one level at a time") and are 
 specific**. `sweep-results-14367-shard1of20.jsonl` / `console-shard1-14367.log` and
 `sweep-results-14367-shard1of4.jsonl` / `console-shard1of4-14367.log` hold these runs.
 
-## dnd5e 6.0.0 (early release): what changed, and what it cost
+## dnd5e 6.0.0 (early release, laptop/source build): what changed, and what it cost
 
 Measured 2026-09-04/05 on Foundry **14.367**, from the early-release source at
 `C:\CODE\dnd5e-release-6.0.0`, on branch `6_0_0_Preview`. This machine had **no system installed at
