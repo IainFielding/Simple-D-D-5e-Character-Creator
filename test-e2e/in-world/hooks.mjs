@@ -101,12 +101,28 @@ function inOrder(names, subset, label) {
 
 const pause = ms => new Promise(r => setTimeout(r, ms));
 
-/** Close every application this module may have left open, so cases cannot bleed into each other. */
+/**
+ * Close every application this module may have left open, so cases cannot bleed into each other.
+ *
+ * **Scoped to windows that are not part of the core interface.** Foundry v14 registers the whole UI
+ * in `foundry.applications.instances` alongside module windows — on this world it holds 22 entries
+ * of which 20 are core: the sidebar, chat, hotbar, scene navigation, the directories, the combat
+ * tracker. Closing those tears down the interface the suite is driving, and one of them never
+ * resolving hung the entire hooks run for 93 minutes with no server traffic at all, past its own
+ * `waitForStage` ceiling, because nothing here has a timeout.
+ *
+ * `ui` is the register of what is core, so anything reachable from it is left alone. A close is also
+ * only awaited when there is one to await — `app.close?.(…).catch(…)` reads a property of `undefined`
+ * and throws synchronously for anything without the method.
+ */
 async function closeAll() {
-  for ( const app of Object.values(ui.windows ?? {}) ) await app.close?.({ force: true }).catch(() => {});
-  for ( const app of foundry.applications.instances?.values() ?? [] ) {
-    await app.close?.({ force: true }).catch(() => {});
-  }
+  const core = new Set(Object.values(ui).filter(v => v && (typeof v === "object")));
+  const closeOne = async app => {
+    if ( !app || core.has(app) || (typeof app.close !== "function") ) return;
+    await Promise.resolve(app.close({ force: true })).catch(() => {});
+  };
+  for ( const app of Object.values(ui.windows ?? {}) ) await closeOne(app);
+  for ( const app of [...(foundry.applications.instances?.values() ?? [])] ) await closeOne(app);
   await pause(200);
 }
 
@@ -128,11 +144,23 @@ async function waitForStage(timeout = 420_000) {
  * `preOpenCreator` gate as a consumer would reach them, which no other harness path does.
  */
 async function openCreator() {
+  console.log("[hooks]   openCreator: closeAll");
   await closeAll();
+  // Drop any draft before every open, not just once per run.
+  //
+  // `api.launchCreator()` offers an unfinished build back through a **modal** DialogV2 and waits for
+  // a click, so in a headless run a stored draft stalls the case before the shell exists. Clearing
+  // once at `purge` is not enough: the cases *create* drafts as they go — the veto case abandons a
+  // half-filled build by design — so case 3 met a draft that case 2 had just written. Nothing here
+  // tests the draft offer, so the right state for every case is "no draft".
+  await game.user?.unsetFlag(MODULE_ID, "creatorDraft").catch(() => {});
   const api = game.modules.get(MODULE_ID)?.api;
   if ( !api ) throw new Error("module API is not installed");
+  console.log("[hooks]   openCreator: launchCreator");
   const shell = await api.launchCreator();
+  console.log(`[hooks]   openCreator: launched (${shell ? "shell" : "null"})`);
   if ( shell ) await waitForStage();
+  console.log("[hooks]   openCreator: stage ready");
   return shell;
 }
 
@@ -230,10 +258,33 @@ async function applyLevelUp(shell) {
  * @returns {Promise<{ok: boolean, cases: object[], failures: string[]}>}
  */
 export async function checkHooks() {
+  // Ungated progress markers, deliberately `console.log` rather than the module's `log()`.
+  //
+  // This suite has never completed on dnd5e 6.0.0: the renderer dies (`page.evaluate: Target
+  // crashed`) and the captured console tail ends at world load, so the crash point is invisible —
+  // every diagnosis so far has been inference. These print unconditionally, so whatever the tail
+  // holds when the page dies names the last step that started.
+  const step = label => console.log(`[hooks] ${label}`);
+
+  step("warmSources: start");
   await warmSources();
+  step("warmSources: done");
   // Runs must be independent: these cases build characters and then level them, so an actor left
   // behind by a previous run is one at the wrong level wearing the name this run will use.
+  step("purge: start");
   const reclaimed = await purge();
+  // A stored draft is as much leftover state as a stray actor, and far more damaging here:
+  // `api.launchCreator()` offers an unfinished build back through a **modal** DialogV2 and awaits
+  // an answer. There is nobody to answer it in a headless run, so the case stalls inside
+  // `launchCreator` before the shell is ever constructed — which is precisely where the markers
+  // showed this suite dying. Every earlier crashed run left one behind, so the failure was
+  // self-perpetuating: the first crash created the draft that stalled every run after it.
+  // The other cases build with `new CreatorShell(...)` directly and never reach `offerDraft`,
+  // which is why only this one was affected.
+  const hadDraft = !!game.user?.getFlag(MODULE_ID, "creatorDraft");
+  if ( hadDraft ) await game.user?.unsetFlag(MODULE_ID, "creatorDraft");
+  step(`purge: removed ${reclaimed} actor(s), draft ${hadDraft ? "cleared" : "absent"}; `
+    + `world holds ${game.actors.size}`);
   const cases = [];
   if ( reclaimed ) cases.push({ label: "Cleanup", ok: true, failures: [], notes: [`reclaimed ${reclaimed} actor(s) from a previous run`] });
 
@@ -251,6 +302,7 @@ export async function checkHooks() {
 /** Run one case, turning a throw into a reported failure rather than an aborted run. */
 async function guard(label, fn) {
   const result = { label, ok: false, failures: [], notes: [] };
+  console.log(`[hooks] case: ${label}`);
   try {
     await fn(result);
   } catch ( err ) {
@@ -296,7 +348,9 @@ async function creationSequence(result) {
   try {
     const shell = await openCreator();
     if ( !shell ) return result.failures.push("api.launchCreator() returned null");
+    console.log("[hooks]   creationSequence: fill");
     const filled = await fill(shell, { name: `${PREFIX}Hooks Level One` });
+    console.log("[hooks]   creationSequence: filled, finishing");
     result.notes.push(`built a ${filled.class}${filled.warnings.length ? ` (quick-build warnings: ${filled.warnings.join(", ")})` : ""}`);
     await shell._finish(null);
     await pause(2500);

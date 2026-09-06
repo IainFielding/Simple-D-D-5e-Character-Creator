@@ -1,6 +1,6 @@
 import { t, log } from "../../config.mjs";
 import { atLevel, advancementHint } from "../levelup-state.mjs";
-import { withItemSegment } from "../../data/advancement-util.mjs";
+import { withItemSegment, advancementTitle} from "../../data/advancement-util.mjs";
 
 /**
  * Optional class features — the items an `ItemGrant` marks as declinable, and the base-or-alternative
@@ -43,7 +43,7 @@ export const optionalGrantStep = {
       })));
       return {
         index: state.optionalGrantSteps.indexOf(record),
-        title: record.advancement.title || record.item?.name || t("levelup.step.optionalGrant.label"),
+        title: advancementTitle(record.advancement) || record.item?.name || t("levelup.step.optionalGrant.label"),
         hint: await advancementHint(record),
         prompt: t(groups ? "levelup.step.optionalGrant.promptReplace" : "levelup.step.optionalGrant.prompt"),
         items: groups ? null : items,
@@ -127,7 +127,7 @@ function buildGroups(record, state) {
     .filter(o => configured.get(o.uuid)?.optional && !bases.has(o.uuid) && !attributed.has(o.uuid))
     .map(o => o.uuid);
   if ( extras.length && (bases.size > 1) ) {
-    log(`replacement grant "${record.advancement.title ?? record.advancement.id}" has ${bases.size} bases `
+    log(`replacement grant "${advancementTitle(record.advancement) || record.advancement.id}" has ${bases.size} bases `
       + `and ${extras.length} unattributable alternatives; leaving them out rather than sharing them`);
   }
 

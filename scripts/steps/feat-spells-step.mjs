@@ -1,5 +1,5 @@
 import { t } from "../config.mjs";
-import { advancementArray } from "../data/advancement-util.mjs";
+import { advancementArray, advancementTitle} from "../data/advancement-util.mjs";
 import { MAGIC_INITIATE_LISTS } from "../data/spell-source.mjs";
 
 /**
@@ -316,7 +316,8 @@ export function originSpecifiedClasses(originDoc) {
   const texts = [originDoc?.system?.description?.value ?? ""];
   for ( const adv of advancementArray(originDoc) ) {
     if ( adv.hint ) texts.push(adv.hint);
-    if ( adv.title ) texts.push(adv.title);
+    const advName = advancementTitle(adv);
+    if ( advName ) texts.push(advName);
   }
   const found = new Set();
   for ( const text of texts ) {

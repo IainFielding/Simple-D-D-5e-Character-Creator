@@ -1,4 +1,5 @@
 import { ABILITIES, formatMod, t, log, storeConfig } from "../../config.mjs";
+import { advancementTitle } from "../../data/advancement-util.mjs";
 import { summarizeOption } from "../../data/equipment-source.mjs";
 import { cartTotalCp, formatCp } from "../../data/store-source.mjs";
 import { pdfExportContext } from "../../build/pdf-export.mjs";
@@ -135,7 +136,7 @@ function scaleRows(clone, actor, cloneClass) {
       const before = isNew ? null : (adv.valueForLevel(oldLevel)?.display ?? null);
       const after = adv.valueForLevel(newLevel)?.display ?? null;
       if ( !after || before === after ) continue;
-      rows.push({ title: adv.title, values: [{ name: before ? `${before} → ${after}` : after, isNew: !before }] });
+      rows.push({ title: advancementTitle(adv), values: [{ name: before ? `${before} → ${after}` : after, isNew: !before }] });
     }
   }
   return rows.sort((a, b) => a.title.localeCompare(b.title, game.i18n.lang));
@@ -258,7 +259,7 @@ export const lvlReviewStep = {
       const carrier = clone.items.get(record.item?.id) ?? record.item;
       const bucket = (carrier && bucketOf(clone, carrier, classByIdentifier)) ?? "species";
       push(abilityRows, bucket, {
-        title: t("advancement.spellAbilityFor", { spell: st.spells[0]?.name ?? record.advancement.title }),
+        title: t("advancement.spellAbilityFor", { spell: st.spells[0]?.name ?? advancementTitle(record.advancement) }),
         values: [{ name: CONFIG.DND5E.abilities[st.ability]?.label ?? st.ability, isNew: true }]
       });
     }

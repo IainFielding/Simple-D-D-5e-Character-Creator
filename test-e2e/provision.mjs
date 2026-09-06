@@ -64,6 +64,11 @@ async function provision(worldId) {
     // stranded flow or a swallowed resolver error explains itself through those lines, and
     // `run.mjs --console` captures the page console to read them back. Turned on per world, after
     // the reload, because the setting only exists once the module has registered it.
+    // The canvas is disabled in `lib/session.mjs`, not here: `core.noCanvas` is a *client*-scoped
+    // setting living in `window.localStorage`, so writing it from a joined session only affects that
+    // session's browser context and is discarded with it. Setting it at provision time looked like
+    // it worked and changed nothing.
+
     if ( spec.modules.includes(MODULE_ID) ) {
       await session.eval(async id => {
         try { await game.settings.set(id, "debugLogging", true); } catch { /* module not active */ }

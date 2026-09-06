@@ -16,28 +16,16 @@
     }
   ],
   "relationships": {
-    "conflicts": [
-      {
-        "id": "hero-mancer",
-        "type": "module",
-        "reason": "Two modules cannot share the character creation and level-up space."
-      }
-    ],
-    "optional": [
-      {
-        "id": "sogrom-dnd5e-character-sheet-pdf",
-        "type": "module",
-        "reason": "Enables the character-sheet PDF export offered on the review screens."
-      }
-    ],
+    "conflicts": [],
+    "optional": [],
     "systems": [
       {
         "id": "dnd5e",
         "type": "system",
         "compatibility": {
           "minimum": "5.3.0",
-          "maximum": "5.9.9",
-          "verified": "5.3.3"
+          "maximum": "6.9.9",
+          "verified": "6.0.0"
         }
       }
     ]

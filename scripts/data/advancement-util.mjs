@@ -13,6 +13,23 @@
  */
 
 /**
+ * An advancement's display name, across both dnd5e generations.
+ *
+ * 5.3.x stores it as `title`; 6.0.0 renamed the schema field to `name` and left `title` as a
+ * deprecated getter that calls `logCompatibilityWarning` **on every read**. That is not merely
+ * untidy: `warmChoices` walks every advancement of every card concurrently, and each warning
+ * carries a stack trace, which was enough to exhaust the renderer and crash the browser tab
+ * outright — the hooks suite died as `page.evaluate: Target crashed`.
+ *
+ * `name` first, so 6.0.0 never touches the deprecated path; `title` remains the 5.3.x fallback.
+ * @param {object} advancement
+ * @returns {string}   The name, or "" when the advancement has neither.
+ */
+export function advancementTitle(advancement) {
+  return advancement?.name ?? advancement?.title ?? "";
+}
+
+/**
  * A document's advancements as a flat array, tolerating every shape dnd5e may hand back. The
  * prepared `doc.advancement.byId` is preferred because it is always populated; the raw
  * `system.advancement` is the fallback for plain object data.
@@ -158,7 +175,7 @@ export function appliesToClass(advancement, item = advancement?.item) {
  */
 export function unresolvedAdvancements(item, level = Infinity) {
   const out = [];
-  const flag = adv => out.push({ id: adv._id, type: adv.type, title: adv.title || adv.type });
+  const flag = adv => out.push({ id: adv._id, type: adv.type, title: advancementTitle(adv) || adv.type });
 
   for ( const adv of advancementArray(item) ) {
     if ( (typeof adv.level === "number") && (adv.level > level) ) continue;

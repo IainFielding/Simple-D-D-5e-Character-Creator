@@ -90,6 +90,30 @@ try {
         + l.copies.map(c => `\n        prepared=${c.prepared} cachedFor=${c.cachedFor ?? "-"}`
           + ` advOrigin=${c.advancementOrigin ?? "-"}`).join(""));
     }
+  } else if ( flag("probe-replflow") ) {
+    console.log(JSON.stringify(await harness("probeReplacementFlow", {
+      scenarioId: value("probe-replflow") || undefined, level: Number(value("level") ?? 3)
+    }), null, 2));
+  } else if ( flag("probe-intercept") ) {
+    console.log(JSON.stringify(await harness("probeInterceptLevelUp", { to: Number(value("level") ?? 3) }), null, 2));
+  } else if ( flag("probe-bookorder") ) {
+    console.log(JSON.stringify(await harness("probeBookOrdering"), null, 2));
+  } else if ( flag("probe-minbook") ) {
+    console.log(JSON.stringify(await harness("probeMinimalBookRepro"), null, 2));
+  } else if ( flag("probe-warmsources") ) {
+    console.log(JSON.stringify(await harness("probeWarm"), null, 2));
+  } else if ( flag("probe-bookwriter") ) {
+    console.log(JSON.stringify(await harness("probeBookWriter"), null, 2));
+  } else if ( flag("probe-books") ) {
+    console.log(JSON.stringify(await harness("probeBuildBooks"), null, 2));
+  } else if ( flag("probe-pollution") ) {
+    console.log(JSON.stringify(await harness("probeBuildPollution"), null, 2));
+  } else if ( flag("probe-detail") ) {
+    console.log(JSON.stringify(await harness("probeDetailWriter"), null, 2));
+  } else if ( flag("probe-apps") ) {
+    console.log(JSON.stringify(await harness("probeOpenApps"), null, 2));
+  } else if ( flag("probe-replacement") ) {
+    console.log(JSON.stringify(await harness("probeReplacement", value("probe-replacement")), null, 2));
   } else if ( flag("probe-warm") ) {
     console.log(JSON.stringify(await harness("probeWarmCalls"), null, 2));
   } else if ( flag("probe") ) {

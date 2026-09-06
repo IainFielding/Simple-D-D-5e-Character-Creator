@@ -240,6 +240,22 @@ function normaliseActivities(item) {
   item.system.activities = out;
 }
 
+/**
+ * Drop the generated `_id` on every entry of an effect's `system.changes`.
+ *
+ * dnd5e 6.0.0 gives each change its own `_id`, minted when the effect is created, so the two builds
+ * mint different ones for identical content and every enchantment-carrying granted spell reports a
+ * row per change. It is volatile identity, exactly like the activity `_id` above and the item `_id`
+ * in `DROP_ITEM` — the change's own fields are what the comparison is about. Left in, it accounted
+ * for 114 rows across 28 subclasses on the first 6.0.0 sweep, three of them failing on nothing else.
+ * @param {object} item   A rewritten item entry, mutated in place.
+ */
+function normaliseEffectChanges(item) {
+  for ( const effect of item?.effects ?? [] ) {
+    for ( const change of effect?.system?.changes ?? [] ) delete change._id;
+  }
+}
+
 /* -------------------------------------------- */
 
 /**
@@ -255,6 +271,7 @@ export function sourceSnapshot(actor) {
   for ( const item of src.items ?? [] ) {
     const entry = rewrite(item, idMap, DROP_ITEM);
     normaliseActivities(entry);
+    normaliseEffectChanges(entry);
     // The module under test stamps its own flags; they are bookkeeping, not advancement output.
     if ( entry.flags ) delete entry.flags[MODULE_FLAG];
 
@@ -277,6 +294,12 @@ export function sourceSnapshot(actor) {
   delete actorData.items;
   if ( actorData.flags ) delete actorData.flags[MODULE_FLAG];
   for ( const key of DROP_DETAILS ) delete actorData.system?.details?.[key];
+
+  // dnd5e 6.0.0 gives actors their own `system.identifier`, slugified from the actor name. The two
+  // builds are deliberately named `…-native` and `…-creator` so they can be told apart in the
+  // world, so this is a restatement of the name `DROP_ACTOR` already drops — it would otherwise
+  // report one row on every scenario, saying nothing about advancement output.
+  delete actorData.system?.identifier;
 
   return { actor: actorData, items };
 }

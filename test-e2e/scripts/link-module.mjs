@@ -25,5 +25,5 @@ if ( !fs.existsSync(path.join(MODULE_SOURCE, "module.json")) ) {
   process.exit(1);
 }
 
-execFileSync("cmd", ["/c", "mklink", "/J", link, MODULE_SOURCE], { stdio: "inherit" });
+execFileSync("cmd", ["/c", "mklink", "/J", link, path.resolve(MODULE_SOURCE)], { stdio: "inherit" });
 console.log(`Linked ${MODULE_ID} -> ${MODULE_SOURCE}`);

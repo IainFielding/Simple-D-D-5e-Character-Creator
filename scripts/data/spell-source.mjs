@@ -1,5 +1,5 @@
 import { DEFAULT_CANTRIPS, DEFAULT_LEVEL1_SPELLS, log } from "../config.mjs";
-import { advancementArray } from "./advancement-util.mjs";
+import { advancementArray, advancementTitle} from "./advancement-util.mjs";
 import { getEnabledPacks, isUsableItemPack } from "./compendium-util.mjs";
 import { forEachLimit, WARM_CONCURRENCY } from "./concurrency.mjs";
 
@@ -401,7 +401,7 @@ export class SpellSource {
 function scaleCount(doc, classId, kind, fallback, level = 1) {
   for ( const adv of advancementArray(doc) ) {
     if ( (adv.type ?? adv.constructor?.typeName) !== "ScaleValue" ) continue;
-    const title = (adv.title ?? adv.configuration?.identifier ?? "").toLowerCase();
+    const title = (advancementTitle(adv) || adv.configuration?.identifier || "").toLowerCase();
     const isCantrip = title.includes("cantrip");
     // Match the scale to the count we want: a "cantrip" scale for cantrips; for spells, a
     // "spells known" scale that is neither the cantrip scale nor a spell-*slot* scale.

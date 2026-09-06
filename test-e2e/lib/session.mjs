@@ -31,11 +31,33 @@ export class Session {
    *   which is what makes a captured screenshot legible on a high-DPI display.
    * @returns {Promise<Session>}
    */
-  static async open({ viewport = { width: 1600, height: 1000 }, deviceScaleFactor = 1 } = {}) {
+  static async open({ viewport = { width: 1600, height: 1000 }, deviceScaleFactor = 1,
+    canvas = false } = {}) {
     const browser = await chromium.launch({
       headless: !HEADED,
-      // Foundry leans on WebGL for the canvas; SwiftShader keeps it working headlessly.
-      args: ["--use-gl=swiftshader", "--enable-unsafe-swiftshader", "--mute-audio"]
+      args: [
+        // Foundry leans on WebGL for the canvas; SwiftShader keeps it working headlessly. Kept even
+        // though `core.noCanvas` is set below, because `HEADED=1` and `screenshots.mjs` can turn the
+        // canvas back on.
+        "--use-gl=swiftshader", "--enable-unsafe-swiftshader", "--mute-audio",
+        // Headroom for the creator's warm-up. `warmSources` runs five phases concurrently —
+        // `warmAll`, `warmClasses`, `warmChoices`, the equipment scan and the Magic Initiate spell
+        // lists — each with eight compendium reads in flight, over every class, species and
+        // background in nine content modules. Only `--hooks` reaches it, because it is the only
+        // suite that opens the real creator; it repeatedly took the renderer down with
+        // `page.evaluate: Target crashed` at exactly that point. A real browser has far more room
+        // than a headless renderer's default heap, so this is headroom for the harness rather than
+        // a statement about the module.
+        "--js-flags=--max-old-space-size=4096",
+        // NOTE: `--blink-settings=imagesEnabled=false` was tried here to cut renderer memory (decoded
+        // bitmaps live outside the JS heap, which is why the heap flag above did nothing for the
+        // hooks crash). It breaks the join screen outright — the form never renders and the session
+        // dies with "The join form never appeared" — so it is not an option. Left recorded so the
+        // next person does not spend the same hour on it.
+        // Chromium's default /dev/shm is small and it falls back to disk noisily under memory
+        // pressure; harmless elsewhere, and one less way for the renderer to die.
+        "--disable-dev-shm-usage"
+      ]
     });
     const context = await browser.newContext({ viewport, deviceScaleFactor });
     const page = await context.newPage();
@@ -44,6 +66,26 @@ export class Session {
     page.on("console", msg => session.consoleLog.push(`[${msg.type()}] ${msg.text()}`));
     // Keep the stack: a bare message rarely identifies which package threw.
     page.on("pageerror", err => session.consoleLog.push(`[pageerror] ${err.message}\n${err.stack ?? ""}`));
+
+    // Turn Foundry's canvas off before the world loads.
+    //
+    // Nothing here looks at the board: the suites drive documents, and `screenshots.mjs` captures
+    // the creator's own DOM, which covers the screen anyway. Under headless Chromium the canvas is
+    // served by SwiftShader — *software* WebGL — and drawing 24 canvas groups plus the FogExtractor's
+    // texture-compression worker was enough to lose the GL context outright: four
+    // `CONTEXT_LOST_WEBGL` warnings and then `page.evaluate: Target crashed`, which killed the hooks
+    // suite during world load, before any of its own code ran.
+    //
+    // It has to be done *here*, in the browser, not with `game.settings.set` after joining:
+    // `core.noCanvas` is registered `scope: "client"`, so it lives in `window.localStorage` and a
+    // fresh Playwright context starts empty every run. `addInitScript` runs before page scripts on
+    // every navigation, which is early enough for `requiresReload` to be moot. The value is the
+    // cleaned JSON Foundry itself writes (`storage.setItem(key, json)`), i.e. the string "true".
+    if ( !canvas ) {
+      await page.addInitScript(() => {
+        try { window.localStorage.setItem("core.noCanvas", "true"); } catch { /* storage blocked */ }
+      });
+    }
 
     // Foundry's render pipeline is entirely promise-based, so a failing application render
     // surfaces as an *unhandled rejection*, which never fires `pageerror` — the window simply
