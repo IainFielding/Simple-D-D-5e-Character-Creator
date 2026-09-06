@@ -155,6 +155,27 @@ The consequence reaches real users, not just this harness: with Tasha's installe
 2014 Ranger loses Favored Enemy, Natural Explorer, Ranger Archetype, Primeval Awareness and Hide in
 Plain Sight. All three 2014 Rangers in the sweep reproduce it.
 
+**Verified by hand, 2026-09-05 — all three paths now measured.** A 2014 Ranger built at level 1
+through the creator and levelled to 3 through the level-up wizard receives **Ranger Archetype** and
+**Primeval Awareness**, with Tasha's enabled. That covers the case neither automated suite reached:
+the sweep exercises `LevelUpDriver` directly, and `--hooks` exercises the shell on a character with
+no replacement grants, but nothing joined the two.
+
+| Path | How it is covered | Result |
+| --- | --- | --- |
+| Creation | sweep, plus a targeted probe with `tashasEnabled: true` | features present |
+| Level-up via `intercept.mjs` | **manual, in the UI** | features present |
+| dnd5e's own flow | `playwright-clean --probe-native` | **none** — bug #1738 |
+
+*Why it was done by hand.* `probeInterceptLevelUp` in `harness.mjs` gets as far as opening the real
+`LevelUpShell` and resolving its advancements, but `LevelUpShell#_finish` returns silently unless
+**every** non-review step is complete — and a Ranger gains Spellcasting at level 2, so the spell step
+stays unfilled and the commit declines with no error. Driving that properly means reusing the
+harness's own level-up machinery, which is the layer the probe existed to bypass. Two earlier runs of
+that probe reported false passes for unrelated reasons (a `level` vs `targetLevel` mix-up, then a
+commit that reverted the fix), both caught only because the trace reports the level *before* each
+step. If you pick this up again, start there.
+
 **This module is unaffected and produces the correct character.** `LevelUpDriver` resolves the
 third-party type through `baseType` and applies the advancement itself, passing the modern
 `{ selected: [...] }` shape. Every `apply` call in `manager-driver.mjs` was audited against this: none

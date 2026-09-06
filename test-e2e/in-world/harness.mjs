@@ -992,24 +992,42 @@ export async function probeInterceptLevelUp({ to = 3 } = {}) {
   try {
     // Level 1 only, built by the creator — the starting point a player would have.
     const book = new AnswerBook({ overrides: scenario.answers ?? {}, generate: true });
-    // `targetLevel`, not `level` — the sweep scenario carries the former, and passing the latter
-    // silently built straight to level 3, making the level-up loop below a no-op that looked like a
-    // pass. The identical before/after item lists were the tell.
+    // `targetLevel`, not `level` — the sweep scenario carries the former, and passing the latter is
+    // silently ignored, building straight to the sweep's level and making the loop below a no-op
+    // that reads as a pass. Twice now. The tell is `trace[0].levelBefore` being the target level.
     actor = await buildCreator({ ...scenario, name: `${PREFIX}intercept [creator]`, targetLevel: 1 },
       { book, unofferable: [] });
     const atOne = actor.items.map(i => i.name).sort();
 
     // Now the path under test: the real intercept, as the sheet's level-up would reach it.
+    // Each iteration is traced — a silent no-op here previously read as a pass.
+    const trace = [];
     for ( let lvl = 2; lvl <= to; lvl++ ) {
-      await triggerLevelUp(actor);
-      await new Promise(r => setTimeout(r, 1500));
-      const shell = [...(foundry.applications.instances?.values() ?? [])]
-        .find(a => a.constructor?.name === "LevelUpShell");
-      if ( !shell ) throw new Error(`no LevelUpShell opened for level ${lvl}`);
-      await shell.state.driver.autoResolve(new ScenarioChoiceProvider(new AnswerBook({ generate: true })));
-      await shell._finish();
-      await new Promise(r => setTimeout(r, 1200));
+      const step = { want: lvl, levelBefore: actor.system?.details?.level ?? null };
+      try {
+        // The creator saves a draft as it builds; `launchCreator` is not involved here, but clearing
+        // it costs nothing and keeps the state comparable with the hooks suite.
+        await game.user?.unsetFlag("sogrom-dnd5e-character-creator", "creatorDraft").catch(() => {});
+        await triggerLevelUp(actor);
+        await new Promise(r => setTimeout(r, 2000));
+        const shell = [...(foundry.applications.instances?.values() ?? [])]
+          .find(a => a.constructor?.name === "LevelUpShell");
+        step.shellFound = !!shell;
+        if ( shell ) {
+          step.driverPresent = !!shell.state?.driver;
+          step.canDrive = shell.state?.driver?.constructor?.name ?? null;
+          await shell.state.driver.autoResolve(new ScenarioChoiceProvider(new AnswerBook({ generate: true })));
+          step.afterResolve = actor.system?.details?.level ?? null;
+          await shell._finish();
+          await new Promise(r => setTimeout(r, 1500));
+        }
+      } catch ( err ) {
+        step.error = `${err.name}: ${err.message}`;
+      }
+      step.levelAfter = actor.system?.details?.level ?? null;
+      trace.push(step);
     }
+    globalThis.__interceptTrace = trace;
 
     const after = actor.items.map(i => i.name).sort();
     const wanted = ["Favored Enemy", "Natural Explorer", "Ranger Archetype", "Primeval Awareness"];
@@ -1018,6 +1036,7 @@ export async function probeInterceptLevelUp({ to = 3 } = {}) {
       level: actor.system?.details?.level ?? null,
       atLevelOne: atOne,
       afterLevelUp: after,
+      trace: globalThis.__interceptTrace ?? [],
       replacementFeatures: Object.fromEntries(wanted.map(n => [n, after.includes(n)]))
     };
   } finally {
