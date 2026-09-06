@@ -962,6 +962,66 @@ export async function probeReplacementFlow({ scenarioId = "sweep:ranger/hunter",
  * never sees the derivation. Tested here as two orderings against two different documents in one
  * page, so neither can contaminate the other.
  */
+/**
+ * Does the **intercept** path apply Tasha's replacement grants on a real level-up?
+ *
+ * The sweep proves the *creation* path does, and it proves the native flow does not (upstream
+ * premium-content#1738). Neither covers the third case a player actually hits: levelling an existing
+ * 2014 class, where `intercept.mjs` claims the native manager via `preAdvancementManagerRender` and
+ * hands it to `LevelUpDriver`. That claim runs through `canDrive` → `isStepSupported` → `baseType`,
+ * so it *should* hold — but that is inference, and the README's own rule is to measure.
+ *
+ * Builds a 2014 Ranger at level 1, then levels it to 3 through `triggerLevelUp`, and reports the
+ * features that landed. Tasha's must be **enabled** for this to mean anything: with it disabled the
+ * class carries plain `ItemGrant`s and the test passes trivially.
+ * @param {object} [options]
+ * @param {number} [options.to]   Target level.
+ */
+export async function probeInterceptLevelUp({ to = 3 } = {}) {
+  const { triggerLevelUp } = await import(
+    "/modules/sogrom-dnd5e-character-creator/scripts/levelup/intercept.mjs");
+  const { ScenarioChoiceProvider } = await import(`./provider.mjs${BUST}`);
+
+  const scenario = (await getSweep(to, true)).scenarios
+    .find(s => s.id === "sweep:ranger/hunter-dnd5e-subclasses");
+  if ( !scenario ) throw new Error("2014 Ranger sweep scenario not found");
+  await cleanup();
+
+  const tashas = game.modules.get("dnd-tashas-cauldron")?.active ?? false;
+  let actor = null;
+  try {
+    // Level 1 only, built by the creator — the starting point a player would have.
+    const book = new AnswerBook({ overrides: scenario.answers ?? {}, generate: true });
+    actor = await buildCreator({ ...scenario, name: `${PREFIX}intercept [creator]`, level: 1 },
+      { book, unofferable: [] });
+    const atOne = actor.items.map(i => i.name).sort();
+
+    // Now the path under test: the real intercept, as the sheet's level-up would reach it.
+    for ( let lvl = 2; lvl <= to; lvl++ ) {
+      await triggerLevelUp(actor);
+      await new Promise(r => setTimeout(r, 1500));
+      const shell = [...(foundry.applications.instances?.values() ?? [])]
+        .find(a => a.constructor?.name === "LevelUpShell");
+      if ( !shell ) throw new Error(`no LevelUpShell opened for level ${lvl}`);
+      await shell.state.driver.autoResolve(new ScenarioChoiceProvider(new AnswerBook({ generate: true })));
+      await shell._finish();
+      await new Promise(r => setTimeout(r, 1200));
+    }
+
+    const after = actor.items.map(i => i.name).sort();
+    const wanted = ["Favored Enemy", "Natural Explorer", "Ranger Archetype", "Primeval Awareness"];
+    return {
+      tashasEnabled: tashas,
+      level: actor.system?.details?.level ?? null,
+      atLevelOne: atOne,
+      afterLevelUp: after,
+      replacementFeatures: Object.fromEntries(wanted.map(n => [n, after.includes(n)]))
+    };
+  } finally {
+    await cleanup();
+  }
+}
+
 export async function probeBookOrdering() {
   const pack = game.packs.get("dnd5e.classes");
   if ( !pack ) throw new Error("dnd5e.classes pack not found");
