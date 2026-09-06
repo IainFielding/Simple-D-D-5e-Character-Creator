@@ -94,6 +94,8 @@ try {
     console.log(JSON.stringify(await harness("probeReplacementFlow", {
       scenarioId: value("probe-replflow") || undefined, level: Number(value("level") ?? 3)
     }), null, 2));
+  } else if ( flag("probe-bookorder") ) {
+    console.log(JSON.stringify(await harness("probeBookOrdering"), null, 2));
   } else if ( flag("probe-minbook") ) {
     console.log(JSON.stringify(await harness("probeMinimalBookRepro"), null, 2));
   } else if ( flag("probe-warmsources") ) {

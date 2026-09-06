@@ -953,6 +953,44 @@ export async function probeReplacementFlow({ scenarioId = "sweep:ranger/hunter",
  * one more read. If the second read differs from the first, dnd5e has written a derived value into
  * a cached document's `_source`.
  */
+/**
+ * Does the `source.book` write depend on whether the document was already cached?
+ *
+ * The UI reproduction failed where the console one succeeded, and the difference was load order.
+ * `CompendiumBrowser.fetch` prepares the *index entry*; a document only shares that object if it was
+ * already in the client cache. Loading it fresh afterwards builds `_source` from server data and
+ * never sees the derivation. Tested here as two orderings against two different documents in one
+ * page, so neither can contaminate the other.
+ */
+export async function probeBookOrdering() {
+  const pack = game.packs.get("dnd5e.classes");
+  if ( !pack ) throw new Error("dnd5e.classes pack not found");
+  const index = await pack.getIndex();
+  const ids = [...index].filter(e => e.type === "class").slice(0, 2).map(e => e._id);
+  if ( ids.length < 2 ) throw new Error("need two class entries");
+  const [idA, idB] = ids;
+  const uuidA = `Compendium.dnd5e.classes.Item.${idA}`;
+  const uuidB = `Compendium.dnd5e.classes.Item.${idB}`;
+  const read = async uuid => (await fromUuid(uuid))?.toObject()?.system?.source?.book ?? null;
+  const fetchClasses = () => dnd5e.applications.CompendiumBrowser.fetch(Item, {
+    types: new Set(["class"]), indexFields: new Set(["system.source"])
+  });
+
+  // Order B — fetch first, then load the document for the very first time.
+  await fetchClasses();
+  const bAfterFetchFirst = await read(uuidB);
+
+  // Order A — load (and therefore cache) the document, then fetch.
+  const aBefore = await read(uuidA);
+  await fetchClasses();
+  const aAfter = await read(uuidA);
+
+  return {
+    orderB_fetchThenLoad: { uuid: uuidB, book: bAfterFetchFirst, polluted: !!bAfterFetchFirst },
+    orderA_loadThenFetch: { uuid: uuidA, before: aBefore, after: aAfter, polluted: aBefore !== aAfter }
+  };
+}
+
 export async function probeMinimalBookRepro() {
   const uuid = "Compendium.dnd5e.classes24.Item.phbftrFighter000";
   const read = async () => (await fromUuid(uuid))?.toObject()?.system?.source?.book ?? null;
