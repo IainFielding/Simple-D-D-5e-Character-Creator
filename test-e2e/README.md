@@ -103,12 +103,27 @@ sections say about this do not survive contact with a full run:
   Aberrant Mind, is first to reach `dnd-tashas-cauldron` (3 rows, valued `TCoE`). Every later scenario
   against those same packs is clean.
 
+> **Decision, 2026-09-05: not being raised upstream.** Iain's call, and a reasonable one. The
+> invented value is the same string dnd5e displays for that pack anyway, so no player ever sees a
+> difference; it costs a maintainer's attention for a field that renders identically either way. The
+> analysis is kept here because it *explains two sweep rows* — anyone diffing actor data will meet it
+> again, and this is the record that stops it being re-investigated from scratch. Reopen only if it
+> starts causing something visible.
+>
+> Note also that a UI-only reproduction proved unreliable: the trigger is dnd5e's Compendium Browser
+> *application* (reached from the button it injects into the Compendium sidebar), not the pack list,
+> and two attempts at UI steps failed before the console reproduction below settled it. Load order
+> does **not** matter — a documented wrong guess; both orderings pollute.
+
 The mechanism in *the warm pollutes the compendium cache* still stands — this refines **when** it
 bites. A pack is polluted once, on first touch, not once per run. Whether the writer is the index
 entry or the document is still the open question, and the experiments listed there are still the ones
 that split it.
 
 ### 3. The 2014 Ranger: **Tasha's Cauldron is broken on 6.0.0**, and the creator is the correct side
+
+> **Filed upstream 2026-09-05 as
+> [foundryvtt-premium-content#1738](https://github.com/foundryvtt/foundryvtt-premium-content/issues/1738).**
 
 **Resolved 2026-09-05, and it is neither ours nor the harness's.** The earlier reading in this
 section — that `native.mjs` had stopped driving the replacement flow — was wrong. It drives it
