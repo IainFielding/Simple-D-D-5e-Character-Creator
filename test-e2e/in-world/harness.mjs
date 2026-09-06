@@ -992,7 +992,10 @@ export async function probeInterceptLevelUp({ to = 3 } = {}) {
   try {
     // Level 1 only, built by the creator — the starting point a player would have.
     const book = new AnswerBook({ overrides: scenario.answers ?? {}, generate: true });
-    actor = await buildCreator({ ...scenario, name: `${PREFIX}intercept [creator]`, level: 1 },
+    // `targetLevel`, not `level` — the sweep scenario carries the former, and passing the latter
+    // silently built straight to level 3, making the level-up loop below a no-op that looked like a
+    // pass. The identical before/after item lists were the tell.
+    actor = await buildCreator({ ...scenario, name: `${PREFIX}intercept [creator]`, targetLevel: 1 },
       { book, unofferable: [] });
     const atOne = actor.items.map(i => i.name).sort();
 
