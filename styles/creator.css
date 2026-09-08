@@ -4802,9 +4802,15 @@ body:has(.sogrom-creator-fullscreen) .application.compendium-browser {
 
 /* The pin sits beside the row, not inside it — the row is itself a button (see work-picker.hbs) —
    so the <li> becomes the flex line and the row takes the slack. Scoped to lists that actually
-   have a pin, so every other pick-list is untouched. */
-.creator-picklist li:has(> .creator-pin),
-.creator-drawer-grid > li:has(> .creator-pin) { display: flex; align-items: stretch; }
+   have a pin, so every other pick-list is untouched.
+
+   `:not(.is-hidden)` is load-bearing, not tidiness. `:has()` carries its argument's specificity, so
+   this selector weighs exactly as much as the `.creator-picklist li.is-hidden { display: none }`
+   that hides a filtered-out row — and being thousands of lines later, it won the tie and re-showed
+   every row the search and spell filters had just hidden. Standing aside for a hidden row leaves
+   that rule uncontested instead of escalating specificity here. */
+.creator-picklist li:has(> .creator-pin):not(.is-hidden),
+.creator-drawer-grid > li:has(> .creator-pin):not(.is-hidden) { display: flex; align-items: stretch; }
 .creator-picklist li:has(> .creator-pin) > .creator-pickrow,
 .creator-drawer-grid > li:has(> .creator-pin) > .creator-pickrow { flex: 1 1 auto; min-width: 0; }
 /* Deliberately quiet until used. An always-lit control on every row of an eighty-row list would

@@ -222,7 +222,14 @@
           "takeFeat": "Take a feat instead",
           "changeFeat": "Choose a different feat",
           "useAbilities": "Improve abilities instead",
-          "locked": "This choice can't raise this ability"
+          "locked": "This choice can't raise this ability",
+          "pickFeat": "Choose a Feat",
+          "cancelPick": "Cancel",
+          "showLater": "Show feats you'll unlock later",
+          "hideLater": "Hide feats you'll unlock later",
+          "comingLater": "Coming Later",
+          "lockedLevel": "Unlocks at level {level}",
+          "lockedPrereq": "Requires a feature you don't have yet"
         },
         "subclass": {
           "label": "Subclass",

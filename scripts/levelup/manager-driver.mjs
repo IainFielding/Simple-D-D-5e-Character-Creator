@@ -2,48 +2,7 @@ import { log, levelUpHpRollToChat } from "../config.mjs";
 import { withItemSegment, addedEntries } from "../data/advancement-util.mjs";
 import { phbWeaponIcon } from "../data/weapon-source.mjs";
 import { bg3TraitIcon } from "../data/bg3-icons.mjs";
-
-/** The level from which the 2024 rules make an ability-score improvement an Epic Boon instead. */
-const EPIC_BOON_LEVEL = 19;
-
-/**
- * The compendium-browser filters for the feat an ASI can take.
- *
- * The browser used to be handed a category filter and a level prerequisite and nothing else, which
- * let three kinds of feat through that an ASI may never take. The level filter looks like it should
- * have caught them and does not, because the data does not say so: **origin** feats (a background's
- * gift) and **fighting style** feats (a class feature's) both carry no level prerequisite at all, so
- * they passed straight through and were offered at every ASI. Filtering by subtype is what actually
- * expresses the rule.
- *
- * What is *not* excluded matters as much:
- *
- *   - **Epic boons** are what a level-19 improvement is for, so they are excluded only below that.
- *     They cannot be left to the level prerequisite either — some of them ship without one.
- *   - **Feats declaring no subtype at all** stay visible. The subtype split arrived with the 2024
- *     rules; 2014 feats and most homebrew have an empty `system.type.subtype`, and an allow-list of
- *     `{general: 1}` would empty the browser in those worlds. Excluding the three wrong kinds rather
- *     than admitting the one right kind keeps them, and follows the same rule `matchesRules` states
- *     for editions in data/source-index.mjs: content that declares nothing belongs everywhere.
- *
- * In a pure 2024 world the two are the same list — every feat there is typed — so this reads as
- * "general feats only" exactly as intended, and degrades to "every feat" where nothing is typed.
- *
- * @param {number} level   The character's level on the clone.
- * @returns {object}       A `filters` object for `CompendiumBrowser.selectOne`.
- */
-export function asiFeatFilters(level) {
-  // -1 is the browser's "exclude"; it builds a NOT..in query, so an untyped feat matches none of
-  // these and survives. A positive value would build an in..list and drop it.
-  const subtype = { origin: -1, fightingStyle: -1 };
-  if ( level < EPIC_BOON_LEVEL ) subtype.epicBoon = -1;
-
-  return { locked: {
-    additional: { category: { feat: 1 }, subtype },
-    arbitrary: [{ k: "system.prerequisites.level", o: "lte", v: level }],
-    types: new Set(["feat"])
-  } };
-}
+import { findAsiFeats, classifyAsiFeats } from "../data/choice-resolver.mjs";
 
 /**
  * Drives a native dnd5e {@link AdvancementManager} from the outside.
@@ -1193,21 +1152,71 @@ export class LevelUpDriver {
   }
 
   /**
-   * Open the system's compendium browser to pick a feat for an ASI decision, then grant it and
-   * fold in the feat's *own* advancements — so a half-feat's fixed ability bonus actually applies,
-   * granted features/proficiencies land, and any sub-choice surfaces as a further decision.
+   * Open the inline feat picker for an ASI decision — flips `record.pickingFeat`, which
+   * {@link asiFeatOptions} and the ASI step's template key off to swap the ability-score panel for
+   * a choice grid. Reset `record.showFuture` on open, so a previous "coming later" toggle doesn't
+   * leak into a fresh pick.
    * @param {object} record   One of {@link asiSteps}.
-   * @returns {Promise<boolean>}  Whether a feat was chosen.
    */
-  async chooseAsiFeat(record) {
-    const browser = dnd5e.applications?.CompendiumBrowser;
-    if ( !browser ) return false;
-    const level = this.clone.system.details.level ?? 0;
-    const filters = asiFeatFilters(level);
+  openAsiFeatPicker(record) {
+    record.pickingFeat = true;
+    record.showFuture = false;
+  }
 
-    const uuid = await browser.selectOne({ filters, tab: "feats" }).catch(() => null);
-    if ( !uuid ) return false;
-    return this.applyAsiFeat(record, uuid);
+  /** Close the inline feat picker without changing the decision. */
+  closeAsiFeatPicker(record) {
+    record.pickingFeat = false;
+  }
+
+  /** Toggle whether the picker's locked "coming later" section is shown. */
+  toggleAsiFeatPeek(record) {
+    record.showFuture = !record.showFuture;
+  }
+
+  /**
+   * The feat picker's current option grid: every eligible general feat, split into pickable
+   * options (grouped Recommended/Other) and a locked "coming later" list — see
+   * {@link module:data/choice-resolver.findAsiFeats} and
+   * {@link module:data/choice-resolver.classifyAsiFeats}.
+   * @param {object} record   One of {@link asiSteps}.
+   * @returns {Promise<{groups: object[]|null, options: object[], lockedOptions: object[]}>}
+   */
+  async asiFeatOptions(record) {
+    const level = this.clone.system.details.level ?? 0;
+    const entries = await findAsiFeats(level);
+    const owned = new Set(record.advancement.actor?.identifiedItems?.keys() ?? []);
+    const taken = this.#takenFeatNames(record);
+    return classifyAsiFeats(entries, level, owned, taken);
+  }
+
+  /**
+   * Names (lowercased) of every non-repeatable feat the clone already holds, from any source —
+   * an earlier ASI's pick, a class/background grant, whatever. {@link classifyAsiFeats} drops these
+   * from the picker entirely: a second copy is never a legal pick (dnd5e's own
+   * `validatePrerequisites` would reject it), so offering it — let alone flagging it "Recommended"
+   * — is nothing but a dead end for the player.
+   * @param {object} record   One of {@link asiSteps}.
+   * @returns {Set<string>}
+   */
+  #takenFeatNames(record) {
+    const names = new Set();
+    for ( const item of record.advancement.actor?.items ?? [] ) {
+      if ( (item.type !== "feat") || item.system?.prerequisites?.repeatable ) continue;
+      names.add(item.name.trim().toLowerCase());
+    }
+    return names;
+  }
+
+  /**
+   * Pick a feat from the inline picker: grant it (via {@link applyAsiFeat}) and close the picker.
+   * @param {object} record   One of {@link asiSteps}.
+   * @param {string} uuid     Source UUID of the feat to take.
+   * @returns {Promise<boolean>}  Whether the feat was taken.
+   */
+  async pickAsiFeat(record, uuid) {
+    const taken = await this.applyAsiFeat(record, uuid);
+    if ( taken ) this.closeAsiFeatPicker(record);
+    return taken;
   }
 
   /**
@@ -1215,9 +1224,9 @@ export class LevelUpDriver {
    * so a half-feat's ability bonus actually applies, granted features and proficiencies land, and
    * any sub-choice surfaces as a further decision.
    *
-   * Split out from {@link chooseAsiFeat} so the decision can also be answered without a UI, which
+   * Split out from {@link pickAsiFeat} so the decision can also be answered without a UI, which
    * is what {@link autoResolve} needs to honour a `{ feat }` answer — the interactive path is just
-   * this preceded by the compendium browser.
+   * this preceded by the inline feat picker.
    * @param {object} record        One of {@link asiSteps}.
    * @param {string} uuid          Source UUID of the feat to take.
    * @param {object} [options]

@@ -5,7 +5,78 @@
   <div class="creator-asi-section creator-pick creator-pick--asi" data-index="{{index}}">
 
     <div class="creator-pick-desc">
-      {{#if isFeat}}
+      {{#if picking}}
+      <div class="creator-levelup-choices creator-asi-feat-picker">
+        <div class="creator-choice-section">
+          <header class="creator-choice-head">
+            <h2>{{localize "sogrom-dnd5e-character-creator.levelup.step.asi.pickFeat"}}</h2>
+          </header>
+
+          {{#if groups}}
+            {{#each groups}}
+            <h3 class="creator-choice-group-head">{{label}}</h3>
+            <ul class="creator-choice-grid">
+              {{#each options}}
+              <li>
+                <button type="button" class="creator-choice-card {{#if recommended}}is-recommended{{/if}}"
+                        data-action="stepAction" data-step-action="asiFeatPick"
+                        data-index="{{../../index}}" data-uuid="{{uuid}}" data-tooltip="{{ccItemTooltip uuid}}">
+                  {{#if recommended}}<i class="creator-choice-card-star fa-solid fa-star" aria-hidden="true"></i>{{/if}}
+                  <img class="creator-choice-card-img" src="{{img}}" alt="">
+                  <span class="creator-choice-card-name">{{name}}</span>
+                </button>
+              </li>
+              {{/each}}
+            </ul>
+            {{/each}}
+          {{else}}
+            <ul class="creator-choice-grid">
+              {{#each options}}
+              <li>
+                <button type="button" class="creator-choice-card"
+                        data-action="stepAction" data-step-action="asiFeatPick"
+                        data-index="{{../index}}" data-uuid="{{uuid}}" data-tooltip="{{ccItemTooltip uuid}}">
+                  <img class="creator-choice-card-img" src="{{img}}" alt="">
+                  <span class="creator-choice-card-name">{{name}}</span>
+                </button>
+              </li>
+              {{/each}}
+            </ul>
+          {{/if}}
+
+          {{#if hasLocked}}
+          <button type="button" class="creator-btn creator-btn-ghost" data-action="stepAction" data-step-action="asiFeatPeek" data-index="{{index}}">
+            {{#if showFuture}}
+            <i class="fa-solid fa-eye-slash"></i> {{localize "sogrom-dnd5e-character-creator.levelup.step.asi.hideLater"}}
+            {{else}}
+            <i class="fa-solid fa-eye"></i> {{localize "sogrom-dnd5e-character-creator.levelup.step.asi.showLater"}}
+            {{/if}}
+          </button>
+          {{#if showFuture}}
+          <h3 class="creator-choice-group-head">{{localize "sogrom-dnd5e-character-creator.levelup.step.asi.comingLater"}}</h3>
+          <ul class="creator-choice-grid">
+            {{#each lockedOptions}}
+            <li>
+              <button type="button" class="creator-choice-card creator-choice-card--taken" data-tooltip="{{ccItemTooltip uuid}}" disabled>
+                <span class="creator-choice-card-badge">{{lockReason}}</span>
+                <img class="creator-choice-card-img" src="{{img}}" alt="">
+                <span class="creator-choice-card-name">{{name}}</span>
+              </button>
+            </li>
+            {{/each}}
+          </ul>
+          {{/if}}
+          {{/if}}
+
+          <div class="creator-ability-actions">
+            <button type="button" class="creator-btn creator-btn-ghost" data-action="stepAction" data-step-action="asiFeatCancel" data-index="{{index}}">
+              {{localize "sogrom-dnd5e-character-creator.levelup.step.asi.cancelPick"}}
+            </button>
+          </div>
+        </div>
+      </div>
+
+      {{else if isFeat}}
       {{#if detail}}
       <article class="creator-detail">
         <header class="creator-detail-head">
@@ -45,6 +116,7 @@
       {{/if}}
     </div>
 
+    {{#unless picking}}
     <aside class="creator-class-aside">
       <h2 class="creator-aside-title">{{localize "sogrom-dnd5e-character-creator.step.originAbilities.label"}}</h2>
       {{#if hasChoice}}
@@ -74,6 +146,7 @@
         {{/each}}
       </ul>
     </aside>
+    {{/unless}}
 
   </div>
   {{/each}}
