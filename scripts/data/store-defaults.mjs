@@ -5,7 +5,7 @@
  * compendium (`dnd5e.equipment24`, the free-rules content) or its legacy `dnd5e.items`
  * pack, so the defaults resolve in any dnd5e world with no extra modules — a classic
  * general store: simple and martial weapons, mundane armor, adventuring gear, a few kits,
- * the five equipment packs, and a spellbook.
+ * musical instruments, the five equipment packs, and a spellbook.
  *
  * Only the UUIDs live here; names, icons, and prices are read from the items themselves the
  * first time the list is hydrated (see `hydrateEntries` in store-source.mjs), so system price
@@ -99,6 +99,17 @@ export const DEFAULT_INVENTORY_UUIDS = [
   `${PACK}.phbtulDisguiseKi`,   // Disguise Kit
   `${PACK}.phbtulNavigators`,   // Navigator's Tools
   `${PACK}.phbtulSmithsTool`,   // Smith's Tools
+  // Musical instruments
+  `${PACK}.phbmusBagpipes00`,   // Bagpipes
+  `${PACK}.phbmusDrum000000`,   // Drum
+  `${PACK}.phbmusDulcimer00`,   // Dulcimer
+  `${PACK}.phbmusFlute00000`,   // Flute
+  `${PACK}.phbmusHorn000000`,   // Horn
+  `${PACK}.phbmusLute000000`,   // Lute
+  `${PACK}.phbmusLyre000000`,   // Lyre
+  `${PACK}.phbmusPanflute00`,   // Pan Flute
+  `${PACK}.phbmusShawm00000`,   // Shawm
+  `${PACK}.phbmusViol000000`,   // Viol
   // Equipment packs (containers — buying one brings its contents along)
   `${PACK}.phbagBurglarsPac`,   // Burglar's Pack
   `${PACK}.phbagDungeoneers`,   // Dungeoneer's Pack
