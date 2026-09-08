@@ -37,12 +37,16 @@ import { summarizeOption } from "../data/equipment-source.mjs";
  * one) still gets a section; it sorts to the end by its localised label rather than being dropped.
  * Icons are FontAwesome 6 Free Solid, which is what Foundry ships.
  *
- * A section is keyed on the item type with one deliberate exception: armour. dnd5e files armour
- * and clothing and rings and wands all as `type: "equipment"`, so grouping on the type alone put
- * a suit of plate, a signet ring and a wand of wonder under one heading — which is the same
- * complaint as the original single "Goods" list, one level down. The armour subtypes are exactly
- * the keys of CONFIG.DND5E.armorTypes (light/medium/heavy/natural/shield), so they split out into
- * their own section and the remainder keeps the system's own "Equipment" label. See sectionKey().
+ * A section is keyed on the item type with three deliberate exceptions: armour, gaming sets and
+ * musical instruments. dnd5e files armour and clothing and rings and wands all as
+ * `type: "equipment"`, so grouping on the type alone put a suit of plate, a signet ring and a
+ * wand of wonder under one heading — which is the same complaint as the original single "Goods"
+ * list, one level down. The armour subtypes are exactly the keys of CONFIG.DND5E.armorTypes
+ * (light/medium/heavy/natural/shield), so they split out into their own section and the
+ * remainder keeps the system's own "Equipment" label. Gaming sets and musical instruments are
+ * both filed as `type: "tool"` alongside artisan's tools and kits — a deck of cards or a lute
+ * buried under "Tools" is the same complaint again, so the `game` and `music` tool subtypes each
+ * get their own section too. See sectionKey().
  */
 const STORE_SECTIONS = [
   { key: "weapon", icon: "fa-gavel" },
@@ -50,13 +54,19 @@ const STORE_SECTIONS = [
   { key: "equipment", icon: "fa-shirt" },
   { key: "consumable", icon: "fa-flask" },
   { key: "tool", icon: "fa-screwdriver-wrench" },
+  { key: "game", icon: "fa-dice" },
+  { key: "music", icon: "fa-music" },
   { key: "loot", icon: "fa-box" }
 ];
 const STORE_SECTION_FALLBACK_ICON = "fa-boxes-stacked";
 
+/** Tool subtypes that get their own shelf section instead of sitting under "Tools". */
+const TOOL_SUBTYPE_SECTIONS = new Set(["game", "music"]);
+
 /**
  * Which shelf section a stock entry belongs in: its item type, except that `equipment` splits
- * into armour and everything else.
+ * into armour and everything else, and `tool` splits gaming sets and musical instruments out of
+ * the general tool bucket.
  *
  * Read from CONFIG rather than a hard-coded list of subtype keys, so a system update that adds an
  * armour kind files it correctly without a change here.
@@ -64,6 +74,7 @@ const STORE_SECTION_FALLBACK_ICON = "fa-boxes-stacked";
  * @returns {string}
  */
 function sectionKey(entry) {
+  if ( entry.type === "tool" ) return TOOL_SUBTYPE_SECTIONS.has(entry.subtype) ? entry.subtype : "tool";
   if ( entry.type !== "equipment" ) return entry.type;
   return (entry.subtype in (CONFIG.DND5E?.armorTypes ?? {})) ? "armor" : "equipment";
 }
@@ -282,10 +293,15 @@ export const storeStep = {
       // The goods, split into headed sections — see groupCards(). `cards` is kept alongside for
       // the count and for anything that wants the flat list.
       //
-      // "armor" is our own section key rather than a dnd5e item type, so it needs its own string;
-      // every other key is a real item type and takes the system's label, which keeps the headings
-      // and the category dropdown speaking the same words.
-      groups: groupCards(cards, key => key === "armor" ? t("step.store.armorHeading") : typeLabel(key)),
+      // "armor", "game" and "music" are our own section keys rather than dnd5e item types, so
+      // they need their own strings; every other key is a real item type and takes the system's
+      // label, which keeps the headings and the category dropdown speaking the same words.
+      groups: groupCards(cards, key => {
+        if ( key === "armor" ) return t("step.store.armorHeading");
+        if ( key === "game" ) return t("step.store.gamingHeading");
+        if ( key === "music" ) return t("step.store.instrumentHeading");
+        return typeLabel(key);
+      }),
       cards,
       packCards,
       hasPacks: packCards.length > 0,
