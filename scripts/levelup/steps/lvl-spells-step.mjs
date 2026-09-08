@@ -238,9 +238,21 @@ export const lvlSpellsStep = {
     // replacement at all. Under the 2014 rules no class trades a cantrip on level-up, so those rows
     // simply don't appear; see {@link module:data/spell-swap}. Shown selected until marked, then struck.
     const canSwap = isCantrips ? plan.canSwapCantrip : plan.canSwapSpell;
+    // The words an owned row wears: the flag under the compare pin, the tooltip behind it, and the
+    // note the detail pane opens with. All three fork on the same edition test that words the hint
+    // above the list ({@link module:data/spell-swap}) — a 2014 Wizard changes what it has prepared,
+    // it does not forget a spell it knows.
+    const prepared = plan.swapLabelKey === "levelup.step.spells.swapHintPrepared";
+    const wording = (known, prep) => `levelup.step.spells.${prepared ? prep : known}`;
+    const ownedLabels = {
+      ownedTag: t(wording("ownedTag", "ownedTagPrepared")),
+      ownedTip: t(wording("ownedTip", "ownedTipPrepared")),
+      swapTag: t("levelup.step.spells.swapTag"),
+      swapTip: t("levelup.step.spells.swapTip")
+    };
     const ownedRows = (canSwap && (plan[isCantrips ? "addCantrips" : "addSpells"] > 0))
       ? ownedItems.map(o => ({
-          ...decorate(o), owned: true, swapMarked: swapMark?.id === o.id,
+          ...decorate(o), ...ownedLabels, owned: true, swapMarked: swapMark?.id === o.id,
           focused: state.focusedSpellUuid === o.uuid
         }))
       : [];
@@ -258,6 +270,12 @@ export const lvlSpellsStep = {
     if ( focus ) {
       focused = {
         ...focus,
+        // What this row *is*, said in full where there is room to say it: the flag in the list is
+        // one word, and one word cannot explain that a known spell is kept out of the pool on
+        // purpose, or that trading one away buys a pick this level.
+        note: focus.owned
+          ? (focus.swapMarked ? t("levelup.step.spells.swapNote") : t(wording("ownedNote", "ownedNotePrepared")))
+          : "",
         description: await spells.description(focus.uuid),
         source: await spells.sourceBook(focus.uuid)
       };
@@ -283,6 +301,9 @@ export const lvlSpellsStep = {
       // The wording follows the class: a 2014 prepared caster is changing what it has prepared,
       // not trading a spell it knows forever.
       swapHint: ownedRows.length ? t(plan.swapLabelKey ?? "levelup.step.spells.swapHint") : "",
+      // A marked swap raises this tab's budget by one, which is otherwise an unexplained extra pick:
+      // name the spell being replaced so the count and the struck-through row are one story.
+      swapActiveHint: (canSwap && swapMark) ? t("levelup.step.spells.swapActive", { name: swapMark.name }) : "",
       // Why there is an extra pick this level: a spell chosen earlier is about to become always
       // prepared, so the selection it was occupying comes back.
       releasedHint: released > 0 ? t("levelup.step.spells.releasedHint", { count: released }) : "",

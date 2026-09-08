@@ -2735,15 +2735,118 @@ body:has(.sogrom-creator-fullscreen) .application.compendium-browser {
 .levelup-spells-releasedhint { margin: -0.35rem 0 0.75rem; color: var(--cc-muted); font-size: 0.82rem; line-height: 1.35; }
 .levelup-spells-swaphint i,
 .levelup-spells-releasedhint i { color: var(--cc-accent); margin-right: 0.25rem; }
-.creator-pickrow.is-owned { border-style: dashed; }
-.creator-pickrow.is-owned .creator-pickrow-name { color: var(--cc-muted); }
-.creator-pickrow.is-owned .creator-pickrow-tick { color: var(--cc-muted); }
-.creator-pickrow.is-swapping {
-  border-color: var(--cc-danger, #c66);
-  background: color-mix(in srgb, var(--cc-danger, #c66) 12%, transparent);
+.levelup-spells-swapactive { margin: -0.35rem 0 0.75rem; color: var(--cc-text); font-size: 0.82rem; line-height: 1.35; }
+.levelup-spells-swapactive i { color: var(--cc-danger, #c66); margin-right: 0.25rem; }
+
+/* A spell already on the sheet is marked two ways, and neither of them costs the name any width.
+
+   The card is *shaded* — a tinted ground, a dashed edge, and the accent picking out the leading
+   border the base row already reserves. The tint is painted on the `<li>`, not on the row inside
+   it, so it runs the full width of the card and under the pin column too; on the row alone it
+   stopped short and left the corner holding the compare pin sitting on bare panel, which read as
+   two cards rather than one.
+
+   And it is *labelled*, in the column the pin already occupies (see `.creator-rowside`). On the
+   row's own line that label took about a quarter of a 224px card — most of the name's share, enough
+   that "Chromatic Orb" wrapped as "Chroma / tic Orb". Stacked under the pin it costs only the few
+   pixels by which the word is wider than the pin. */
+.creator-spells .creator-picklist > li:has(.creator-pickrow.is-owned) {
+  background: color-mix(in srgb, var(--cc-accent) 9%, var(--cc-panel));
 }
+.creator-spells .creator-picklist > li:has(.creator-pickrow.is-swapping) {
+  background: color-mix(in srgb, var(--cc-danger, #c66) 12%, var(--cc-panel));
+}
+.creator-pickrow.is-owned {
+  border-style: dashed;
+  border-left-color: color-mix(in srgb, var(--cc-accent) 60%, transparent);
+}
+.creator-pickrow.is-owned .creator-pickrow-name { color: var(--cc-muted); }
+.creator-pickrow.is-swapping { border-color: var(--cc-danger, #c66); }
 .creator-pickrow.is-swapping .creator-pickrow-name { color: var(--cc-text); text-decoration: line-through; opacity: 0.75; }
-.creator-pickrow.is-swapping .creator-pickrow-tick { color: var(--cc-danger, #c66); }
+
+/* The card's right-hand column: compare pin on top, state flag beneath it. Centred as a group, so
+   a card with no flag puts the pin exactly where it has always been. */
+.creator-picklist li:has(> .creator-rowside):not(.is-hidden) { display: flex; align-items: stretch; }
+.creator-picklist li:has(> .creator-rowside) > .creator-pickrow { flex: 1 1 auto; min-width: 0; }
+.creator-rowside {
+  flex: 0 0 auto;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0.25rem;
+  padding: 0.35rem 0.2rem;
+}
+/* Nothing to show — no pin on this list and no flag on this row. `:not(:has(*))` rather than
+   `:empty`, which the template's own indentation would defeat. */
+.creator-rowside:not(:has(*)) { display: none; }
+/* Alone in the column the pin keeps the full-height hit area it had as a direct child of the row;
+   sharing with a flag it becomes a square above it. */
+.creator-rowside .creator-pin { height: 2.25rem; border-bottom: 0; }
+.creator-rowside .creator-pin:only-child { height: auto; align-self: stretch; margin: -0.35rem -0.2rem; }
+/* The pin's "quiet until the row is hovered" rule keys off a direct child; nested in the column it
+   needs saying again. */
+.creator-picklist li:hover .creator-rowside .creator-pin { color: var(--cc-muted); }
+
+/* The flag itself: a word, sized to sit under a 2.25rem pin without widening the column more than
+   the word demands. `cursor: help` is what advertises the tooltip — it is the only thing here that
+   answers a hover rather than a click. */
+.creator-pickrow-flag {
+  display: block;
+  padding: 0.05rem 0.3rem;
+  border: 1px solid var(--cc-line);
+  border-radius: var(--cc-radius-pill);
+  background: var(--cc-panel-2, var(--cc-panel));
+  color: var(--cc-muted);
+  font-size: 0.58rem;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  text-align: center;
+  white-space: nowrap;
+  cursor: help;
+}
+.creator-pickrow-flag.is-swapping {
+  color: var(--cc-danger, #c66);
+  border-color: color-mix(in srgb, var(--cc-danger, #c66) 55%, transparent);
+  background: color-mix(in srgb, var(--cc-danger, #c66) 16%, var(--cc-panel));
+}
+
+/* Spell names wrap between words and never inside one. The shared pick-row name allows
+   `overflow-wrap: anywhere`, which is right for a single narrow column and wrong for a grid cell:
+   it spends the shortage on hyphen-less mid-word breaks rather than on a second line. Two lines,
+   clamped, of whole words — the bargain the class browse rows already struck. Scoped to the spell
+   grids, which is every list that shares this cell size: the level-up step, the creation step and
+   the feat-spell browser. */
+.creator-spells .creator-picklist .creator-pickrow-name {
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  overflow: hidden;
+  overflow-wrap: normal;
+}
+
+/* The detail pane's version of the same explanation, with room for the whole sentence. Same dashed
+   idiom as the feat-spells "already known" note, so the two screens read as one module. */
+.creator-swap-note {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.45rem;
+  margin: 0 0 0.6rem;
+  padding: 0.5rem 0.75rem;
+  background: var(--cc-panel);
+  border: 1px dashed var(--cc-line);
+  border-radius: var(--cc-radius);
+  color: var(--cc-muted);
+  font-size: 0.85rem;
+  line-height: 1.45;
+}
+.creator-swap-note i { margin-top: 0.15rem; color: var(--cc-accent); }
+.creator-swap-note.is-swapping {
+  border-color: color-mix(in srgb, var(--cc-danger, #c66) 55%, transparent);
+  background: color-mix(in srgb, var(--cc-danger, #c66) 10%, transparent);
+  color: var(--cc-text);
+}
+.creator-swap-note.is-swapping i { color: var(--cc-danger, #c66); }
 
 /* Where this caster's spells come from. The borrowed note is a quiet aside — it answers a question
    the player may not have asked yet ("why is my Fighter seeing wizard spells"), so it must not

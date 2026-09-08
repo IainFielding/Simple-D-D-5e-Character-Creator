@@ -9,6 +9,9 @@
     <p class="levelup-spells-intro">{{intro}}</p>
     {{#if swapHint}}<p class="levelup-spells-swaphint"><i class="fa-solid fa-arrow-right-arrow-left"></i> {{swapHint}}</p>{{/if}}
     {{#if releasedHint}}<p class="levelup-spells-releasedhint"><i class="fa-solid fa-wand-sparkles"></i> {{releasedHint}}</p>{{/if}}
+    {{!-- Once a swap is marked the tab's count goes up by one, which without this line is an extra
+          pick out of nowhere. Naming the spell ties the raised budget to the struck-through row. --}}
+    {{#if swapActiveHint}}<p class="levelup-spells-swapactive"><i class="fa-solid fa-arrow-right-arrow-left"></i> {{swapActiveHint}}</p>{{/if}}
     {{> "modules/sogrom-dnd5e-character-creator/templates/parts/spell-list-notice.hbs" this}}
 
     {{!-- With no list to draw from there is nothing behind any of these: the tabs would count
@@ -73,7 +76,15 @@
       </header>
 
       {{#if focused.owned}}
-      {{! An owned spell — offer to swap it out (freeing a slot) or keep it. }}
+      {{! An owned spell — say why it is in a list of spells to learn, then offer to swap it out
+          (freeing a pick) or keep it. The note carries the explanation the one-word flag on the row
+          can only gesture at, and changes once the swap is marked to say what happens next. }}
+      {{#if focused.note}}
+      <p class="creator-swap-note {{#if focused.swapMarked}}is-swapping{{/if}}">
+        <i class="fa-solid {{#if focused.swapMarked}}fa-arrow-right-arrow-left{{else}}fa-bookmark{{/if}}" aria-hidden="true"></i>
+        <span>{{focused.note}}</span>
+      </p>
+      {{/if}}
       <button type="button" class="creator-btn {{#if focused.swapMarked}}creator-btn-primary{{else}}creator-btn-danger{{/if}}"
               data-action="stepAction" data-step-action="swap-spell"
               data-id="{{focused.id}}" data-name="{{focused.name}}" data-level="{{focused.level}}">
