@@ -222,7 +222,14 @@
           "takeFeat": "Take a feat instead",
           "changeFeat": "Choose a different feat",
           "useAbilities": "Improve abilities instead",
-          "locked": "This choice can't raise this ability"
+          "locked": "This choice can't raise this ability",
+          "pickFeat": "Choose a Feat",
+          "cancelPick": "Cancel",
+          "showLater": "Show feats you'll unlock later",
+          "hideLater": "Hide feats you'll unlock later",
+          "comingLater": "Coming Later",
+          "lockedLevel": "Unlocks at level {level}",
+          "lockedPrereq": "Requires a feature you don't have yet"
         },
         "subclass": {
           "label": "Subclass",
@@ -271,6 +278,16 @@
           "releasedHint": "{count} extra pick — a new feature grants a spell you already knew, always prepared, so the selection it was using is yours again.",
           "swapOut": "Swap Out",
           "keep": "Keep",
+          "ownedTag": "Known",
+          "ownedTagPrepared": "Prepared",
+          "ownedTip": "Spell already known — it is on your character sheet. Pick it and choose Swap Out to trade it for another.",
+          "ownedTipPrepared": "Spell already prepared — it is on your character sheet. Pick it and choose Swap Out to change it for another.",
+          "swapTag": "Replacing",
+          "swapTip": "Marked to be replaced. Choose the spell that takes its place; nothing leaves your sheet until the level-up is applied.",
+          "ownedNote": "You already know this spell, so it is not in the list to learn. Swapping it out gives you one extra pick this level to learn something in its place.",
+          "ownedNotePrepared": "You already have this spell prepared, so it is not in the list to learn. Swapping it out gives you one extra pick this level to prepare something in its place.",
+          "swapNote": "Marked to be replaced. Choose the spell that takes its place from the list — nothing leaves your sheet until you apply the level-up.",
+          "swapActive": "Replacing {name} — one of the picks below takes its place.",
           "add": "Learn Spell",
           "remove": "Forget Spell",
           "selected": "Learning",
@@ -468,6 +485,7 @@
         "selectHint": "Pick a spell from the list to read it and add it to your character.",
         "concentration": "Concentration",
         "ritual": "Ritual",
+        "chosenTip": "Chosen — it joins your character when you finish.",
         "add": "Add spell",
         "remove": "Remove spell"
       },
@@ -523,6 +541,8 @@
         "filterSubtypeAria": "Filter by kind",
         "packsHeading": "Adventuring Packs",
         "armorHeading": "Armor & Shields",
+        "gamingHeading": "Gaming Sets",
+        "instrumentHeading": "Musical Instruments",
         "grantedHeading": "From your class & background"
       },
       "review": {

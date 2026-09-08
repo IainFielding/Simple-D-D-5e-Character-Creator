@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { computeSpellPlan, spellChanges } from "../scripts/levelup/steps/lvl-spells-step.mjs";
+import { computeSpellPlan, lvlSpellsStep, spellChanges } from "../scripts/levelup/steps/lvl-spells-step.mjs";
 import { fighter, wizard } from "./fixtures/dnd5e-5.3.3.mjs";
 
 /**
@@ -306,5 +306,106 @@ describe("computeSpellPlan swap allowance", () => {
     const plan = computeSpellPlan(actor, cls);
     expect(plan.canSwapCantrip).toBe(true);
     expect(plan.canSwapSpell).toBe(true);
+  });
+});
+
+/* -------------------------------------------- */
+/*  Owned rows say what they are                 */
+/* -------------------------------------------- */
+
+/**
+ * A spell already on the sheet appears in a list headed "choose the spells you learn", which is a
+ * contradiction until something explains it. The row carries a flag under the compare pin (the one
+ * place on a 224px card that costs the name no width) with a tooltip behind it, and the detail pane
+ * carries the long form. All of it follows the caster: a 2014 prepared class changes what it has
+ * prepared rather than forgetting a spell it knows, and the same edition test that words the step's
+ * hint words the flag, the tooltip and the note.
+ */
+describe("owned spell rows", () => {
+  /** The one spell the character already has, as ownedSpells() reads it off an actor. */
+  const KNOWN = {
+    type: "spell", id: "own1", name: "Magic Missile", img: "", uuid: "Actor.a.Item.own1",
+    _stats: { compendiumSource: "Compendium.dnd5e.spells.Item.mm" },
+    system: {
+      level: 1, prepared: 1, sourceItem: "class:wizard", identifier: "magic-missile",
+      school: "evo", properties: []
+    }
+  };
+  /** One unknown spell in the pool, so the list isn't all swap candidates. */
+  const POOL = {
+    uuid: "Compendium.dnd5e.spells.Item.shield", name: "Shield", img: "", level: 1,
+    identifier: "shield", school: "Abjuration", propertyKeys: ""
+  };
+
+  const spells = {
+    forClassAtLevel: async () => ({ byLevel: { 0: [], 1: [POOL] } }),
+    description: async () => "<p>A dart of force.</p>",
+    sourceBook: async () => "PHB"
+  };
+
+  function stateFor({ prepared = false, swapSpell = null, focus = null } = {}) {
+    return {
+      actor: { items: [KNOWN] },
+      spellSource: { items: [] },     // nothing owned *by identity*, so the pool row survives
+      classItem: { name: "Wizard" },
+      spellTab: "spells",
+      focusedSpellUuid: focus,
+      selectedCantrips: [], selectedSpells: [],
+      swapCantrip: null, swapSpell,
+      spellListOverride: "",
+      spellPlan: () => ({
+        isSpellcaster: true, sourceTag: "class:wizard", castUuid: "Compendium.x.Item.wiz",
+        listType: "class", maxSpellLevel: 1, addCantrips: 0, addSpells: 1,
+        canSwapCantrip: false, canSwapSpell: true,
+        releasedCantrips: 0, releasedSpells: 0,
+        swapLabelKey: prepared
+          ? "levelup.step.spells.swapHintPrepared" : "levelup.step.spells.swapHint"
+      })
+    };
+  }
+
+  it("flags the known spell, above the pool, with the tooltip that explains it", async () => {
+    const ctx = await lvlSpellsStep.context({ state: stateFor(), spells });
+    expect(ctx.list[0].owned).toBe(true);
+    expect(ctx.list[0].name).toBe("Magic Missile");
+    expect(ctx.list[0].ownedTag).toBe("sogrom-dnd5e-character-creator.levelup.step.spells.ownedTag");
+    expect(ctx.list[0].ownedTip).toBe("sogrom-dnd5e-character-creator.levelup.step.spells.ownedTip");
+    // A pool spell is not a swap candidate and carries none of it.
+    expect(ctx.list[1].owned).toBe(false);
+    expect(ctx.list[1].ownedTag).toBeUndefined();
+  });
+
+  it("uses the prepared wording throughout for a 2014 prepared caster", async () => {
+    const ctx = await lvlSpellsStep.context({ state: stateFor({ prepared: true }), spells });
+    expect(ctx.list[0].ownedTag).toBe("sogrom-dnd5e-character-creator.levelup.step.spells.ownedTagPrepared");
+    expect(ctx.list[0].ownedTip).toBe("sogrom-dnd5e-character-creator.levelup.step.spells.ownedTipPrepared");
+    expect(ctx.swapHint).toBe("sogrom-dnd5e-character-creator.levelup.step.spells.swapHintPrepared");
+  });
+
+  it("names the marked spell and the extra pick it bought", async () => {
+    const state = stateFor({ swapSpell: { id: "own1", name: "Magic Missile" } });
+    const ctx = await lvlSpellsStep.context({ state, spells });
+    expect(ctx.list.find(s => s.owned).swapMarked).toBe(true);
+    expect(ctx.list.find(s => s.owned).swapTag).toBe("sogrom-dnd5e-character-creator.levelup.step.spells.swapTag");
+    // The raised budget is named rather than left as an unexplained +1.
+    expect(ctx.swapActiveHint).toContain("levelup.step.spells.swapActive");
+    expect(ctx.swapActiveHint).toContain("Magic Missile");
+    expect(ctx.addSpells).toBe(2);
+  });
+
+  it("gives the focused detail the long-form note, in both swap states", async () => {
+    const plain = await lvlSpellsStep.context({ state: stateFor({ focus: KNOWN._stats.compendiumSource }), spells });
+    expect(plain.focused.note).toBe("sogrom-dnd5e-character-creator.levelup.step.spells.ownedNote");
+
+    const marked = await lvlSpellsStep.context({
+      state: stateFor({ focus: KNOWN._stats.compendiumSource, swapSpell: { id: "own1", name: "Magic Missile" } }),
+      spells
+    });
+    expect(marked.focused.note).toBe("sogrom-dnd5e-character-creator.levelup.step.spells.swapNote");
+  });
+
+  it("leaves an ordinary pool spell without a note", async () => {
+    const ctx = await lvlSpellsStep.context({ state: stateFor({ focus: POOL.uuid }), spells });
+    expect(ctx.focused.note).toBe("");
   });
 });

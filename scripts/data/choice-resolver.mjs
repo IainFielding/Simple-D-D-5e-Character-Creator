@@ -926,6 +926,101 @@ export async function findRestrictedItems(cfg, maxLevel = null, rules = null) {
   return results;
 }
 
+/** The level from which the 2024 rules make an ability-score improvement an Epic Boon instead. */
+const ASI_EPIC_BOON_LEVEL = 19;
+
+/**
+ * Scan enabled compendiums for every general feat an ASI-or-feat decision may offer, memoised.
+ *
+ * Unlike {@link findRestrictedItems} this never drops a feat for being above the character's level —
+ * every match is returned with its own prerequisite level/items intact, so the caller (the ASI feat
+ * picker) can show it locked instead of hiding it outright. What IS excluded here, unconditionally, is
+ * the *kind* of feat an ASI may never offer regardless of level: **origin** feats (a background's gift)
+ * and **fighting-style** feats (a class feature's) both carry no level prerequisite of their own, so a
+ * level filter alone would let them through. Epic boons are excluded only below level 19 — that's what
+ * a level-19 improvement is for, and some ship with no level prerequisite either.
+ *
+ * Feats declaring no subtype at all (2014 content, most homebrew) are never excluded here: the subtype
+ * split is a 2024-rules concept, and an allow-list of "general" would empty the pool for a 2014 table —
+ * the same principle {@link matchesRules} states for editions.
+ * @param {number} level   The character's level, used only to decide whether epic boons are excluded.
+ * @returns {Promise<{uuid: string, name: string, img: string, prereqLevel: number, prereqItems: string[]}[]>}
+ */
+export async function findAsiFeats(level) {
+  const excluded = new Set(["origin", "fightingStyle"]);
+  if ( level < ASI_EPIC_BOON_LEVEL ) excluded.add("epicBoon");
+  const sig = `asiFeats|${[...excluded].sort().join(",")}`;
+  if ( restrictedCache.has(sig) ) return restrictedCache.get(sig);
+
+  const enabled = getEnabledPacks();
+  const results = [];
+  const seenNames = new Set();
+  const nameKey = n => (n ?? "").trim().toLowerCase();
+  for ( const pack of game.packs ) {
+    if ( !pack.visible || !isUsableItemPack(pack, enabled) ) continue;
+    try {
+      const index = await pack.getIndex({
+        fields: ["type", "system.type.subtype", "system.prerequisites.level", "system.prerequisites.items"]
+      });
+      for ( const e of index ) {
+        if ( e.type !== "feat" ) continue;
+        const subtype = e.system?.type?.subtype ?? "";
+        if ( subtype && excluded.has(subtype) ) continue;
+        const nk = nameKey(e.name);
+        if ( seenNames.has(nk) ) continue;   // same feat shared across edition packs — keep one
+        seenNames.add(nk);
+        results.push({
+          uuid: e.uuid, name: e.name, img: e.img,
+          prereqLevel: Number(e.system?.prerequisites?.level ?? 0),
+          prereqItems: Array.from(e.system?.prerequisites?.items ?? [])
+        });
+      }
+    } catch ( err ) {
+      log(`ASI feat scan failed for ${pack.collection}`, err);
+    }
+  }
+  restrictedCache.set(sig, results);
+  return results;
+}
+
+/**
+ * Classify a scanned feat pool ({@link findAsiFeats}) against one build: split into pickable options —
+ * grouped into a "Recommended"/"Other" panel via {@link groupRecommended} when the build unlocked any of
+ * them — and a locked "coming later" list, each carrying the reason it's locked. Pure (no compendium
+ * access), so it is unit-testable on its own.
+ * @param {{uuid: string, name: string, img: string, prereqLevel: number, prereqItems: string[]}[]} entries
+ * @param {number} level              The character's current level.
+ * @param {Set<string>} owned         Identifier slugs the build already grants (see {@link evalItemPrereq}).
+ * @param {Set<string>} [takenNames]  Lowercased names of non-repeatable feats the build already holds —
+ *   dropped entirely rather than offered or recommended, since a second copy is never a legal pick
+ *   (mirrors `Item5e#validatePrerequisites`, which would reject it) and re-showing your own pick back to
+ *   you as "recommended" is exactly the confusing case this exists to avoid.
+ * @returns {{groups: object[]|null, options: object[], lockedOptions: object[]}}
+ */
+export function classifyAsiFeats(entries, level, owned, takenNames = new Set()) {
+  const options = [];
+  const lockedOptions = [];
+  for ( const e of entries ) {
+    if ( takenNames.has(e.name.trim().toLowerCase()) ) continue;
+    const levelLocked = e.prereqLevel > level;
+    const { hasReq, met } = evalItemPrereq(e.prereqItems, owned);
+    if ( !levelLocked && (!hasReq || met) ) {
+      options.push({ uuid: e.uuid, name: e.name, img: e.img, recommended: hasReq && met });
+    } else {
+      lockedOptions.push({
+        uuid: e.uuid, name: e.name, img: e.img,
+        lockReason: levelLocked
+          ? t("levelup.step.asi.lockedLevel", { level: e.prereqLevel })
+          : t("levelup.step.asi.lockedPrereq")
+      });
+    }
+  }
+  const collator = (a, b) => a.name.localeCompare(b.name, game.i18n.lang);
+  options.sort(collator);
+  lockedOptions.sort(collator);
+  return { groups: groupRecommended(options), options, lockedOptions };
+}
+
 /* -------------------------------------------- */
 /*  Small utilities                             */
 /* -------------------------------------------- */

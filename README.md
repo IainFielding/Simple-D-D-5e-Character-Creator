@@ -1,5 +1,5 @@
-![](https://img.shields.io/badge/Foundry-v14.366-informational) 
-![](https://img.shields.io/badge/D&D-v5.3.3-informational)
+![](https://img.shields.io/badge/Foundry-v14.367-informational) 
+![](https://img.shields.io/badge/D&D-v6.0.0-informational)
 ![Latest Release Download Count](https://img.shields.io/github/downloads/IainFielding/Simple-DnD5e-Character-Creator/latest/module.zip?label=Downloads) [![Ko-fi](https://img.shields.io/badge/Ko--fi-sogrom?logo=ko-fi&logoColor=white)](https://ko-fi.com/sogrom)<br>
 
 # Simple D&D Character Creator

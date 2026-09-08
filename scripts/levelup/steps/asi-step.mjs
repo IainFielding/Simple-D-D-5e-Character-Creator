@@ -38,6 +38,18 @@ export const asiStep = {
       const st = driver.asiState(record);
       const index = state.asiSteps.indexOf(record);
 
+      if ( record.pickingFeat ) {
+        // Mid-pick: swap the ability-score/feat panel for the inline feat grid until the player
+        // chooses one (or cancels back to whatever this decision held before).
+        const picker = await driver.asiFeatOptions(record);
+        sections.push({
+          index, picking: true,
+          groups: picker.groups, options: picker.options, lockedOptions: picker.lockedOptions,
+          showFuture: !!record.showFuture, hasLocked: picker.lockedOptions.length > 0
+        });
+        continue;
+      }
+
       if ( st.type === "feat" ) {
         // Feat chosen: description on the left (like a background), stacked ability scores on the
         // right. A feat with an ability *choice* gets live steppers on its child record; otherwise
@@ -85,7 +97,10 @@ export const asiStep = {
     if ( action === "asiInc" ) await driver.adjustAsi(record, el.dataset.key, 1);
     else if ( action === "asiDec" ) await driver.adjustAsi(record, el.dataset.key, -1);
     else if ( action === "asiAbilities" ) await driver.useAsiAbilities(record);
-    else if ( action === "asiFeat" ) await driver.chooseAsiFeat(record);
+    else if ( action === "asiFeat" ) driver.openAsiFeatPicker(record);
+    else if ( action === "asiFeatCancel" ) driver.closeAsiFeatPicker(record);
+    else if ( action === "asiFeatPeek" ) driver.toggleAsiFeatPeek(record);
+    else if ( action === "asiFeatPick" ) await driver.pickAsiFeat(record, el.dataset.uuid);
   }
 };
 

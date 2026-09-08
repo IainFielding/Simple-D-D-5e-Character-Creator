@@ -42,21 +42,40 @@
         {{/if}}
       </span>
     </span>
+    {{#if active}}
+    <i class="creator-pickrow-tick fa-solid fa-check"
+       data-tooltip="{{localize 'sogrom-dnd5e-character-creator.step.spells.chosenTip'}}"></i>
+    {{/if}}
+  </button>
+  {{!-- The right-hand column: the compare pin, and under it the state flag for a spell that is
+        already on the sheet.
+
+        Both sit *beside* the row, never inside it — the row is itself a button, and a button inside
+        a button is invalid markup that browsers silently unnest, which would leave the pin firing
+        the pick. Same reasoning, same markup as the class/species pickers.
+
+        The flag lives here rather than on the row's own line because the list is a grid of 224px
+        cards: on the line it took about a quarter of one, which is most of the name's share, and
+        "Chromatic Orb" wrapped as "Chroma / tic Orb". Stacked under the pin it shares a column the
+        card already spends, and the name keeps its width. Its tooltip is the sentence the one word
+        cannot fit; the wording arrives on the row because it follows the caster — a 2014 prepared
+        class reads "Prepared", a spells-known class "Known" ({@link module:data/spell-swap}). --}}
+  <div class="creator-rowside">
+    {{#if compareCategory}}
+    <button type="button" class="creator-pin {{#if pinned}}is-pinned{{/if}}"
+            data-action="togglePin" data-category="{{compareCategory}}" data-uuid="{{uuid}}"
+            aria-pressed="{{#if pinned}}true{{else}}false{{/if}}"
+            data-tooltip="{{#if pinned}}{{localize "sogrom-dnd5e-character-creator.compare.unpin"}}{{else}}{{localize "sogrom-dnd5e-character-creator.compare.pin"}}{{/if}}"
+            aria-label="{{localize "sogrom-dnd5e-character-creator.compare.pinAria" name=name}}">
+      <i class="fa-solid fa-scale-balanced" aria-hidden="true"></i>
+    </button>
+    {{/if}}
     {{#if owned}}
-      {{#if swapMarked}}<i class="creator-pickrow-tick fa-solid fa-arrow-right-arrow-left"></i>
-      {{else}}<i class="creator-pickrow-tick fa-solid fa-bookmark"></i>{{/if}}
-    {{else if active}}<i class="creator-pickrow-tick fa-solid fa-check"></i>{{/if}}
-  </button>
-  {{!-- The pin sits *beside* the row, never inside it: the row is itself a button, and a button
-        inside a button is invalid markup that browsers silently unnest, which would leave the pin
-        firing the pick. Same reasoning, same markup as the class/species pickers. --}}
-  {{#if compareCategory}}
-  <button type="button" class="creator-pin {{#if pinned}}is-pinned{{/if}}"
-          data-action="togglePin" data-category="{{compareCategory}}" data-uuid="{{uuid}}"
-          aria-pressed="{{#if pinned}}true{{else}}false{{/if}}"
-          data-tooltip="{{#if pinned}}{{localize "sogrom-dnd5e-character-creator.compare.unpin"}}{{else}}{{localize "sogrom-dnd5e-character-creator.compare.pin"}}{{/if}}"
-          aria-label="{{localize "sogrom-dnd5e-character-creator.compare.pinAria" name=name}}">
-    <i class="fa-solid fa-scale-balanced" aria-hidden="true"></i>
-  </button>
-  {{/if}}
+      {{#if swapMarked}}
+      <span class="creator-pickrow-flag is-swapping" data-tooltip="{{swapTip}}">{{swapTag}}</span>
+      {{else}}
+      <span class="creator-pickrow-flag" data-tooltip="{{ownedTip}}">{{ownedTag}}</span>
+      {{/if}}
+    {{/if}}
+  </div>
 </li>

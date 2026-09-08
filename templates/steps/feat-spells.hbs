@@ -120,7 +120,9 @@
                 data-tooltip="{{ccItemTooltip uuid}}">
           <img class="creator-pickrow-img" src="{{img}}" alt="">
           <span class="creator-pickrow-name">{{name}}</span>
-          {{#if owned}}<span class="creator-pickrow-tag">{{localize "sogrom-dnd5e-character-creator.step.featSpells.knownTag"}}</span>{{/if}}
+          {{!-- The tag's tooltip is the same sentence the detail pane shows, so "Known" explains
+                itself on hover instead of only after the row is opened. --}}
+          {{#if owned}}<span class="creator-pickrow-tag" data-tooltip="{{localize 'sogrom-dnd5e-character-creator.step.featSpells.alreadyKnown'}}">{{localize "sogrom-dnd5e-character-creator.step.featSpells.knownTag"}}</span>{{/if}}
           {{#if active}}<i class="creator-pickrow-tick fa-solid fa-check"></i>{{/if}}
         </button>
       </li>

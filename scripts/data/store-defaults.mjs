@@ -4,8 +4,9 @@
  * "Reset to defaults" restores). Every UUID points into the system's own 2024 equipment
  * compendium (`dnd5e.equipment24`, the free-rules content) or its legacy `dnd5e.items`
  * pack, so the defaults resolve in any dnd5e world with no extra modules — a classic
- * general store: simple and martial weapons, mundane armor, adventuring gear, a few kits,
- * the five equipment packs, and a spellbook.
+ * general store: simple and martial weapons, mundane armor, adventuring gear, the full set
+ * of artisan's tools and other kits, gaming sets, musical instruments, the five equipment
+ * packs, and a spellbook.
  *
  * Only the UUIDs live here; names, icons, and prices are read from the items themselves the
  * first time the list is hydrated (see `hydrateEntries` in store-source.mjs), so system price
@@ -93,12 +94,47 @@ export const DEFAULT_INVENTORY_UUIDS = [
   `${PACK}.phbagClothesTrav`,   // Clothes, Traveler's
   `${PACK}.phbagSignalWhist`,   // Signal Whistle
   `${PACK}.phbagBell0000000`,   // Bell
-  // Tools & kits
-  `${PACK}.phbtulThievesToo`,   // Thieves' Tools
-  `${PACK}.phbtulHerbalismK`,   // Herbalism Kit
-  `${PACK}.phbtulDisguiseKi`,   // Disguise Kit
-  `${PACK}.phbtulNavigators`,   // Navigator's Tools
+  // Artisan's tools
+  `${PACK}.phbtulAlchemists`,   // Alchemist's Supplies
+  `${PACK}.phbtulBrewersSup`,   // Brewer's Supplies
+  `${PACK}.phbtulCalligraph`,   // Calligrapher's Supplies
+  `${PACK}.phbtulCarpenters`,   // Carpenter's Tools
+  `${PACK}.phbtulCartograph`,   // Cartographer's Tools
+  `${PACK}.phbtulCobblersTo`,   // Cobbler's Tools
+  `${PACK}.phbtulCooksUtens`,   // Cook's Utensils
+  `${PACK}.phbtulGlassblowe`,   // Glassblower's Tools
+  `${PACK}.phbtulJewelersTo`,   // Jeweler's Tools
+  `${PACK}.phbtulLeatherwor`,   // Leatherworker's Tools
+  `${PACK}.phbtulMasonsTool`,   // Mason's Tools
+  `${PACK}.phbtulPaintersSu`,   // Painter's Supplies
+  `${PACK}.phbtulPottersToo`,   // Potter's Tools
   `${PACK}.phbtulSmithsTool`,   // Smith's Tools
+  `${PACK}.phbtulTinkersToo`,   // Tinker's Tools
+  `${PACK}.phbtulWeaversToo`,   // Weaver's Tools
+  `${PACK}.phbtulWoodcarver`,   // Woodcarver's Tools
+  // Other tools & kits
+  `${PACK}.phbtulDisguiseKi`,   // Disguise Kit
+  `${PACK}.phbtulForgeryKit`,   // Forgery Kit
+  `${PACK}.phbtulHerbalismK`,   // Herbalism Kit
+  `${PACK}.phbtulNavigators`,   // Navigator's Tools
+  `${PACK}.phbtulPoisonersK`,   // Poisoner's Kit
+  `${PACK}.phbtulThievesToo`,   // Thieves' Tools
+  // Gaming sets
+  `${PACK}.phbgstDice000000`,   // Dice
+  `${PACK}.phbgstDragonches`,   // Dragonchess
+  `${PACK}.phbgstPlayingcar`,   // Playing Cards
+  `${PACK}.phbgstThreedrago`,   // Three-Dragon Ante
+  // Musical instruments
+  `${PACK}.phbmusBagpipes00`,   // Bagpipes
+  `${PACK}.phbmusDrum000000`,   // Drum
+  `${PACK}.phbmusDulcimer00`,   // Dulcimer
+  `${PACK}.phbmusFlute00000`,   // Flute
+  `${PACK}.phbmusHorn000000`,   // Horn
+  `${PACK}.phbmusLute000000`,   // Lute
+  `${PACK}.phbmusLyre000000`,   // Lyre
+  `${PACK}.phbmusPanflute00`,   // Pan Flute
+  `${PACK}.phbmusShawm00000`,   // Shawm
+  `${PACK}.phbmusViol000000`,   // Viol
   // Equipment packs (containers — buying one brings its contents along)
   `${PACK}.phbagBurglarsPac`,   // Burglar's Pack
   `${PACK}.phbagDungeoneers`,   // Dungeoneer's Pack
@@ -114,19 +150,32 @@ const PHB_MODULE_ID = "dnd-players-handbook";
 const SYSTEM_PREFIX = `${PACK}.`;
 const PHB_PREFIX = `Compendium.${PHB_MODULE_ID}.equipment.Item.`;
 
+/** Heroes of Faerun adds three musical instruments with no system-pack equivalent. */
+const HOF_MODULE_ID = "dnd-heroes-faerun";
+const HOF_PACK = "Compendium.dnd-heroes-faerun.items.Item";
+const HOF_INSTRUMENT_UUIDS = [
+  `${HOF_PACK}.hofCittern000000`,   // Cittern
+  `${HOF_PACK}.hofBandore000000`,   // Bandore
+  `${HOF_PACK}.hofYarting000000`    // Yarting
+];
+
 /**
  * The default stock resolved against the best available source: with the Player's
  * Handbook module active its equipment pack takes over (same ids, richer art/text —
  * verified 1:1 for every id above except the legacy-pack Spellbook), item by item so an
- * id the module ever drops falls back to the system copy instead of a broken row.
+ * id the module ever drops falls back to the system copy instead of a broken row. With
+ * Heroes of Faerun active, its three extra musical instruments are appended — they have
+ * no system-pack equivalent, so there's nothing to substitute, only add.
  * Callers wanting the raw system list (tests, docs) use {@link DEFAULT_INVENTORY_UUIDS}.
  * @returns {string[]}
  */
 export function defaultInventoryUuids() {
-  if ( !globalThis.game?.modules?.get(PHB_MODULE_ID)?.active ) return [...DEFAULT_INVENTORY_UUIDS];
-  return DEFAULT_INVENTORY_UUIDS.map(uuid => {
+  const phbActive = !!globalThis.game?.modules?.get(PHB_MODULE_ID)?.active;
+  const uuids = !phbActive ? [...DEFAULT_INVENTORY_UUIDS] : DEFAULT_INVENTORY_UUIDS.map(uuid => {
     if ( !uuid.startsWith(SYSTEM_PREFIX) ) return uuid;
     const phbUuid = PHB_PREFIX + uuid.slice(SYSTEM_PREFIX.length);
     try { return fromUuidSync(phbUuid) ? phbUuid : uuid; } catch { return uuid; }
   });
+  if ( globalThis.game?.modules?.get(HOF_MODULE_ID)?.active ) uuids.push(...HOF_INSTRUMENT_UUIDS);
+  return uuids;
 }
