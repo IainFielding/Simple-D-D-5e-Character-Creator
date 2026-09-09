@@ -18,9 +18,24 @@ describe("classifyAsiFeats", () => {
 
   it("puts an unrestricted feat in the pickable options, not recommended", () => {
     const { options, lockedOptions, groups } = classifyAsiFeats([entry()], 4, new Set());
-    expect(options).toEqual([{ uuid: entry().uuid, name: "Alert", img: "icons/alert.svg", recommended: false }]);
+    expect(options).toEqual([{
+      uuid: entry().uuid, name: "Alert", img: "icons/alert.svg", abilities: [], recommended: false
+    }]);
     expect(lockedOptions).toEqual([]);
     expect(groups).toBeNull();
+  });
+
+  it("carries each feat's ability increases onto both lists, for the picker's filter", () => {
+    // The "increases X" dropdown reads this off the classified options, so a half-feat has to keep
+    // its abilities whether it ends up pickable or shelved — a Strength filter should still find a
+    // Strength half-feat sitting in "coming later".
+    const { options, lockedOptions } = classifyAsiFeats([
+      entry({ uuid: "u1", name: "Slasher", abilities: ["str", "dex"] }),
+      entry({ uuid: "u2", name: "Spellfire Adept", abilities: ["cha"], prereqItems: ["spellfire-spark"] })
+    ], 4, new Set());
+
+    expect(options.map(o => o.abilities)).toEqual([["str", "dex"]]);
+    expect(lockedOptions.map(o => o.abilities)).toEqual([["cha"]]);
   });
 
   it("locks a feat above the character's level, and never hides it outright", () => {

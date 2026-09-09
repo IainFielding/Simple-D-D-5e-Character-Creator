@@ -10,8 +10,8 @@ import { advancementArray } from "../data/advancement-util.mjs";
  * head — the picker shows one detail page at a time, by design. So the comparison happens in
  * memory, which is where it goes wrong.
  *
- * **This module extracts almost nothing itself, and that is the whole design.** The equivalent in
- * other builders runs to a thousand lines because it re-reads every advancement type per category —
+ * **This module extracts almost nothing itself, and that is the whole design.** The obvious
+ * implementation runs to a thousand lines, because it re-reads every advancement type per category —
  * movement, senses, resistances, scale values, damage parts — building bespoke cells for each. We
  * already do that reading once, in {@link module:data/source-index}: `advancementGroups()` flattens
  * an item's traits and its granted features and spells for the detail pane, and

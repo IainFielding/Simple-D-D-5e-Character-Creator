@@ -47,6 +47,52 @@ export function registeredClassLists() {
 }
 
 /**
+ * The alternatives to a feat-granted spell the character already knows — Cold Caster's "you learn a
+ * different **Wizard** cantrip of your choice".
+ *
+ * The feat never names that list in data: an `ItemGrant` carries a uuid, not a `restriction.list`
+ * the way an `ItemChoice` does. So the list is inferred from the granted spell's own membership —
+ * whichever registered class lists hold it — and the alternatives are that list's other spells at
+ * the same level. For Ray of Frost that resolves to the Wizard list, which is exactly what the feat
+ * says.
+ *
+ * **When the spell belongs to no registered list** the honest answer is not "offer nothing", which
+ * would strand a player the rules do give a choice; it is to widen to every registered class list
+ * at that level. That happens only where the world's content has not registered the list the feat
+ * assumes, and a slightly wide pool is a better failure than a dead control.
+ *
+ * @param {string} uuid    The granted spell's uuid.
+ * @param {number} level   Its spell level; alternatives are drawn at the same level.
+ * @returns {Promise<{uuid: string, name: string, img: string, level: number, listLabel: string}[]>}
+ *   Sorted by name, excluding the granted spell itself.
+ */
+export async function spellAlternatives(uuid, level) {
+  const lists = registeredClassLists();
+  const forId = id => dnd5e.registry?.spellLists?.forType?.("class", id)?.uuids ?? new Set();
+  const owning = lists.filter(l => forId(l.id).has(uuid));
+  const pool = owning.length ? owning : lists;
+
+  const seen = new Map();
+  for ( const list of pool ) {
+    for ( const candidate of forId(list.id) ) {
+      if ( (candidate === uuid) || seen.has(candidate) ) continue;
+      seen.set(candidate, list.label);
+    }
+  }
+  const docs = await Promise.all([...seen.keys()].map(u => fromUuid(u).catch(() => null)));
+  const out = [];
+  [...seen.keys()].forEach((u, i) => {
+    const doc = docs[i];
+    if ( !doc || (Number(doc.system?.level ?? -1) !== level) ) return;
+    out.push({
+      uuid: u, name: doc.name, img: doc.img || "icons/svg/book.svg",
+      level, listLabel: seen.get(u)
+    });
+  });
+  return out.sort((a, b) => a.name.localeCompare(b.name, game.i18n.lang));
+}
+
+/**
  * The registry's own display name for a list — "Wizard", "Life Domain" — for the line that tells a
  * player which list they are looking at. Falls back to the identifier, which is at least true.
  * @param {string} type

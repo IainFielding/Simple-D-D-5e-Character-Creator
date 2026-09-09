@@ -2711,6 +2711,28 @@ body:has(.sogrom-creator-fullscreen) .application.compendium-browser {
 .creator-spells { grid-template-rows: minmax(0, 1fr); }
 .creator-spells-none { grid-column: 1 / -1; grid-row: 1 / -1; }
 
+/* Spells a feat handed out, above the caster's own picks (and the whole page for a non-caster).
+   Reuses the pick-row shape so a granted spell reads as the same kind of thing as a chosen one —
+   it differs only in being fixed, which the tick and the absence of a button already say. */
+.creator-feat-grants { margin-bottom: 1rem; }
+.creator-feat-grant-list { overflow: visible; flex: 0 0 auto; }
+/* Not a button: there is nothing to click. Kill the affordances the row shape brings with it. */
+.creator-feat-grant { cursor: default; }
+.creator-feat-grant:hover { border-color: var(--cc-select); }
+.creator-feat-grant-from { color: var(--cc-muted); font-style: italic; }
+.creator-feat-grant-swapped { color: var(--cc-accent); }
+/* The substitution control, indented under the row it belongs to so the pair reads as one item. */
+.creator-feat-grant-swap {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  padding: 0.5rem 0.75rem 0.75rem 3.4rem;
+  font-size: 0.85rem;
+  color: var(--cc-muted);
+}
+.creator-feat-grant-swap select { flex: 1 1 12rem; min-width: 0; }
+
 /* Level-up spell step: a one-line intro above the tabs, and a small spell-level badge on each
    pick-row (the leveled tab mixes spell levels, so each row states its own). */
 .levelup-spells-intro { margin: 0 0 0.75rem; color: var(--cc-muted); font-size: 0.9rem; line-height: 1.4; }
@@ -3433,8 +3455,8 @@ body:has(.sogrom-creator-fullscreen) .application.compendium-browser {
 }
 /* Row-shaped cards: back into the flow, ahead of the label, where it always worked. */
 .creator-choices .creator-choice-card-star,
-.levelup-block[data-density="compact"] .creator-choice-card-star,
-.levelup-block[data-density="chip"] .creator-choice-card-star {
+[data-density="compact"] .creator-choice-card-star,
+[data-density="chip"] .creator-choice-card-star {
   position: static;
 }
 .creator-choices .creator-choice-card.is-recommended::after,
@@ -3984,6 +4006,28 @@ body:has(.sogrom-creator-fullscreen) .application.compendium-browser {
 }
 .creator-pick--asi .creator-class-aside { max-height: none; overflow: visible; }
 
+/* The feat picker's toolbar: name search plus the "increases <ability>" dropdown. Borrows the spell
+   toolbar's row so the two chooser screens read alike, but at the picker's own width — it sits in
+   the ASI screen's left column beside the ability aside, not across a full stage. */
+.creator-feat-search-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem;
+  margin-bottom: 0.85rem;
+}
+.creator-feat-search-row .creator-search { flex: 1 1 200px; width: auto; }
+.creator-feat-search-row .creator-spell-filter { flex: 0 1 auto; }
+
+/* Hidden by the filter pass, which hides a card's `li`, and a group's grid together with the
+   heading that introduces it — a heading left standing over an emptied grid reads as a fault.
+   `!important` is not needed: the grids are `display: grid` from a single-class rule, and these
+   selectors carry a class more. */
+.creator-asi-feat-picker li.is-hidden,
+.creator-asi-feat-picker .creator-choice-grid.is-hidden,
+.creator-asi-feat-picker .creator-choice-group-head.is-hidden,
+.creator-asi-feat-picker .creator-choice-empty.is-hidden { display: none; }
+
 /* Icon badge standing in for the item art in the ASI placeholder's detail header (56px = img size). */
 .creator-detail-icon {
   flex: 0 0 auto;
@@ -3998,15 +4042,20 @@ body:has(.sogrom-creator-fullscreen) .application.compendium-browser {
   font-size: 1.6rem;
 }
 
-/* Density tiers — vary card + icon size by how many options a pick offers (set per block). */
+/* Density tiers — vary card + icon size by how many options a pick offers.
+   Declared with `data-density` on whichever element owns the grids. Usually that is a level-up
+   block (see level.hbs), but not always: the ASI screen's block is a `form` — right for the
+   ability-score steppers — while the feat picker *inside* it is a 50+ option chooser that needs
+   its own tier. So these are keyed off the attribute alone rather than off `.levelup-block`,
+   and the nearest declaring ancestor wins. */
 /* Large option lists (a long feature / spell / weapon-mastery pool, 9+ options): a fixed five-wide
    grid of small horizontal chips — icon then name — so a 10-40 option pick stays scannable in a few
    tidy rows instead of sprawling into tall cards. Columns step down as the window narrows. */
-.levelup-block[data-density="compact"] .creator-choice-grid {
+[data-density="compact"] .creator-choice-grid {
   grid-template-columns: repeat(5, minmax(0, 1fr));
   gap: 0.5rem;
 }
-.levelup-block[data-density="compact"] .creator-choice-card {
+[data-density="compact"] .creator-choice-card {
   flex-direction: row;
   justify-content: flex-start;
   align-items: center;
@@ -4014,49 +4063,49 @@ body:has(.sogrom-creator-fullscreen) .application.compendium-browser {
   padding: 0.5rem 0.65rem;
   gap: 0.5rem;
 }
-.levelup-block[data-density="compact"] .creator-choice-card-img { width: 34px; height: 34px; flex: 0 0 auto; }
-.levelup-block[data-density="compact"] .creator-choice-card-name {
+[data-density="compact"] .creator-choice-card-img { width: 34px; height: 34px; flex: 0 0 auto; }
+[data-density="compact"] .creator-choice-card-name {
   font-size: 0.82rem;
   text-align: left;
   line-height: 1.2;
   min-width: 0;
 }
 /* The tick overlay is tuned for tall cards; pull it into the shorter chip's corner. */
-.levelup-block[data-density="compact"] .creator-choice-card-check { top: 0.3rem; right: 0.35rem; }
+[data-density="compact"] .creator-choice-card-check { top: 0.3rem; right: 0.35rem; }
 
 @media (max-width: 1000px) {
-  .levelup-block[data-density="compact"] .creator-choice-grid { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+  [data-density="compact"] .creator-choice-grid { grid-template-columns: repeat(4, minmax(0, 1fr)); }
 }
 @media (max-width: 760px) {
-  .levelup-block[data-density="compact"] .creator-choice-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+  [data-density="compact"] .creator-choice-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
 }
 
-.levelup-block[data-density="chip"] .creator-choice-grid {
+[data-density="chip"] .creator-choice-grid {
   grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
   gap: 0.5rem;
 }
-.levelup-block[data-density="chip"] .creator-choice-card {
+[data-density="chip"] .creator-choice-card {
   flex-direction: row;
   justify-content: flex-start;
   min-height: 0;
   padding: 0.55rem 0.8rem;
   gap: 0.55rem;
 }
-.levelup-block[data-density="chip"] .creator-choice-card-name { font-size: 0.9rem; text-align: left; }
+[data-density="chip"] .creator-choice-card-name { font-size: 0.9rem; text-align: left; }
 
 /* The "Current"/"Known" badge is a corner overlay tuned for the tall card's empty top padding.
    In the short horizontal chip layouts there is no free corner, so it lands on top of the icon
    and name. Float it inline at the end of the row instead, so it sits beside the text, not over it. */
-.levelup-block[data-density="compact"] .creator-choice-card-badge,
-.levelup-block[data-density="chip"] .creator-choice-card-badge {
+[data-density="compact"] .creator-choice-card-badge,
+[data-density="chip"] .creator-choice-card-badge {
   position: static;
   order: 3;
   margin-left: auto;
   flex: 0 0 auto;
   align-self: center;
 }
-.levelup-block[data-density="compact"] .creator-choice-card-name,
-.levelup-block[data-density="chip"] .creator-choice-card-name {
+[data-density="compact"] .creator-choice-card-name,
+[data-density="chip"] .creator-choice-card-name {
   flex: 1 1 auto;
   min-width: 0;
   /* With the badge sharing the row, a long name (e.g. "Two-Weapon Fighting") would wrap to three
@@ -4067,10 +4116,10 @@ body:has(.sogrom-creator-fullscreen) .application.compendium-browser {
   overflow: hidden;
 }
 /* Trim the inline badge so the name keeps as much of the narrow chip's width as possible. */
-.levelup-block[data-density="compact"] .creator-choice-card-badge { font-size: 0.55rem; padding: 0.06rem 0.32rem; }
+[data-density="compact"] .creator-choice-card-badge { font-size: 0.55rem; padding: 0.06rem 0.32rem; }
 /* When such a card is also ticked, keep the inline badge clear of the corner check overlay. */
-.levelup-block[data-density="compact"] .creator-choice-card.is-selected .creator-choice-card-badge,
-.levelup-block[data-density="chip"] .creator-choice-card.is-selected .creator-choice-card-badge { margin-right: 1rem; }
+[data-density="compact"] .creator-choice-card.is-selected .creator-choice-card-badge,
+[data-density="chip"] .creator-choice-card.is-selected .creator-choice-card-badge { margin-right: 1rem; }
 
 /* Guided flow: when the player finishes a decision, the next incomplete block (or, if the level is
    done, the enabled Next button) gets a brief ring pulse to draw the eye onward — nothing collapses

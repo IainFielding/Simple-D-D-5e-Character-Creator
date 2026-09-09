@@ -1,7 +1,7 @@
 import { ABILITIES, formatMod, t, log, storeConfig } from "../../config.mjs";
 import { advancementTitle } from "../../data/advancement-util.mjs";
-import { summarizeOption } from "../../data/equipment-source.mjs";
-import { cartTotalCp, formatCp } from "../../data/store-source.mjs";
+import { summarizeEquipment } from "../../data/equipment-source.mjs";
+import { cartSummary } from "../../data/store-source.mjs";
 import { pdfExportContext } from "../../build/pdf-export.mjs";
 
 /**
@@ -156,15 +156,7 @@ function scaleRows(clone, actor, cloneClass) {
 async function reviewEquipment(state, source, equipment) {
   if ( !state.emberCreation || !equipment ) return {};
   try {
-    const loaded = await equipment.load(state, source);
-    const out = {};
-    for ( const key of ["class", "background"] ) {
-      if ( !loaded[key] || !state.equipment[key] ) continue;
-      const { items, gold } = summarizeOption(loaded[key], state.equipment[key]);
-      if ( !items.length && !gold ) continue;
-      out[key] = { items, gold, hasAny: true };
-    }
-    return out;
+    return summarizeEquipment(await equipment.load(state, source), state.equipment);
   } catch ( err ) {
     log("review equipment summary failed", err);
     return {};
@@ -179,13 +171,7 @@ async function reviewEquipment(state, source, equipment) {
  */
 function reviewPurchases(state) {
   if ( !state.emberCreation || !storeConfig().enabled ) return null;
-  const purchases = state.store?.purchases ?? {};
-  const items = Object.entries(purchases)
-    .filter(([, p]) => (Number(p?.qty) || 0) > 0)
-    .map(([uuid, p]) => ({ uuid, name: p.name, img: p.img, count: p.qty > 1 ? p.qty : null }))
-    .sort((a, b) => a.name.localeCompare(b.name, game.i18n.lang));
-  if ( !items.length ) return null;
-  return { items, total: formatCp(cartTotalCp(purchases)) };
+  return cartSummary(state.store?.purchases);
 }
 
 /* -------------------------------------------- */

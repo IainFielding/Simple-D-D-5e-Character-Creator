@@ -1,10 +1,11 @@
 import { t } from "../../config.mjs";
-import { cantripsKnownAtLevel, buildSpellFromEntry, spellFilterOptions, spellListNotice, spellMethodFor }
-  from "../../data/spell-source.mjs";
+import { cantripsKnownAtLevel, buildSpellFromEntry, spellFilterOptions, spellListNotice, spellMethodFor,
+  spellAlternatives } from "../../data/spell-source.mjs";
 import { ownedSpellKeys, spellKey } from "../../data/spell-identity.mjs";
 import { planSpellReconciliation } from "../../build/spell-reconcile.mjs";
 import { swapAllowance } from "../../data/spell-swap.mjs";
 import { pinContext } from "../../app/compare.mjs";
+import { advancementArray } from "../../data/advancement-util.mjs";
 
 /**
  * @typedef {object} SpellPlan
@@ -181,6 +182,16 @@ export const lvlSpellsStep = {
     }
     if ( action === "pick-spell" ) return pickSpell(el, ctx);
     if ( action === "swap-spell" ) return toggleSwap(el, ctx);
+    // Substituting a feat-granted spell the character already knows. The empty value is "keep the
+    // spell the feat names", so clearing the control undoes the substitution rather than leaving
+    // the grant with nothing.
+    if ( action === "feat-spell-swap" ) {
+      const key = el.dataset.key;
+      if ( !key ) return;
+      if ( el.value ) state.featSpellSwaps[key] = el.value;
+      else delete state.featSpellSwaps[key];
+      return;
+    }
     // The player naming the list this caster draws from, when nothing could work it out for them,
     // and taking it back again. Either way the pool changes, so picks staged against the old one go.
     if ( (action === "choose-spell-list") || (action === "clear-spell-list") ) {
@@ -194,8 +205,18 @@ export const lvlSpellsStep = {
   },
 
   async context({ state, spells, app }) {
+    // Feat grants render on this page whether or not the character can cast anything of their own —
+    // Cold Caster exists so a Fighter can learn a cantrip, and that Fighter has no other spell
+    // capacity to bring them here. Resolved before the caster check for exactly that reason.
+    const featGrants = await featGrantContext(state);
     const plan = state.spellPlan();
-    if ( !plan.isSpellcaster ) return { isSpellcaster: false, hint: t("levelup.step.spells.noneNeeded") };
+    if ( !plan.isSpellcaster ) {
+      return {
+        isSpellcaster: false, featGrants,
+        // Only "nothing to learn" when the feats brought nothing either.
+        hint: featGrants.length ? null : t("levelup.step.spells.noneNeeded")
+      };
+    }
 
     const pool = await spells.forClassAtLevel(plan.castUuid, plan.maxSpellLevel, plan.listType,
       { doc: plan.castItem, listOverride: state.spellListOverride });
@@ -394,6 +415,120 @@ function ownedSpells(actor, sourceTag, isCantrips) {
 }
 
 /**
+ * The feat-granted spells as the spell page shows them: always ticked, and — for a grant whose feat
+ * allows it, to a character who already knows the spell — offering the substitute the rules give.
+ *
+ * Ticked rather than tickable because the feat is already taken; the decision the player made was
+ * "take Cold Caster", and asking them to confirm the cantrip it says they learn is a second question
+ * the rules never pose. The one real decision is the substitution, and it appears only where the
+ * feat's text puts it.
+ * @param {import("../levelup-state.mjs").LevelUpState} state
+ * @returns {Promise<object[]>}
+ */
+async function featGrantContext(state) {
+  const grants = state.featSpells ?? [];
+  return Promise.all(grants.map(async g => {
+    const swappable = g.replaceable && g.alreadyKnown;
+    const chosenUuid = state.featSpellSwaps?.[g.key] ?? "";
+    const alternatives = swappable ? await spellAlternatives(g.uuid, g.level) : [];
+    const chosen = alternatives.find(a => a.uuid === chosenUuid) ?? null;
+    return {
+      key: g.key,
+      featName: g.featName,
+      featImg: g.featImg,
+      // What the character ends up with: the granted spell, or the substitute they chose instead.
+      name: chosen?.name ?? g.name,
+      img: chosen?.img ?? g.img,
+      uuid: chosen?.uuid ?? g.uuid,
+      levelLabel: g.level === 0 ? t("levelup.step.spells.cantripTag") : t("levelup.step.spells.levelTag", { level: g.level }),
+      swappable,
+      // Named so the player can see what they are replacing, not just that they replaced something.
+      replacedName: chosen ? g.name : "",
+      alternatives: alternatives.map(a => ({ ...a, selected: a.uuid === chosenUuid })),
+      alreadyKnown: g.alreadyKnown
+    };
+  }));
+}
+
+/**
+ * The spells a feat taken this level-up hands out — Cold Caster's Ray of Frost, Enclave Magic's
+ * Thorn Whip — read off the feat's own `ItemGrant` advancements.
+ *
+ * **Why these need the spell page at all.** dnd5e treats them as items granted by an advancement,
+ * so nothing showed the player a spell they had just gained, and for the ones the pack marks
+ * `optional` nothing granted them either: the system's rule is that an optional item is *not*
+ * applied by default (see `#ingestFlow`'s ItemGrant branch), so Cold Caster arrived as an unticked
+ * box in a features list. Both feats and spells, and the player's own spell list, live here.
+ *
+ * **`optional` is the replacement flag, and it is exact.** Cold Caster reads "You learn the Ray of
+ * Frost cantrip. *If you already know it, you learn a different Wizard cantrip of your choice*" —
+ * and its granted item is the only one of the five spell-granting feats in the reference content
+ * marked `optional`; the four without the clause are all unmarked. So the pack's flag says
+ * precisely what the prose says, and no description has to be parsed to know it.
+ *
+ * Pure apart from the uuid lookups, so the shape can be tested without a manager.
+ * @param {import("../levelup-state.mjs").LevelUpState} state
+ * @returns {Promise<{key: string, featId: string, featName: string, featImg: string, advId: string,
+ *   uuid: string, name: string, img: string, level: number, replaceable: boolean,
+ *   alreadyKnown: boolean, spell: object}[]>}
+ */
+export async function featSpellGrants(state) {
+  const driver = state.driver;
+  if ( !driver?.clone ) return [];
+  // Every spell the character already holds, minus the ones these grants themselves put there —
+  // a grant must not report its own spell as one the character "already knew".
+  const grantedIds = new Set();
+  const raw = [];
+
+  for ( const record of state.asiSteps ?? [] ) {
+    const st = driver.asiState(record);
+    if ( (st?.type !== "feat") || !st.feat ) continue;
+    const featItem = driver.clone.items.get(st.feat.id);
+    if ( !featItem ) continue;
+
+    for ( const adv of advancementArray(featItem) ) {
+      if ( (adv.type !== "ItemGrant") || !adv.configuration?.spell ) continue;
+      for ( const id of Object.keys(adv.value?.added ?? {}) ) grantedIds.add(id);
+      for ( const entry of Array.from(adv.configuration.items ?? []) ) {
+        const uuid = (typeof entry === "string") ? entry : entry?.uuid;
+        if ( !uuid ) continue;
+        raw.push({
+          key: `${st.feat.id}:${uuid}`,
+          featId: st.feat.id, featName: st.feat.name, featImg: st.feat.img,
+          // Tags the substitute back to its feat, exactly as the creation flow tags a Magic
+          // Initiate pick — `feat:<identifier>`.
+          featIdentifier: featItem.system?.identifier ?? "",
+          advId: adv._id ?? adv.id,
+          uuid,
+          // The pack's own per-item flag — see the note above. `configuration.optional` is a
+          // different thing (the whole advancement may be skipped) and is not it.
+          replaceable: (typeof entry === "object") && !!entry.optional,
+          spell: adv.configuration.spell
+        });
+      }
+    }
+  }
+  if ( !raw.length ) return [];
+
+  const owned = ownedSpellKeys({ items: [...driver.clone.items].filter(i => !grantedIds.has(i.id)) });
+  const docs = await Promise.all(raw.map(g => fromUuid(g.uuid).catch(() => null)));
+  return raw.map((g, i) => {
+    const doc = docs[i];
+    const level = Number(doc?.system?.level ?? 0);
+    return {
+      ...g,
+      name: doc?.name ?? g.uuid,
+      img: doc?.img ?? "icons/svg/book.svg",
+      level,
+      // The rules make the substitution conditional — "*If you already know it*" — so the control
+      // only exists for a character who does. A feat that grants a spell they don't have is not
+      // offering a choice, and rendering one would invent a rule.
+      alreadyKnown: !!doc && owned.has(spellKey(doc))
+    };
+  });
+}
+
+/**
  * Resolve the staged spell step into concrete actor changes: the spells to create and the ids of
  * swapped-out spells to delete. A swap only deletes when its freed slot was actually used (the
  * bucket holds more picks than the base add budget), so marking without picking a replacement is a
@@ -408,6 +543,46 @@ export function spellChanges(state) {
   if ( state.swapCantrip && state.selectedCantrips.length > plan.addCantrips ) deleteIds.push(state.swapCantrip.id);
   if ( state.swapSpell && state.selectedSpells.length > plan.addSpells ) deleteIds.push(state.swapSpell.id);
   return { sourceTag: plan.sourceTag, method: plan.method ?? "spell", create, deleteIds };
+}
+
+/**
+ * Item data for the substitutes chosen in place of feat-granted spells.
+ *
+ * Separate from {@link spellChanges} rather than folded into its `create` list, for two reasons that
+ * both matter. These spells belong to the **feat**, not to the levelling class, so they carry a
+ * `feat:<identifier>` source tag and the grant's own casting configuration — the same tagging the
+ * creation flow applies to a Magic Initiate pick. And the caster path is gated on the class having a
+ * `sourceTag` at all: a Fighter who took Cold Caster has none, and routing these through that gate
+ * would silently drop the very case this feature exists for.
+ *
+ * The originals are not created here. Those are granted on the clone by the advancement itself
+ * ({@link module:levelup/manager-driver.LevelUpDriver#syncFeatSpellGrants}), which is what carries
+ * them through Apply; creating them again would be the duplicate `spell-reconcile` exists to undo.
+ * @param {import("../levelup-state.mjs").LevelUpState} state
+ * @returns {Promise<object[]>}
+ */
+export async function featSubstituteData(state) {
+  const swaps = state.featSpellSwaps ?? {};
+  const grants = (state.featSpells ?? []).filter(g => swaps[g.key]);
+  const data = [];
+  for ( const grant of grants ) {
+    const doc = await fromUuid(swaps[grant.key]).catch(() => null);
+    if ( !doc ) continue;
+    const obj = doc.toObject();
+    if ( obj._stats ) obj._stats.compendiumSource = swaps[grant.key];
+    const cfg = grant.spell ?? {};
+    // Mirror what the ItemGrant would have applied to the spell it replaces: the same preparation
+    // mode (2 = always prepared, which is what these feats grant), the same casting method, and the
+    // same ability. The ability list can offer several — Cold Caster's "the ability increased by
+    // this feat" — and the first allowed is the default the native grant flow also lands on.
+    foundry.utils.setProperty(obj, "system.prepared", Number(cfg.prepared ?? 1));
+    foundry.utils.setProperty(obj, "system.method", cfg.method || "spell");
+    const ability = Array.from(cfg.ability ?? [])[0];
+    if ( ability ) foundry.utils.setProperty(obj, "system.ability", ability);
+    foundry.utils.setProperty(obj, "system.sourceItem", `feat:${grant.featIdentifier || grant.featId}`);
+    data.push(obj);
+  }
+  return data;
 }
 
 /** Sort spells by level then name — the leveled tab and tally read top-down through the levels. */

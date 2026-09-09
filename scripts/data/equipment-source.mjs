@@ -275,6 +275,29 @@ export function summarizeOption(data, eqState) {
   return { items, gold };
 }
 
+/**
+ * Every origin's selected equipment, summarised for a review screen and keyed by the origin that
+ * granted it. A source with nothing to show is omitted, so the map can be rendered as-is.
+ *
+ * The selection is read back from the wizard's own state rather than off the character, because
+ * starting gear is not an advancement: nothing has been written to the actor at the point either
+ * review runs. A source the player never reached carries no selection, and is skipped —
+ * {@link summarizeOption} indexes into its argument and would throw on one.
+ * @param {Record<string, object>} loaded      The loaded equipment trees, by origin key.
+ * @param {Record<string, object>} selection   The player's picks (`state.equipment`).
+ * @returns {Record<string, {items: object[], gold: string, hasAny: boolean}>}
+ */
+export function summarizeEquipment(loaded, selection) {
+  const out = {};
+  for ( const key of ["class", "background"] ) {
+    if ( !loaded?.[key] || !selection?.[key] ) continue;
+    const { items, gold } = summarizeOption(loaded[key], selection[key]);
+    if ( !items.length && !gold ) continue;
+    out[key] = { items, gold, hasAny: true };
+  }
+  return out;
+}
+
 /** Flatten an equipment tree into display rows (items, currency, and inline OR selectors). */
 function flattenTree(node, orSelections = {}) {
   if ( !node ) return [];

@@ -1,6 +1,6 @@
 import { emberActive, log, storeConfig } from "../config.mjs";
 import { collectEquipment } from "../data/equipment-source.mjs";
-import { equipmentBudgetCp, cartTotalCp, remainingCurrency, purchasedItems } from "../data/store-source.mjs";
+import { equipmentBudgetCp, applyCartToCurrency, cartTotalCp, purchasedItems } from "../data/store-source.mjs";
 import { equipmentStep } from "../steps/equipment-step.mjs";
 import { storeStep } from "../steps/store-step.mjs";
 import { spellChanges, buildSpellItemData } from "./steps/lvl-spells-step.mjs";
@@ -169,15 +169,9 @@ export async function stageEmberGear(state, { equipment, source }) {
   items.push(...gear);
 
   // Anything bought on the Store step rides along, with its total deducted from the coin the
-  // equipment choice yielded — the same arithmetic the creation grant does. The step's gate keeps
-  // the cart inside the budget, so an overspend here means stale state: drop it rather than write
-  // negative gold.
-  let cartCp = storeConfig().enabled ? cartTotalCp(state.store?.purchases) : 0;
-  const { spendable, remainder } = remainingCurrency(currency, cartCp);
-  if ( cartCp > 0 && !spendable ) {
-    log("store cart exceeds the starting currency; purchases skipped");
-    cartCp = 0;
-  }
+  // equipment choice yielded — literally the arithmetic the creation grant does, shared so the two
+  // hand-offs can never disagree about what a cart costs.
+  const { cartCp, currency: granted } = applyCartToCurrency(state.store?.purchases, currency);
   if ( cartCp > 0 ) items.push(...await purchasedItems(state.store.purchases));
 
   // Spell picks staged on the spell step. A swap-out can't arise at creation (there is nothing
@@ -190,7 +184,7 @@ export async function stageEmberGear(state, { equipment, source }) {
   // Coin from a "gold instead of gear" option (less anything spent in the shop), added to whatever
   // the build already carries.
   const updates = {};
-  for ( const [denomination, amount] of Object.entries(cartCp > 0 ? remainder : currency) ) {
+  for ( const [denomination, amount] of Object.entries(granted) ) {
     if ( !amount ) continue;
     const held = clone.system?.currency?.[denomination] ?? 0;
     updates[`system.currency.${denomination}`] = held + amount;

@@ -12,7 +12,6 @@
       "reset": "Reset",
       "on": "On",
       "off": "Off",
-      "selectHint": "Choose an option from the list to see its full description.",
       "noResults": "No matches for “{query}”.",
       "noResultsFilters": "No matches — try adjusting the filters.",
       "close": "Close",
@@ -229,7 +228,12 @@
           "hideLater": "Hide feats you'll unlock later",
           "comingLater": "Coming Later",
           "lockedLevel": "Unlocks at level {level}",
-          "lockedPrereq": "Requires a feature you don't have yet"
+          "lockedPrereq": "Requires a feature you don't have yet",
+          "searchFeats": "Search feats",
+          "filterAnyAbility": "All feats",
+          "filterIncreases": "Increases {ability}",
+          "filterAbilityAria": "Filter by increased ability",
+          "noMatches": "No feats match your search."
         },
         "subclass": {
           "label": "Subclass",
@@ -317,7 +321,13 @@
           "listChoose": "Draw spells from",
           "listChooseAria": "Choose which class spell list this caster draws from",
           "listNone": "Choose a spell list…",
-          "listNoneAvailable": "This world has no class spell lists enabled at all. Ask your GM to enable a compendium that provides them."
+          "listNoneAvailable": "This world has no class spell lists enabled at all. Ask your GM to enable a compendium that provides them.",
+          "fromFeats": "From your feats",
+          "grantedTip": "Granted by a feat you took this level",
+          "alreadyKnown": "You already know this — you may learn a different one instead",
+          "keepGranted": "Keep the granted spell",
+          "replacing": "instead of {name}",
+          "cantripTag": "Cantrip"
         }
       }
     },

@@ -21,8 +21,6 @@ import { sourcePageFor } from "../data/journal-source.mjs";
  *
  * Any failure degrades rather than breaks: it falls back to the item's own enriched description,
  * which is what the detail pane already shows.
- *
- * This approach was taken from **Character Builder (DnD 5e)** by Raphael Andrade (MIT).
  */
 
 /**

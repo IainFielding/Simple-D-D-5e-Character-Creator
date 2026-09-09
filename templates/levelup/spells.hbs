@@ -6,6 +6,7 @@
   {{#if isSpellcaster}}
   <!-- Main column: intro, tabs, filters, and the spell list for the active tab -->
   <div class="creator-pick-side">
+    {{> "modules/sogrom-dnd5e-character-creator/templates/parts/feat-spell-grants.hbs" this}}
     <p class="levelup-spells-intro">{{intro}}</p>
     {{#if swapHint}}<p class="levelup-spells-swaphint"><i class="fa-solid fa-arrow-right-arrow-left"></i> {{swapHint}}</p>{{/if}}
     {{#if releasedHint}}<p class="levelup-spells-releasedhint"><i class="fa-solid fa-wand-sparkles"></i> {{releasedHint}}</p>{{/if}}
@@ -148,6 +149,12 @@
       <span class="creator-spell-selected-empty">{{localize "sogrom-dnd5e-character-creator.levelup.step.spells.selectedNone"}}</span>
       {{/if}}
     </div>
+  </div>
+
+  {{else if featGrants.length}}
+  {{!-- A non-caster who took a spell-granting feat: the grant is the whole page. --}}
+  <div class="creator-pick-side">
+    {{> "modules/sogrom-dnd5e-character-creator/templates/parts/feat-spell-grants.hbs" this}}
   </div>
 
   {{else}}

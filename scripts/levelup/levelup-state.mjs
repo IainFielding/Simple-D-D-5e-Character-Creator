@@ -168,6 +168,18 @@ export class LevelUpState {
   focusedSpellUuid = null;
 
   /**
+   * The ASI feat picker's client-side filters: a name search, and "shows feats that increase <X>",
+   * which is the question a player opening this screen is usually actually asking — the picker
+   * offers every feat in the world, and half of them raise an ability.
+   *
+   * Here rather than in the DOM for the same reason as the spell filters below: peeking at the
+   * "coming later" list re-renders the block and would otherwise wipe the search that was narrowing
+   * it. One field per control in `FEAT_FILTER_CONTROLS`.
+   */
+  featSearch = "";
+  featAbilityFilter = "";
+
+  /**
    * The spell list's client-side filters. They filter the DOM directly, but every spell click
    * re-renders the stage and rebuilds the controls — so the values live here and the shell restores
    * them after each render rather than letting them reset. Cleared only with the window.
@@ -363,12 +375,35 @@ export class LevelUpState {
 
   /**
    * Whether a spell step should appear (between the level screens and the review): the leveled
-   * class is a caster and this level-up opened new cantrip or prepared-spell capacity.
+   * class is a caster and this level-up opened new cantrip or prepared-spell capacity — **or** a
+   * feat taken this level-up hands out a spell of its own.
+   *
+   * The second clause is deliberately not gated on being a caster, and that is the whole point of
+   * it: Cold Caster and its kin exist so a Fighter can learn a cantrip, so the character who most
+   * needs to be shown the spell they just gained is exactly the one with no spellcasting capacity
+   * to trigger the first clause. Synchronous because the rail asks this on every render, so it
+   * reads the flag {@link featSpellsResolved} caches rather than re-walking the feats.
    * @returns {boolean}
    */
   hasSpellStep() {
-    return this.spellPlan().hasDelta;
+    return this.spellPlan().hasDelta || this.featSpells.length > 0;
   }
+
+  /**
+   * The feat-granted spells resolved for this level-up, or `[]` before the spell step has resolved
+   * them. Written by the step's own context pass ({@link module:levelup/steps/lvl-spells-step}),
+   * because resolving them needs `fromUuid` and the rail's gate above must stay synchronous.
+   * @type {object[]}
+   */
+  featSpells = [];
+
+  /**
+   * Replacement picks for feat-granted spells the character already knew, keyed by grant.
+   * `{ "<featItemId>:<spellUuid>": "<replacement spell uuid>" }`. Session state — the level-up
+   * either commits or is discarded whole.
+   * @type {Record<string, string>}
+   */
+  featSpellSwaps = {};
 
   /** The hit-point decisions surfaced for this level-up (one per gained level). */
   get hpSteps() {

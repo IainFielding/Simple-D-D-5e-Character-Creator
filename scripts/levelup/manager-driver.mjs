@@ -771,7 +771,7 @@ export class LevelUpDriver {
     const synth = await this.#ingestItemFeatures(item, targetLevel);
     // A pick's sub-decisions usually come off level-0 flows — surface them on the pick's screen.
     const screen = record.screenLevel ?? record.level;
-    for ( const r of [...synth.choices, ...synth.asi, ...synth.traits, ...synth.grants] ) {
+    for ( const r of LevelUpDriver.#synthRecords(synth) ) {
       r.screenLevel = Math.max(r.screenLevel ?? r.level, screen);
     }
     (record.pickSynth ??= {})[uuid] = synth;
@@ -1257,9 +1257,7 @@ export class LevelUpDriver {
         record.featSynth = await this.#ingestItemFeatures(featItem, 0);
         // The feat's own advancements come off level-0 flows; surface any choices they reveal on the
         // same screen as the granting ASI rather than a phantom "level 0" screen.
-        for ( const r of [...record.featSynth.choices, ...record.featSynth.asi, ...record.featSynth.traits, ...record.featSynth.grants] ) {
-          r.screenLevel = record.level;
-        }
+        for ( const r of LevelUpDriver.#synthRecords(record.featSynth) ) r.screenLevel = record.level;
       }
       this.clone.reset();
       return true;
@@ -1280,13 +1278,14 @@ export class LevelUpDriver {
    * @param {Item5e} item
    * @param {number} maxLevel
    * @returns {Promise<{flows: object[], choices: object[], asi: object[], traits: object[],
-   *                    grants: object[]}>}
+   *                    grants: object[], optionalGrants: object[]}>}
    */
   async #ingestItemFeatures(item, maxLevel) {
     const beforeChoices = this.choiceSteps.length;
     const beforeAsi = this.asiSteps.length;
     const beforeTraits = this.traitSteps.length;
     const beforeGrants = this.grantSteps.length;
+    const beforeOptional = this.optionalGrantSteps.length;
     const flows = [];
     await this.#ingestItemTree(item, maxLevel, flows, new Set([item.id]));
     // A feature synthesised after the main walk — a subclass's, or a chosen feat's — can carry an
@@ -1298,8 +1297,32 @@ export class LevelUpDriver {
       choices: this.choiceSteps.slice(beforeChoices),
       asi: this.asiSteps.slice(beforeAsi),
       traits: this.traitSteps.slice(beforeTraits),
-      grants: this.grantSteps.slice(beforeGrants)
+      grants: this.grantSteps.slice(beforeGrants),
+      // Declinable grants count too, and leaving them out was a real fault rather than an omission
+      // of tidiness: a feat's advancements all come off level-0 flows, so an optional one that was
+      // never re-pointed at the granting decision's screen put a phantom **"Level 0"** screen in the
+      // rail — `gainedLevels()` reads `optionalGrantSteps` like every other decision array. Cold
+      // Caster is the case in the wild: its granted cantrip is the one item of the five
+      // spell-granting feats that the pack marks `optional`.
+      optionalGrants: this.optionalGrantSteps.slice(beforeOptional)
     };
+  }
+
+  /**
+   * Every decision record a synth surfaced, flattened.
+   *
+   * One list, because the three callers that re-point a synth's records at the screen that revealed
+   * them must agree on what "its records" means — and when they were three hand-written spreads,
+   * they did not: all three omitted the optional grants, and each would have had to be found and
+   * fixed separately. Adding a decision array is now a line here rather than four edits.
+   * @param {object} synth   From {@link #ingestItemFeatures}.
+   * @returns {object[]}
+   */
+  static #synthRecords(synth) {
+    return [
+      ...(synth?.choices ?? []), ...(synth?.asi ?? []), ...(synth?.traits ?? []),
+      ...(synth?.grants ?? []), ...(synth?.optionalGrants ?? [])
+    ];
   }
 
   /**
@@ -1334,7 +1357,8 @@ export class LevelUpDriver {
   /**
    * Reverse what {@link #ingestItemFeatures} applied: undo each synthesised advancement and drop the
    * decisions it added. Best-effort — reversing a flow the player never touched is a no-op.
-   * @param {{flows: object[], choices: object[], asi: object[], traits: object[], grants: object[]}} synth
+   * @param {{flows: object[], choices: object[], asi: object[], traits: object[], grants: object[],
+   *   optionalGrants: object[]}} synth
    */
   async #reverseSynth(synth) {
     if ( !synth ) return;
@@ -1357,6 +1381,11 @@ export class LevelUpDriver {
     }
     if ( synth.traits?.length ) this.traitSteps = this.traitSteps.filter(tr => !synth.traits.includes(tr));
     if ( synth.grants?.length ) this.grantSteps = this.grantSteps.filter(g => !synth.grants.includes(g));
+    // Same reason as the rest: a feat swapped for another must not leave its declinable grant
+    // behind, still offering an item the character no longer has the feat for.
+    if ( synth.optionalGrants?.length ) {
+      this.optionalGrantSteps = this.optionalGrantSteps.filter(o => !synth.optionalGrants.includes(o));
+    }
     this.clone.reset();
   }
 
@@ -1422,7 +1451,7 @@ export class LevelUpDriver {
     record.featSynth = await this.#ingestItemFeatures(subclassItem, targetLevel);
     // A decision revealed at or below the subclass's own level belongs on the subclass's screen
     // (there is no earlier screen to host it); later-level ones keep their own screens.
-    for ( const r of [...record.featSynth.choices, ...record.featSynth.asi, ...record.featSynth.traits, ...record.featSynth.grants] ) {
+    for ( const r of LevelUpDriver.#synthRecords(record.featSynth) ) {
       r.screenLevel = Math.max(r.screenLevel ?? r.level, record.screenLevel);
     }
     this.clone.reset();
@@ -1686,6 +1715,46 @@ export class LevelUpDriver {
    * reverse/re-apply.
    * @param {object} record   One of {@link optionalGrantSteps}.
    */
+  /**
+   * Hold the clone in step with the spell page's feat grants: take the spell a feat hands out, or
+   * drop it when the player has substituted a different one.
+   *
+   * Two problems, one lever. A feat whose granted item the pack marks `optional` — Cold Caster —
+   * is *not* applied by dnd5e's seed, so without this the spell the feat's own text says you learn
+   * simply never arrived. And a substitution has to remove the original, which for an `ItemGrant`
+   * means a full reverse: {@link setOptionalGrant} is the only subtractive path there is.
+   *
+   * Doing it against the clone rather than at Finish is what makes the rest of the wizard tell the
+   * truth — Review lists the spell, the reconciliation pass sees it, and the capacity arithmetic
+   * counts it — because all of those read the clone.
+   *
+   * Guarded on the current selection, so a render that changes nothing writes nothing: this is
+   * called on every render and `setOptionalGrant` reverses and re-applies the advancement.
+   * @param {{key: string, advId: string, uuid: string}[]} grants   From `featSpellGrants`.
+   * @param {Record<string, string>} swaps   Substitutions, keyed as the grants are.
+   * @returns {Promise<boolean>}  Whether anything was written.
+   */
+  async syncFeatSpellGrants(grants, swaps = {}) {
+    let changed = false;
+    for ( const record of this.optionalGrantSteps ) {
+      const advId = record.advancement?._id ?? record.advancement?.id;
+      const mine = grants.filter(g => g.advId === advId);
+      if ( !mine.length ) continue;
+      const st = this.optionalGrantState(record);
+      // A substituted grant contributes nothing here; its replacement is created with the spell
+      // picks at Finish, tagged to the feat.
+      const wanted = new Set(mine.filter(g => !swaps[g.key]).map(g => withItemSegment(g.uuid)));
+      // Items on the same advancement that this pass knows nothing about keep whatever they had.
+      const known = new Set(mine.map(g => withItemSegment(g.uuid)));
+      for ( const opt of st.options ) if ( !known.has(opt.uuid) && opt.selected ) wanted.add(opt.uuid);
+      const current = new Set(st.options.filter(o => o.selected).map(o => o.uuid));
+      if ( (current.size === wanted.size) && [...wanted].every(u => current.has(u)) ) continue;
+      await this.setOptionalGrant(record, [...wanted]);
+      changed = true;
+    }
+    return changed;
+  }
+
   optionalGrantState(record) {
     const adv = record.advancement;
     // Both sides normalised. This content stores its uuids in the pre-v10 shape while `value.added`
