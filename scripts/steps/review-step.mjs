@@ -1,10 +1,10 @@
 import { ABILITIES, formatMod, storeConfig, t } from "../config.mjs";
-import { cartTotalCp, formatCp } from "../data/store-source.mjs";
+import { cartSummary } from "../data/store-source.mjs";
 import { DETAIL_FIELDS, DETAIL_TEXT_FIELDS } from "./details-step.mjs";
 import { advancementArray, advancementTitle} from "../data/advancement-util.mjs";
 import { resolveChoices, traitChoiceTitle, traitKeyLabel } from "../data/choice-resolver.mjs";
 import { resolveFeatSpells, grantedSpellCards } from "./feat-spells-step.mjs";
-import { summarizeOption } from "../data/equipment-source.mjs";
+import { summarizeEquipment } from "../data/equipment-source.mjs";
 import { pdfExportContext } from "../build/pdf-export.mjs";
 
 /*
@@ -112,15 +112,7 @@ async function originGrantedSpells(doc, sel) {
  */
 async function reviewEquipment(state, source, equipment) {
   if ( !equipment ) return {};
-  const loaded = await equipment.load(state, source);
-  const out = {};
-  for ( const key of ["class", "background"] ) {
-    if ( !loaded[key] ) continue;
-    const { items, gold } = summarizeOption(loaded[key], state.equipment[key]);
-    if ( !items.length && !gold ) continue;
-    out[key] = { items, gold, hasAny: true };
-  }
-  return out;
+  return summarizeEquipment(await equipment.load(state, source), state.equipment);
 }
 
 /**
@@ -130,13 +122,7 @@ async function reviewEquipment(state, source, equipment) {
  */
 function reviewPurchases(state) {
   if ( !storeConfig().enabled ) return null;
-  const purchases = state.store?.purchases ?? {};
-  const items = Object.entries(purchases)
-    .filter(([, p]) => (Number(p?.qty) || 0) > 0)
-    .map(([uuid, p]) => ({ uuid, name: p.name, img: p.img, count: p.qty > 1 ? p.qty : null }))
-    .sort((a, b) => a.name.localeCompare(b.name, game.i18n.lang));
-  if ( !items.length ) return null;
-  return { items, total: formatCp(cartTotalCp(purchases)) };
+  return cartSummary(state.store?.purchases);
 }
 
 /* -------------------------------------------- */

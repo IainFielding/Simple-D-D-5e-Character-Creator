@@ -422,3 +422,88 @@ describe("resolveSubclass — multi-level jump", () => {
     expect(screens).toContainEqual(["Level 5 Pick", 5]);
   });
 });
+
+/* -------------------------------------------- */
+/*  Feat with a declinable grant (Cold Caster)  */
+/* -------------------------------------------- */
+
+/**
+ * A feat whose granted item the pack marks `optional` — Cold Caster, whose Ray of Frost is the one
+ * item of the five spell-granting feats flagged that way, because its text lets a character who
+ * already knows the cantrip learn a different one.
+ */
+function optionalGrantFlow(item, level = 0) {
+  const uuid = "Compendium.phb.spells.Item.rayOfFrost";
+  const advancement = {
+    _id: "advColdCasterGrant",
+    type: "ItemGrant",
+    item,
+    configuration: {
+      items: [{ uuid, optional: true }],
+      spell: { ability: ["int", "wis", "cha"], method: "spell", prepared: 2 }
+    },
+    value: { added: {} },
+    reversed: [],
+    async apply() {},
+    async reverse(lvl) { this.reversed.push(lvl); }
+  };
+  // No automatic value: an optional item is a decision, which is what routes it to the driver's
+  // optional-grant branch rather than being applied outright.
+  return { advancement, level, getAutomaticApplicationValue: async () => false };
+}
+
+/** A world whose level-4 feature choice grants a feat carrying that declinable spell grant. */
+function makeOptionalGrantWorld() {
+  const clone = { items: makeItems([{ id: "clsFighter000000", type: "class" }]), reset: () => {} };
+  const featItem = { id: "featColdCaster00", name: "Cold Caster", hasAdvancement: true };
+  const grant = optionalGrantFlow(featItem, 0);
+  const flowsByItem = new Map([[featItem.id, [grant]]]);
+
+  const driver = new LevelUpDriver(makeManager({ steps: [classStep(4)], clone, flowsByItem }));
+  const uuid = "Compendium.hof.options.Item.coldCaster";
+  const choiceAdv = {
+    type: "ItemChoice",
+    configuration: { choices: { 4: { count: 1, replacement: false } }, pool: [{ uuid }] },
+    value: { added: {}, replaced: {} },
+    getCounts(level) {
+      const current = Object.keys(this.value.added[level] ?? {}).length;
+      return { current, max: this.configuration.choices[level]?.count ?? 0, full: current >= 1 };
+    },
+    async apply(level, { selected }) {
+      for ( const u of selected ) {
+        if ( u !== uuid ) continue;
+        clone.items.set(featItem);
+        (this.value.added[level] ??= {})[featItem.id] = u;
+      }
+    },
+    async reverse() {}
+  };
+  const record = { level: 4, screenLevel: 4, advancement: choiceAdv, item: null };
+  driver.choiceSteps.push(record);
+  return { driver, record, uuid, grant };
+}
+
+describe("a feat whose grant the player may decline", () => {
+  it("puts the decision on the granting screen, not on a phantom level-0 one", async () => {
+    // The bug this pins: a feat's advancements all come off level-0 flows, and the synth's
+    // re-pointing pass covered choices, ASIs, traits and grants but not *optional* grants. The
+    // record kept `screenLevel: 0`, and `gainedLevels()` reads that array like any other — so a
+    // Fighter taking Cold Caster grew a "Level 0" screen in the rail.
+    const w = makeOptionalGrantWorld();
+    await w.driver.toggleChoice(w.record, w.uuid);
+
+    expect(w.driver.optionalGrantSteps).toHaveLength(1);
+    expect(w.driver.optionalGrantSteps[0].screenLevel).toBe(4);
+  });
+
+  it("tracks the decision on the synth, so undoing the pick takes it away too", async () => {
+    // Left untracked it also leaked: swapping the feat for another kept offering the old feat's
+    // spell, on a screen for a feat the character no longer had.
+    const w = makeOptionalGrantWorld();
+    await w.driver.toggleChoice(w.record, w.uuid);
+    expect(w.record.pickSynth[w.uuid].optionalGrants).toHaveLength(1);
+
+    await w.driver.toggleChoice(w.record, w.uuid);
+    expect(w.driver.optionalGrantSteps).toHaveLength(0);
+  });
+});

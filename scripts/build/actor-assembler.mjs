@@ -1,7 +1,7 @@
-import { ABILITIES, MODULE_ID, log, storeConfig } from "../config.mjs";
+import { ABILITIES, MODULE_ID, log } from "../config.mjs";
 import { resolveChoices } from "../data/choice-resolver.mjs";
 import { collectEquipment } from "../data/equipment-source.mjs";
-import { cartTotalCp, purchasedItems, remainingCurrency } from "../data/store-source.mjs";
+import { applyCartToCurrency, purchasedItems } from "../data/store-source.mjs";
 import { spellMethodFor } from "../data/spell-source.mjs";
 import { resolveFeatSpells } from "../steps/feat-spells-step.mjs";
 import { LevelUpDriver } from "../levelup/manager-driver.mjs";
@@ -218,20 +218,13 @@ async function grantEquipment(actor, state, source, equipment) {
 
   const { items, currency } = await collectEquipment(loaded, state);
 
-  // The cart only applies while it fits inside the currency the equipment choice yields —
-  // the step's gates enforce that, so an overspent cart here means stale state; skip it
-  // rather than write negative gold.
-  let cartCp = storeConfig().enabled ? cartTotalCp(state.store?.purchases) : 0;
-  const { spendable, remainder } = remainingCurrency(currency, cartCp);
-  if ( cartCp > 0 && !spendable ) {
-    log("store cart exceeds the starting currency; purchases skipped");
-    cartCp = 0;
-  }
+  // The cart only applies while it fits inside the currency the equipment choice yields; see
+  // {@link module:data/store-source.applyCartToCurrency} for what happens when it doesn't.
+  const { cartCp, currency: grantedCurrency } = applyCartToCurrency(state.store?.purchases, currency);
   if ( cartCp > 0 ) items.push(...await purchasedItems(state.store.purchases));
 
   if ( items.length ) await actor.createEmbeddedDocuments("Item", items, { keepId: true, render: false });
 
-  const grantedCurrency = cartCp > 0 ? remainder : currency;
   const update = {};
   for ( const [denom, amount] of Object.entries(grantedCurrency) ) {
     if ( amount > 0 ) update[`system.currency.${denom}`] = (actor.system?.currency?.[denom] ?? 0) + amount;

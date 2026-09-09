@@ -20,6 +20,23 @@ function flattenDecisions(resolved) {
 }
 
 /**
+ * How many of the checklist's decisions are made, against how many there are. Spell-type choices
+ * are excluded on both counts — they are decided on the feat-spells step, not here — and the rail
+ * summary and the blocked-Next hint both read this, so neither can drift from what is rendered.
+ * @param {object|null} resolved  The cached resolution (`state.choiceCache`).
+ * @returns {{done: number, total: number}}
+ */
+function decisionCounts(resolved) {
+  let total = 0, done = 0;
+  for ( const s of resolved?.sources ?? [] ) for ( const r of s.requirements ) {
+    if ( r.spellStep ) continue;
+    total++;
+    if ( r.complete ) done++;
+  }
+  return { done, total };
+}
+
+/**
  * The Choices step: every player decision a chosen origin defers to level ≤ 1 —
  * skill/tool/language/weapon proficiencies, Expertise, size, "choose a feature"
  * (ItemChoice), spellcasting-ability picks — laid out as one guided checklist of accordion
@@ -46,26 +63,16 @@ export const choicesStep = {
 
   /** Why Next is blocked: how many decisions are still open. */
   incompleteHint(state) {
-    const resolved = state.choiceCache;
-    if ( !resolved?.hasAny ) return null;
-    let total = 0, done = 0;
-    for ( const s of resolved.sources ) for ( const r of s.requirements ) {
-      if ( r.spellStep ) continue;
-      total++; if ( r.complete ) done++;
-    }
+    if ( !state.choiceCache?.hasAny ) return null;
+    const { done, total } = decisionCounts(state.choiceCache);
     const remain = total - done;
     return remain > 0 ? t("step.choices.hint", { count: remain }) : null;
   },
 
   /** Rail summary: "3/4 made" once there's anything to decide. */
   summary(state) {
-    const resolved = state.choiceCache;
-    if ( !resolved?.hasAny ) return "";
-    let total = 0, done = 0;
-    for ( const s of resolved.sources ) for ( const r of s.requirements ) {
-      if ( r.spellStep ) continue;             // decided on the feat-spells step, not here
-      total++; if ( r.complete ) done++;
-    }
+    if ( !state.choiceCache?.hasAny ) return "";
+    const { done, total } = decisionCounts(state.choiceCache);
     return total ? t("step.choices.progress", { done, total }) : "";
   },
 

@@ -22,9 +22,9 @@ import { isGrantedSpell, spellKey } from "../data/spell-identity.mjs";
  * **Which copy survives.** Always the granted one. It carries the richer configuration (preparation
  * state, uses, forward activity), and — decisively — the granting advancement records the item id it
  * created in its own `value.added`. Deleting the granted copy would leave that record pointing at a
- * document that no longer exists, which is why the module this approach was studied from needs a
- * whole redirect pass to clean up after itself. Deleting the *chosen* copy costs nothing: no
- * advancement, and nothing else on the actor, refers to it.
+ * document that no longer exists — recoverable only by a redirect pass over every advancement
+ * record that could name it. Deleting the *chosen* copy costs nothing: no advancement, and nothing
+ * else on the actor, refers to it.
  *
  * **Planning is separate from applying, deliberately.** {@link planSpellReconciliation} only reads,
  * so it can be run against a level-up driver's *clone* to learn what a merge would free up while the
@@ -35,11 +35,6 @@ import { isGrantedSpell, spellKey } from "../data/spell-identity.mjs";
  * **When it refuses.** A missed merge is a visible duplicate; a wrong merge destroys a spell the
  * character was entitled to. So the match must be unambiguous on every axis that could mean "these
  * are actually different entitlements" — see {@link mergeable}.
- *
- * The reconciliation approach (identity by compendium source, compatibility before merging, refusing
- * on doubt) is modelled on the always-prepared reconciliation in **Character Builder (DnD 5e)** by
- * Raphael Andrade, MIT-licensed. No code was copied; this is a much smaller re-implementation
- * against our own data shapes.
  */
 
 /**

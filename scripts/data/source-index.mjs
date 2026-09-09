@@ -62,8 +62,14 @@ export function matchesRules(cardRules, want) {
  */
 let packageTypes = null;
 
-/** The injected lookup {@link module:data/dedupe} needs; null for a package no enabled pack claims. */
-function packageTypeOf(packageId) {
+/**
+ * The injected lookup {@link module:data/dedupe} needs; null for a package no enabled pack claims.
+ *
+ * Exported because the compendium scans in {@link module:data/choice-resolver} weigh duplicates by
+ * the same policy — a feat republished by three packages must collapse to the copy whose
+ * prerequisites the pickers can trust, not to whichever pack indexed first.
+ */
+export function packageTypeOf(packageId) {
   if ( !packageTypes ) {
     packageTypes = new Map();
     for ( const pack of game.packs ?? [] ) {
@@ -531,13 +537,17 @@ function traitTags(adv) {
  * resolved origin document and flatten its configuration. Kept free of any state
  * or UI concern — just data extraction.
  *
+ * Exported because half-feats carry the same advancement: the ASI feat picker's "increases"
+ * filter reads its abilities from here, so a feat and a background are understood by one piece
+ * of code rather than two that can disagree.
+ *
  * Both shapes the origin packs use are returned. A 2024 background spends a point budget
  * (`points: 3, cap: 2`) with nothing fixed; a 2014 species usually fixes its increase outright
  * (Hill Dwarf's `+2 CON, +1 WIS`) with no budget at all, and the Half-Elf does both. Only an
  * advancement that raises nothing — no budget *and* no non-zero fixed entry — is dropped, so the
  * panel can show a fixed increase read-only rather than leaving the player to discover it on Review.
  */
-function readAsi(doc) {
+export function readAsi(doc) {
   const byType = doc.advancement?.byType?.AbilityScoreImprovement;
   let adv = byType?.length ? (byType.find(a => (a.level ?? 0) === 0) ?? byType[0]) : null;
   if ( !adv ) {

@@ -4,9 +4,10 @@ import {
 import { CreatorShellBase, shellOptions, railStageParts, dossierStageParts } from "../app/shell-base.mjs";
 import { illuminatePages } from "../app/page-illumination.mjs";
 import { buildSteps } from "./registry.mjs";
+import { featSpellGrants } from "./steps/lvl-spells-step.mjs";
 import { getSources, isStale, invalidateSources } from "../data/source-cache.mjs";
 import { forEachLimit, WARM_CONCURRENCY } from "../data/concurrency.mjs";
-import { applyLevelUpSpells, spellChanges } from "./steps/lvl-spells-step.mjs";
+import { applyLevelUpSpells, spellChanges, featSubstituteData } from "./steps/lvl-spells-step.mjs";
 import { reconcileGrantedSpells } from "../build/spell-reconcile.mjs";
 import { captureLevelUpSummary, postLevelUpSummary, postCreationSummary } from "../build/chat-summary.mjs";
 import { exportCharacterPdf } from "../build/pdf-export.mjs";
@@ -177,6 +178,16 @@ export class LevelUpShell extends CreatorShellBase {
 
   /** @override */
   async _prepareContext() {
+    // Resolve any spells the feats taken this level-up hand out, BEFORE the step set is built: a
+    // feat-granted spell is one of the things that makes a spell step appear (`hasSpellStep`), and
+    // that gate has to stay synchronous for the rail, so the async part happens once here.
+    this.state.featSpells = await featSpellGrants(this.state);
+    // Take (or, where substituted, drop) those spells on the clone, so Review, the reconciliation
+    // pass and the capacity arithmetic all read the same character the spell page is showing. A
+    // no-op unless something actually differs — see the guard in `syncFeatSpellGrants`.
+    if ( this.state.featSpells.length ) {
+      await this.state.driver?.syncFeatSpellGrants(this.state.featSpells, this.state.featSpellSwaps);
+    }
     // A level-up is a pipeline: choosing a subclass reveals its feature steps. Rebuild the step
     // set each render so the rail grows (or shrinks) with the decisions the driver has surfaced,
     // keeping the active index in range.
@@ -338,6 +349,9 @@ export class LevelUpShell extends CreatorShellBase {
     // would otherwise reset to "show everything"). Shared with the creator, which needs exactly
     // the same behaviour on exactly the same controls.
     this._wireSpellFilters(this.element);
+    // The ASI feat picker's own toolbar, on the same terms: filters in the DOM, values on the state
+    // so the re-render a "coming later" peek causes puts them back.
+    this._wireFeatFilters(this.element);
     this.#guideToNext();
   }
 
@@ -498,6 +512,20 @@ export class LevelUpShell extends CreatorShellBase {
         if ( deleteIds.length ) await actor.deleteEmbeddedDocuments("Item", deleteIds, { render: false });
       } catch ( err ) {
         log("level-up spell grant failed", err);
+        ui.notifications?.error(t("levelup.notify.spellsFailed"));
+      }
+    }
+
+    // Substitutes chosen in place of a feat-granted spell. Outside the block above deliberately:
+    // they belong to the feat, so they carry its tag and its casting configuration, and they must
+    // land even for a character with no caster `sourceTag` at all — a Fighter who took Cold Caster
+    // is precisely the case, and the guard above would have dropped them.
+    if ( !ember ) {
+      try {
+        const subs = await featSubstituteData(this.state);
+        if ( subs.length ) await actor.createEmbeddedDocuments("Item", subs, { render: false });
+      } catch ( err ) {
+        log("feat spell substitute failed", err);
         ui.notifications?.error(t("levelup.notify.spellsFailed"));
       }
     }

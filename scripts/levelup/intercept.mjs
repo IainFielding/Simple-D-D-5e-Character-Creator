@@ -20,8 +20,7 @@ import { isEmberCreationManager, foldOriginScreens } from "./ember-creation.mjs"
  *    as if the sheet's level selector was used; with them disabled world-wide (no manager is
  *    ever built) it constructs one by hand and drives it directly.
  *
- * Both paths self-gate on the `mode` setting and stand down entirely when Hero Mancer is active.
- * Call once, at `ready`.
+ * Both paths self-gate on the `mode` setting. Call once, at `ready`.
  *
  * For a junior dev: "intercept" = we hook the dnd5e level-up so our own UI runs instead of the
  * system's default wizard. The clean way in is the `preAdvancementManagerRender` hook: it fires

@@ -1,3 +1,4 @@
+import { storeConfig, log } from "../config.mjs";
 import { collectEquipment } from "./equipment-source.mjs";
 import { createItemData } from "./item-factory.mjs";
 
@@ -297,6 +298,45 @@ export function remainingCurrency(currency, cartCp) {
   const total = totalCp(currency);
   if ( cost > total ) return { spendable: false, remainder: { ...(currency ?? {}) } };
   return { spendable: true, remainder: fromCopper(total - cost) };
+}
+
+/**
+ * Apply the shop cart to the currency a starting-equipment choice yielded: what there is to
+ * spend, and the coin left afterwards. Both wizards ask this — the creation grant and the Ember
+ * hand-off — and must answer it identically, since the cart was filled against one budget.
+ *
+ * An overspent cart means stale state (the Store step's own gate keeps it inside the budget), so
+ * it is dropped rather than written as negative gold. A world with the store switched off spends
+ * nothing regardless of what an older session left in the cart.
+ * @param {Record<string, {qty: number, cp: number}>} purchases
+ * @param {Record<string, number>} currency  The currency the equipment choice yields.
+ * @returns {{cartCp: number, currency: Record<string, number>}} `cartCp` is 0 when nothing is
+ *   spent, in which case `currency` is the grant untouched.
+ */
+export function applyCartToCurrency(purchases, currency) {
+  let cartCp = storeConfig().enabled ? cartTotalCp(purchases) : 0;
+  const { spendable, remainder } = remainingCurrency(currency, cartCp);
+  if ( cartCp > 0 && !spendable ) {
+    log("store cart exceeds the starting currency; purchases skipped");
+    cartCp = 0;
+  }
+  return { cartCp, currency: cartCp > 0 ? remainder : currency };
+}
+
+/**
+ * The cart as a review panel: one row per purchased item, sorted by name and carrying its
+ * quantity, plus the total spent. Null when nothing was bought, so a caller can drop the panel
+ * rather than render an empty one. Both review screens show the same thing.
+ * @param {Record<string, {qty: number, cp: number, name: string, img: string}>} purchases
+ * @returns {{items: object[], total: string}|null}
+ */
+export function cartSummary(purchases) {
+  const items = Object.entries(purchases ?? {})
+    .filter(([, p]) => (Number(p?.qty) || 0) > 0)
+    .map(([uuid, p]) => ({ uuid, name: p.name, img: p.img, count: p.qty > 1 ? p.qty : null }))
+    .sort((a, b) => a.name.localeCompare(b.name, game.i18n.lang));
+  if ( !items.length ) return null;
+  return { items, total: formatCp(cartTotalCp(purchases)) };
 }
 
 /**

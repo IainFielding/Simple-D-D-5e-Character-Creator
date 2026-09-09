@@ -1,6 +1,7 @@
-import { t, log } from "../config.mjs";
+import { ABILITIES, t, log } from "../config.mjs";
 import { advancementArray, appliesToClass, advancementTitle} from "./advancement-util.mjs";
-import { matchesRules } from "./source-index.mjs";
+import { matchesRules, packageTypeOf, readAsi } from "./source-index.mjs";
+import { packageOf, rankPackage } from "./dedupe.mjs";
 import { getEnabledPacks, isUsableItemPack } from "./compendium-util.mjs";
 import { toolCategoryKey, toolChoices } from "./tool-source.mjs";
 import { phbWeaponIcon } from "./weapon-source.mjs";
@@ -866,6 +867,32 @@ function toolPoolCategory(entry) {
 }
 
 /**
+ * Decide which copy of a same-named feature survives, when several packages publish it.
+ *
+ * Both compendium scans below collapse results that share a name, because a feat carried by the
+ * Player's Handbook module, by the system's own packs and by a book that reprints it is one feat to
+ * the player. **Which** copy survives is not cosmetic: the copies disagree about
+ * `system.prerequisites`. In a typical install a third of the feats present in more than one pack
+ * differ on their declared level or required items — one copy gates Chef at level 4, another gates
+ * it not at all — so keeping whichever pack Foundry happened to index first decided *at random*
+ * whether a feat was gated, and whether a build that qualifies for it saw it recommended.
+ *
+ * The tie-break is {@link module:data/dedupe.rankPackage}, the policy the origin grids already use:
+ * a real book's copy beats the system's generic SRD copy, and the book's copy is the one that
+ * carries the prerequisite data. Ranks are compared strictly, so an equal-ranked duplicate leaves
+ * the copy already found in place.
+ * @param {Map<string, {uuid: string}>} byName   Accumulator keyed by lowercased name.
+ * @param {string} key                           The lowercased name.
+ * @param {string} uuid                          The candidate copy's uuid.
+ * @returns {boolean}  Whether the candidate should replace what is stored.
+ */
+function preferredCopy(byName, key, uuid) {
+  const seen = byName.get(key);
+  if ( !seen ) return true;
+  return rankPackage(packageOf(uuid), packageTypeOf) < rankPackage(packageOf(seen.uuid), packageTypeOf);
+}
+
+/**
  * Scan enabled compendiums for items matching an `allowDrops` restriction, memoised.
  * When `maxLevel` is given, items are filtered to those the character qualifies for by
  * `system.prerequisites.level` (matching the native ItemChoice flow's feature-level gate — used at
@@ -887,8 +914,7 @@ export async function findRestrictedItems(cfg, maxLevel = null, rules = null) {
   if ( restrictedCache.has(sig) ) return restrictedCache.get(sig);
 
   const enabled = getEnabledPacks();
-  const results = [];
-  const seenNames = new Set();
+  const byName = new Map();
   const nameKey = n => (n ?? "").trim().toLowerCase();
   for ( const pack of game.packs ) {
     // `visible` is this scan's own extra bar: an `allowDrops` pool must never offer the player
@@ -909,25 +935,60 @@ export async function findRestrictedItems(cfg, maxLevel = null, rules = null) {
         // the packs rather than authored on the advancement, so nothing else narrows it.
         if ( !matchesRules(e.system?.source?.rules, rules) ) continue;
         if ( (maxLevel != null) && (Number(e.system?.prerequisites?.level ?? 0) > maxLevel) ) continue;
+        // Same feature shared across edition packs — keep the copy whose prerequisites can be
+        // trusted, not simply the first one found. See {@link preferredCopy}.
         const nk = nameKey(e.name);
-        if ( seenNames.has(nk) ) continue;   // same feature shared across edition packs — keep one
-        seenNames.add(nk);
+        if ( !preferredCopy(byName, nk, e.uuid) ) continue;
         // Carried through (not filtered here) so the caller can gate on / recommend by item
         // prerequisites against the specific build — that check is build-dependent, unlike this
         // memoised scan.
         const prereqItems = Array.from(e.system?.prerequisites?.items ?? []);
-        results.push({ key: e.uuid, uuid: e.uuid, label: e.name, img: e.img, prereqItems });
+        byName.set(nk, { key: e.uuid, uuid: e.uuid, label: e.name, img: e.img, prereqItems });
       }
     } catch ( err ) {
       log(`restricted-item scan failed for ${pack.collection}`, err);
     }
   }
+  const results = [...byName.values()];
   restrictedCache.set(sig, results);
   return results;
 }
 
 /** The level from which the 2024 rules make an ability-score improvement an Epic Boon instead. */
 const ASI_EPIC_BOON_LEVEL = 19;
+
+/**
+ * Which abilities a feat can raise — the half-feats' "+1 to Strength or Constitution".
+ *
+ * Read from the feat's own AbilityScoreImprovement advancement by {@link module:data/source-index.readAsi},
+ * the same reader the origin panel uses, so a half-feat and a background are never understood two
+ * different ways. Both shapes count: an ability with a non-zero `fixed` entry, and — when there is a
+ * point budget to spend — every ability the advancement does not lock. The 2024 packs almost always
+ * use the second (`points: 1` with five of the six locked), so reading `fixed` alone would report
+ * nothing for most half-feats.
+ *
+ * Deliberately resolved from the documents rather than the compendium index. `system.advancement`
+ * is an array, so indexing it would pull every advancement of every item in every scanned pack —
+ * measured at ~500KB across four content modules to obtain the ~48KB that belongs to feats, held
+ * for the session. This pass loads only the feats that survived the scan, bounded and in parallel,
+ * and its results are memoised with them.
+ * @param {{uuid: string}[]} entries   Scanned feats, enriched in place with `abilities`.
+ */
+async function addFeatAbilities(entries) {
+  await forEachLimit(entries, WARM_CONCURRENCY, async entry => {
+    entry.abilities = [];
+    try {
+      const asi = readAsi(await fromUuid(entry.uuid));
+      if ( !asi ) return;
+      const open = asi.points > 0 ? ABILITIES.filter(k => !asi.locked.includes(k)) : [];
+      entry.abilities = ABILITIES.filter(k => (Number(asi.fixed?.[k] ?? 0) > 0) || open.includes(k));
+    } catch ( err ) {
+      // A feat we cannot read is simply one with no ability increase to filter on — never a reason
+      // to lose the feat itself, which the scan has already established is pickable.
+      log(`could not read the ability increase for ${entry.uuid}`, err);
+    }
+  });
+}
 
 /**
  * Scan enabled compendiums for every general feat an ASI-or-feat decision may offer, memoised.
@@ -943,6 +1004,15 @@ const ASI_EPIC_BOON_LEVEL = 19;
  * Feats declaring no subtype at all (2014 content, most homebrew) are never excluded here: the subtype
  * split is a 2024-rules concept, and an allow-list of "general" would empty the pool for a 2014 table —
  * the same principle {@link matchesRules} states for editions.
+ *
+ * The **category** is a different matter, and is required. `feat` is the document type of every
+ * *feature* in dnd5e — class features, species traits, background features, monster features,
+ * eldritch invocations, artificer infusions, maneuvers, metamagic, runes — and only
+ * `system.type.value === "feat"` marks the ones that are actually feats. Matching on the document
+ * type alone offered all of them: a single content module contributed 300-odd class features to the
+ * pool, "Additional Wizard Spells" and "Ability Score Improvement" among them. This is the same
+ * test dnd5e's own ASI flow applies to a dropped item, and the same one {@link findRestrictedItems}
+ * already applies via an advancement's `restriction.type`.
  * @param {number} level   The character's level, used only to decide whether epic boons are excluded.
  * @returns {Promise<{uuid: string, name: string, img: string, prereqLevel: number, prereqItems: string[]}[]>}
  */
@@ -953,23 +1023,30 @@ export async function findAsiFeats(level) {
   if ( restrictedCache.has(sig) ) return restrictedCache.get(sig);
 
   const enabled = getEnabledPacks();
-  const results = [];
-  const seenNames = new Set();
+  const byName = new Map();
   const nameKey = n => (n ?? "").trim().toLowerCase();
   for ( const pack of game.packs ) {
     if ( !pack.visible || !isUsableItemPack(pack, enabled) ) continue;
     try {
       const index = await pack.getIndex({
-        fields: ["type", "system.type.subtype", "system.prerequisites.level", "system.prerequisites.items"]
+        fields: ["type", "system.type.value", "system.type.subtype",
+          "system.prerequisites.level", "system.prerequisites.items"]
       });
       for ( const e of index ) {
         if ( e.type !== "feat" ) continue;
-        const subtype = e.system?.type?.subtype ?? "";
+        const type = e.system?.type ?? {};
+        // The category, not just the document type — see the note above. A blank category is a
+        // feature that never declared one, not a permissive "any": the lineage options in the 2024
+        // origins pack are the ones that would slip through.
+        if ( type.value !== "feat" ) continue;
+        const subtype = type.subtype ?? "";
         if ( subtype && excluded.has(subtype) ) continue;
+        // Same feat shared across edition packs — keep the copy whose prerequisites can be
+        // trusted. Picking the first one found let a copy that declares none silently un-gate a
+        // feat, and cost a qualifying build its "Recommended" flag. See {@link preferredCopy}.
         const nk = nameKey(e.name);
-        if ( seenNames.has(nk) ) continue;   // same feat shared across edition packs — keep one
-        seenNames.add(nk);
-        results.push({
+        if ( !preferredCopy(byName, nk, e.uuid) ) continue;
+        byName.set(nk, {
           uuid: e.uuid, name: e.name, img: e.img,
           prereqLevel: Number(e.system?.prerequisites?.level ?? 0),
           prereqItems: Array.from(e.system?.prerequisites?.items ?? [])
@@ -979,6 +1056,8 @@ export async function findAsiFeats(level) {
       log(`ASI feat scan failed for ${pack.collection}`, err);
     }
   }
+  const results = [...byName.values()];
+  await addFeatAbilities(results);
   restrictedCache.set(sig, results);
   return results;
 }
@@ -988,7 +1067,8 @@ export async function findAsiFeats(level) {
  * grouped into a "Recommended"/"Other" panel via {@link groupRecommended} when the build unlocked any of
  * them — and a locked "coming later" list, each carrying the reason it's locked. Pure (no compendium
  * access), so it is unit-testable on its own.
- * @param {{uuid: string, name: string, img: string, prereqLevel: number, prereqItems: string[]}[]} entries
+ * @param {{uuid: string, name: string, img: string, prereqLevel: number, prereqItems: string[],
+ *   abilities: string[]}[]} entries
  * @param {number} level              The character's current level.
  * @param {Set<string>} owned         Identifier slugs the build already grants (see {@link evalItemPrereq}).
  * @param {Set<string>} [takenNames]  Lowercased names of non-repeatable feats the build already holds —
@@ -1004,11 +1084,17 @@ export function classifyAsiFeats(entries, level, owned, takenNames = new Set()) 
     if ( takenNames.has(e.name.trim().toLowerCase()) ) continue;
     const levelLocked = e.prereqLevel > level;
     const { hasReq, met } = evalItemPrereq(e.prereqItems, owned);
+    // `abilities` rides along on both lists so the picker's "increases" filter can act on a card
+    // without re-reading anything — see {@link addFeatAbilities}.
     if ( !levelLocked && (!hasReq || met) ) {
-      options.push({ uuid: e.uuid, name: e.name, img: e.img, recommended: hasReq && met });
+      options.push({
+        uuid: e.uuid, name: e.name, img: e.img,
+        abilities: e.abilities ?? [], recommended: hasReq && met
+      });
     } else {
       lockedOptions.push({
         uuid: e.uuid, name: e.name, img: e.img,
+        abilities: e.abilities ?? [],
         lockReason: levelLocked
           ? t("levelup.step.asi.lockedLevel", { level: e.prereqLevel })
           : t("levelup.step.asi.lockedPrereq")

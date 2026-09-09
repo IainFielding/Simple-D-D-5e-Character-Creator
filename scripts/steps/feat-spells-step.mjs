@@ -34,6 +34,22 @@ const CLASS_LISTS = MAGIC_INITIATE_LISTS;
  *  when the class is fixed (a Wizard Magic Initiate always casts off Intelligence, not a choice). */
 const MI_CLASS_ABILITY = { cleric: "wis", druid: "wis", wizard: "int" };
 
+/**
+ * How many of the feats' spells are chosen, against how many they ask for — the one tally the rail
+ * summary and the blocked-Next hint both quote, so they can never disagree about what is left.
+ * @param {import("../state/creator-state.mjs").CreatorState} state
+ * @returns {{picked: number, total: number}}
+ */
+function spellCounts(state) {
+  let picked = 0, total = 0;
+  for ( const g of state.featSpellCache ?? [] ) {
+    const b = state.featSpells[g.key];
+    picked += (b?.cantrips.length ?? 0) + (b?.spells.length ?? 0);
+    total += g.cantripCount + g.spellCount;
+  }
+  return { picked, total };
+}
+
 export const featSpellsStep = {
   id: "featSpells",
   icon: "fa-solid fa-hand-sparkles",
@@ -57,27 +73,14 @@ export const featSpellsStep = {
 
   /** Why Next is blocked: how many feat spells are still to be chosen. */
   incompleteHint(state) {
-    const grants = state.featSpellCache ?? [];
-    let picked = 0, total = 0;
-    for ( const g of grants ) {
-      const b = state.featSpells[g.key];
-      picked += (b?.cantrips.length ?? 0) + (b?.spells.length ?? 0);
-      total += g.cantripCount + g.spellCount;
-    }
+    const { picked, total } = spellCounts(state);
     const remain = Math.max(0, total - picked);
     return remain ? t("step.featSpells.hint", { count: remain }) : null;
   },
 
   /** Rail summary: how many of the feats' spells are chosen in total. */
   summary(state) {
-    const grants = state.featSpellCache ?? [];
-    if ( !grants.length ) return "";
-    let picked = 0, total = 0;
-    for ( const g of grants ) {
-      const b = state.featSpells[g.key];
-      picked += (b?.cantrips.length ?? 0) + (b?.spells.length ?? 0);
-      total += g.cantripCount + g.spellCount;
-    }
+    const { picked, total } = spellCounts(state);
     return total ? t("step.featSpells.picked", { count: picked, total }) : "";
   },
 

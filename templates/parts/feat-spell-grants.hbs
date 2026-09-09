@@ -1,0 +1,56 @@
+{{!--
+  Spells a feat taken this level-up hands out — Cold Caster's Ray of Frost and its kin.
+
+  Shown ticked, not tickable: the decision the player made was "take this feat", and the spell its
+  own text says you learn is not a second question. What *is* a question, and only where the feat's
+  text puts it, is the substitution — "If you already know it, you learn a different Wizard cantrip
+  of your choice" — so the select below appears only for a grant the pack marks replaceable whose
+  spell the character already knows.
+
+  Rendered on both halves of the spell page: a caster sees it above their own picks, and a
+  non-caster (the Fighter these feats exist for) sees it as the whole page.
+--}}
+{{#if featGrants.length}}
+<section class="creator-feat-grants">
+  <h3 class="creator-choice-group-head">
+    {{localize "sogrom-dnd5e-character-creator.levelup.step.spells.fromFeats"}}
+  </h3>
+  <ul class="creator-picklist creator-feat-grant-list">
+    {{#each featGrants}}
+    <li>
+      <div class="creator-pickrow is-selected creator-feat-grant" data-tooltip="{{ccItemTooltip uuid}}">
+        <img class="creator-pickrow-img" src="{{img}}" alt="">
+        <span class="creator-spellrow-text">
+          <span class="creator-pickrow-name">{{name}}</span>
+          <span class="creator-spellrow-meta">
+            <span class="creator-spellrow-level">{{levelLabel}}</span>
+            <span class="creator-feat-grant-from">{{featName}}</span>
+            {{#if replacedName}}
+            <span class="creator-feat-grant-swapped">
+              {{localize "sogrom-dnd5e-character-creator.levelup.step.spells.replacing" name=replacedName}}
+            </span>
+            {{/if}}
+          </span>
+        </span>
+        <i class="creator-pickrow-tick fa-solid fa-check"
+           data-tooltip="{{localize 'sogrom-dnd5e-character-creator.levelup.step.spells.grantedTip'}}"></i>
+      </div>
+
+      {{#if swappable}}
+      {{!-- The character already knows the granted spell, and this feat's text lets them take a
+            different one instead. Empty value = keep what the feat names. --}}
+      <label class="creator-feat-grant-swap">
+        <span>{{localize "sogrom-dnd5e-character-creator.levelup.step.spells.alreadyKnown"}}</span>
+        <select data-action="stepAction" data-step-action="feat-spell-swap" data-key="{{key}}">
+          <option value="">{{localize "sogrom-dnd5e-character-creator.levelup.step.spells.keepGranted"}}</option>
+          {{#each alternatives}}
+          <option value="{{uuid}}" {{#if selected}}selected{{/if}}>{{name}}</option>
+          {{/each}}
+        </select>
+      </label>
+      {{/if}}
+    </li>
+    {{/each}}
+  </ul>
+</section>
+{{/if}}

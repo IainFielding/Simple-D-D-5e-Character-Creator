@@ -6,11 +6,40 @@
 
     <div class="creator-pick-desc">
       {{#if picking}}
-      <div class="creator-levelup-choices creator-asi-feat-picker">
+      {{!-- `data-density` sizes the cards in the grids below; the ASI block's own density is "form",
+            for the ability steppers, so the picker declares its own. See creator.css density tiers. --}}
+      <div class="creator-levelup-choices creator-asi-feat-picker" data-density="{{pickerDensity}}">
         <div class="creator-choice-section">
           <header class="creator-choice-head">
             <h2>{{localize "sogrom-dnd5e-character-creator.levelup.step.asi.pickFeat"}}</h2>
           </header>
+
+          {{!-- Name search plus "shows feats that increase X". Both filter the cards in the DOM
+                (see CreatorShellBase#_applyFeatFilters) rather than re-rendering, so typing keeps
+                focus; their values live on the state so a "coming later" peek doesn't wipe them.
+                The dropdown appears only when some feat on screen raises an ability at all. --}}
+          <div class="creator-feat-search-row">
+            <label class="creator-search">
+              <i class="fa-solid fa-magnifying-glass"></i>
+              <input type="search" data-feat-search autocomplete="off"
+                     aria-label="{{localize 'sogrom-dnd5e-character-creator.common.search'}}"
+                     placeholder="{{localize 'sogrom-dnd5e-character-creator.levelup.step.asi.searchFeats'}}">
+            </label>
+            {{#if abilityOptions.length}}
+            <label class="creator-spell-filter">
+              <i class="fa-solid fa-dumbbell"></i>
+              <select data-feat-filter-ability
+                      aria-label="{{localize 'sogrom-dnd5e-character-creator.levelup.step.asi.filterAbilityAria'}}">
+                <option value="">{{localize "sogrom-dnd5e-character-creator.levelup.step.asi.filterAnyAbility"}}</option>
+                {{#each abilityOptions}}
+                <option value="{{value}}">
+                  {{localize "sogrom-dnd5e-character-creator.levelup.step.asi.filterIncreases" ability=label}}
+                </option>
+                {{/each}}
+              </select>
+            </label>
+            {{/if}}
+          </div>
 
           {{#if groups}}
             {{#each groups}}
@@ -20,7 +49,8 @@
               <li>
                 <button type="button" class="creator-choice-card {{#if recommended}}is-recommended{{/if}}"
                         data-action="stepAction" data-step-action="asiFeatPick"
-                        data-index="{{../../index}}" data-uuid="{{uuid}}" data-tooltip="{{ccItemTooltip uuid}}">
+                        data-index="{{../../index}}" data-uuid="{{uuid}}" data-tooltip="{{ccItemTooltip uuid}}"
+                        data-name="{{name}}" data-abilities="{{abilityKeys}}">
                   {{#if recommended}}<i class="creator-choice-card-star fa-solid fa-star" aria-hidden="true"></i>{{/if}}
                   <img class="creator-choice-card-img" src="{{img}}" alt="">
                   <span class="creator-choice-card-name">{{name}}</span>
@@ -35,7 +65,8 @@
               <li>
                 <button type="button" class="creator-choice-card"
                         data-action="stepAction" data-step-action="asiFeatPick"
-                        data-index="{{../index}}" data-uuid="{{uuid}}" data-tooltip="{{ccItemTooltip uuid}}">
+                        data-index="{{../index}}" data-uuid="{{uuid}}" data-tooltip="{{ccItemTooltip uuid}}"
+                        data-name="{{name}}" data-abilities="{{abilityKeys}}">
                   <img class="creator-choice-card-img" src="{{img}}" alt="">
                   <span class="creator-choice-card-name">{{name}}</span>
                 </button>
@@ -43,6 +74,12 @@
               {{/each}}
             </ul>
           {{/if}}
+
+          {{!-- Shown by the filter pass when every card is hidden; there is no server-side empty
+                state to render, because filtering never re-renders. --}}
+          <p class="creator-choice-empty is-hidden" data-feat-empty>
+            {{localize "sogrom-dnd5e-character-creator.levelup.step.asi.noMatches"}}
+          </p>
 
           {{#if hasLocked}}
           <button type="button" class="creator-btn creator-btn-ghost" data-action="stepAction" data-step-action="asiFeatPeek" data-index="{{index}}">
@@ -57,7 +94,9 @@
           <ul class="creator-choice-grid">
             {{#each lockedOptions}}
             <li>
-              <button type="button" class="creator-choice-card creator-choice-card--taken" data-tooltip="{{ccItemTooltip uuid}}" disabled>
+              <button type="button" class="creator-choice-card creator-choice-card--taken"
+                      data-tooltip="{{ccItemTooltip uuid}}"
+                      data-name="{{name}}" data-abilities="{{abilityKeys}}" disabled>
                 <span class="creator-choice-card-badge">{{lockReason}}</span>
                 <img class="creator-choice-card-img" src="{{img}}" alt="">
                 <span class="creator-choice-card-name">{{name}}</span>

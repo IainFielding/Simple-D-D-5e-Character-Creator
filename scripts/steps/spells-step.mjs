@@ -73,19 +73,12 @@ export const spellsStep = {
       state.focusedSpellUuid = el.dataset.uuid;
       return;
     }
-    // The player naming the list this caster draws from, when nothing could work it out for them.
-    // Clearing it hands the question back to {@link module:data/spell-source.spellListFor}.
-    if ( action === "choose-spell-list" ) {
-      state.spellListOverride = el.value ?? "";
-      state.focusedSpellUuid = null;
-      // The pool is about to be a different set of spells, so picks made against the old one are
-      // not picks against this one.
-      state.selectedCantrips = [];
-      state.selectedSpells = [];
-      return;
-    }
-    if ( action === "clear-spell-list" ) {
-      state.spellListOverride = "";
+    // The player naming the list this caster draws from, when nothing could work it out for them,
+    // and taking it back again — clearing it hands the question back to
+    // {@link module:data/spell-source.spellListFor}. Either way the pool becomes a different set of
+    // spells, so picks staged against the old one are not picks against this one.
+    if ( (action === "choose-spell-list") || (action === "clear-spell-list") ) {
+      state.spellListOverride = (action === "choose-spell-list") ? (el.value ?? "") : "";
       state.focusedSpellUuid = null;
       state.selectedCantrips = [];
       state.selectedSpells = [];

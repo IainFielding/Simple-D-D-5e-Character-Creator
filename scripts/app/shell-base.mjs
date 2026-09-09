@@ -134,6 +134,22 @@ export const SPELL_FILTER_CONTROLS = [
   { selector: "[data-spell-filter-range]", stateKey: "spellRangeFilter", event: "change" }
 ];
 
+/**
+ * The ASI feat picker's own filter controls, in toolbar order.
+ *
+ * Separate from {@link SPELL_FILTER_CONTROLS} rather than folded into it: the two toolbars are never
+ * on screen together, they carry different state keys, and — the deciding reason — they filter
+ * different markup. Spells are `.creator-pickrow` rows carrying their own `data-*`; feats are
+ * `.creator-choice-card` buttons in grouped grids, where hiding the last card of a group must also
+ * hide that group's heading.
+ *
+ * @type {{selector: string, stateKey: string, event: string}[]}
+ */
+export const FEAT_FILTER_CONTROLS = [
+  { selector: "[data-feat-search]", stateKey: "featSearch", event: "input" },
+  { selector: "[data-feat-filter-ability]", stateKey: "featAbilityFilter", event: "change" }
+];
+
 export class CreatorShellBase extends HandlebarsApplicationMixin(ApplicationV2) {
 
   /** Index of the step currently on screen, into whatever list the subclass walks. */
@@ -422,6 +438,74 @@ export class CreatorShellBase extends HandlebarsApplicationMixin(ApplicationV2) 
    * @param {boolean} filtered  Whether a non-search filter is also narrowing.
    */
   _afterFilter(needle, filtered) {}    // eslint-disable-line no-unused-vars
+
+  /* -------------------------------------------- */
+  /*  Feat picker filters                         */
+  /* -------------------------------------------- */
+
+  /**
+   * Bind the ASI feat picker's search box and "increases" dropdown, restoring both from the state.
+   *
+   * Same contract as {@link CreatorShellBase#_wireSpellFilters}: values live on the state, the pass
+   * runs in the DOM without re-rendering so typing keeps focus, and the values are put back after
+   * the re-render that peeking or picking causes. A no-op on every screen that has no picker open.
+   * @param {HTMLElement} root
+   * @returns {boolean}  Whether a feat picker was found and wired.
+   */
+  _wireFeatFilters(root) {
+    const controls = FEAT_FILTER_CONTROLS
+      .map(c => ({ ...c, el: root.querySelector(c.selector) }))
+      .filter(c => c.el);
+    if ( !controls.length ) return false;
+
+    for ( const { el, stateKey, event } of controls ) {
+      el.value = this.state?.[stateKey] ?? "";
+      el.addEventListener(event, () => {
+        if ( this.state ) this.state[stateKey] = el.value;
+        this._applyFeatFilters();
+      });
+    }
+    this._applyFeatFilters();
+    return true;
+  }
+
+  /**
+   * Hide feat cards that don't match the name search and the "increases" filter, both of which must
+   * pass for a card to show.
+   *
+   * Two things make this more than the spell pass. A card's abilities are a *set* — a half-feat
+   * offering "+1 Strength or Constitution" matches either — so the test is membership, not equality.
+   * And the cards sit in grouped grids ("Recommended", "Other", "Coming later"), each behind its own
+   * heading: filtering to one ability routinely empties a whole group, and a heading left standing
+   * over nothing reads as a rendering fault. So every grid is hidden along with the heading that
+   * introduces it once it has no visible card left.
+   */
+  _applyFeatFilters() {
+    const root = this.element;
+    const picker = root.querySelector(".creator-asi-feat-picker");
+    if ( !picker ) return;
+    const needle = (picker.querySelector("[data-feat-search]")?.value ?? "").trim().toLowerCase();
+    const ability = picker.querySelector("[data-feat-filter-ability]")?.value ?? "";
+
+    for ( const card of picker.querySelectorAll(".creator-choice-card") ) {
+      const abilities = (card.dataset.abilities ?? "").split(" ").filter(Boolean);
+      const matches = (!needle || (card.dataset.name ?? "").toLowerCase().includes(needle))
+        && (!ability || abilities.includes(ability));
+      (card.closest("li") ?? card).classList.toggle("is-hidden", !matches);
+    }
+
+    // A grid and the heading above it stand or fall together. `previousElementSibling` is the
+    // heading only when the markup pairs them directly, which it does; anything else is left alone.
+    let anyVisible = false;
+    for ( const grid of picker.querySelectorAll(".creator-choice-grid") ) {
+      const visible = [...grid.children].some(li => !li.classList.contains("is-hidden"));
+      anyVisible ||= visible;
+      grid.classList.toggle("is-hidden", !visible);
+      const head = grid.previousElementSibling;
+      if ( head?.classList.contains("creator-choice-group-head") ) head.classList.toggle("is-hidden", !visible);
+    }
+    picker.querySelector("[data-feat-empty]")?.classList.toggle("is-hidden", anyVisible);
+  }
 
   /* -------------------------------------------- */
   /*  Source book details                         */

@@ -57,6 +57,9 @@ Hooks.once("init", () => {
     tpl("parts/spell-filters.hbs"),
     tpl("parts/spell-row.hbs"),
     tpl("parts/spell-list-notice.hbs"),
+    // Spells a feat hands out, shown on the level-up spell page. Registered here with the other
+    // spell partials because a partial is resolved from the registry at render time, not fetched.
+    tpl("parts/feat-spell-grants.hbs"),
     // The comparison grid is included by stage.hbs alongside the book-page overlay, so it is a
     // partial for the same reason that one is: the stage is loaded as a PART, its includes are not.
     tpl("parts/compare.hbs"),
@@ -256,7 +259,7 @@ Hooks.once("ready", () => {
 
   // Install the level-up takeover hooks (primary: wrap the native AdvancementManager;
   // fallback: a sheet button when the world has disabled native advancements). Both paths
-  // self-gate on the `mode` setting and Hero Mancer, so this is safe to register unconditionally.
+  // self-gate on the `mode` setting, so this is safe to register unconditionally.
   registerLevelUp();
 
   // Watch for characters crossing their XP threshold. Registered unconditionally for the same

@@ -32,8 +32,7 @@ export const ABILITIES = ["str", "dex", "con", "int", "wis", "cha"];
  *
  * Deliberately *not* "sogrom": the same author publishes a dozen other `sogrom-*` content
  * modules, so that namespace would be ambiguous the moment any of them wanted a hook of their
- * own. This is the camelCase of the module title, which is the convention other Foundry modules
- * follow (Hero Mancer emits `heroMancer.*`).
+ * own. This is the camelCase of the module title, which is the convention Foundry modules follow.
  *
  * Changing this string is a breaking change for every consumer, so treat it as permanent.
  */
