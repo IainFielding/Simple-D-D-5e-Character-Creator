@@ -7,7 +7,7 @@ import { resolveChoices } from "../data/choice-resolver.mjs";
 import { hasSourcePage } from "../data/journal-source.mjs";
 import { hasRulesPage } from "../data/rules-source.mjs";
 import { applyQuickBuild } from "../data/quick-build.mjs";
-import { t, log, levelUpEnabled } from "../config.mjs";
+import { t, log, levelUpEnabled, systemRulesEdition } from "../config.mjs";
 import { pinContext } from "../app/compare.mjs";
 import { matchesRules } from "../data/source-index.mjs";
 
@@ -155,11 +155,15 @@ export const classStep = {
     const detail = selected ? await source.detail(selected) : null;
     const groups = selected ? await source.advancementGroups(selected) : null;
     const cards = source.classes().map(c => ({ ...c, selected: c.uuid === selected }));
+    // Marks the off-edition cards hidden in place, so the first paint is already filtered.
+    const rulesFilter = editionFilterContext(state, cards);
     return {
       // Opts the grid into side-by-side comparison: pin-decorated cards, plus the toolbar's
       // compare control. Inert without a shell, so the step still renders in tests.
       ...pinContext(app?.pins, "class", cards),
-      count: cards.length,
+      count: cards.filter(c => !c.hidden).length,
+      // The drawer's edition dropdown; null in a world holding only one edition of classes.
+      rulesFilter,
       hasSelection: !!selected,
       // Which step action a drawer card fires, so parts/work-picker.hbs stays step-agnostic.
       pickAction: "pick-class",
@@ -181,6 +185,77 @@ export const classStep = {
     };
   }
 };
+
+/* -------------------------------------------- */
+/*  Edition filter                              */
+/* -------------------------------------------- */
+
+/** The editions the drawer can filter to, newest first — the order they are offered in. */
+const EDITIONS = ["2024", "2014"];
+
+/**
+ * The class drawer's edition dropdown, and the pass that hides the cards it excludes.
+ *
+ * A world with both books enabled lists every class twice — thirteen apparently-duplicate pairs
+ * told apart only by the small edition badge on the card. The class step is where the edition gets
+ * decided for the whole build (the origin grids are scoped to whatever is picked here), so this is
+ * the right place to say "show me one book at a time".
+ *
+ * Offered only where it would do something: a world holding classes from a single edition gets no
+ * control rather than a dropdown whose every option shows the same list.
+ *
+ * The default is the world's own answer — dnd5e's `rulesVersion` setting — so a legacy table opens
+ * on the 2014 classes without touching anything. Once a class is chosen its edition wins instead,
+ * so re-opening the drawer never hides the card that is currently selected. An explicit pick by
+ * the player outranks both, `""` (both editions) included.
+ *
+ * Filtering marks the cards rather than dropping them: the shell re-filters this same DOM as the
+ * dropdown changes (no re-render, so the search field keeps focus), and it can only re-show a card
+ * that was rendered in the first place.
+ * @param {import("../state/creator-state.mjs").CreatorState} state
+ * @param {object[]} cards   The class cards, marked in place with `hidden` and `filterRules`.
+ * @returns {{value: string, options: {value: string, label: string, selected: boolean}[]}|null}
+ */
+function editionFilterContext(state, cards) {
+  const present = EDITIONS.filter(edition => cards.some(c => String(c.rules) === edition));
+  if ( present.length < 2 ) return null;
+  const value = String(state.classRulesFilter ?? defaultEdition(state, cards, present));
+  for ( const card of cards ) {
+    // Only an edition the dropdown actually offers is filterable. A card declaring something else
+    // — no edition at all, or some third edition a pack invented — is treated as undeclared and
+    // stays on offer, because no option here would ever bring it back. `filterRules` is what the
+    // row carries into the DOM, so the shell's live pass filters on exactly the same terms.
+    card.filterRules = present.includes(String(card.rules)) ? String(card.rules) : null;
+    card.hidden = !matchesRules(card.filterRules, value || null);
+  }
+  return {
+    value,
+    options: [
+      { value: "", label: t("step.class.filterAllEditions"), selected: value === "" },
+      ...present.map(edition => ({
+        value: edition,
+        label: t("step.class.filterEdition", { year: edition }),
+        selected: value === edition
+      }))
+    ]
+  };
+}
+
+/**
+ * The edition to open the drawer on when the player has not chosen one: the edition of the class
+ * they already picked, else the one the world plays by — and "both" where that edition isn't among
+ * the classes on offer, so the default can never empty the list it is filtering.
+ * @param {import("../state/creator-state.mjs").CreatorState} state
+ * @param {object[]} cards
+ * @param {string[]} present   The editions actually represented in the cards.
+ * @returns {string}
+ */
+function defaultEdition(state, cards, present) {
+  const chosen = state.classUuid ? cards.find(c => c.uuid === state.classUuid)?.rules : null;
+  if ( chosen && present.includes(String(chosen)) ) return String(chosen);
+  const world = systemRulesEdition();
+  return present.includes(world) ? world : "";
+}
 
 /* -------------------------------------------- */
 /*  Target level                                */

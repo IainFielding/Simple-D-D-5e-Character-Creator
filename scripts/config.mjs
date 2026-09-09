@@ -452,6 +452,29 @@ export function emberActive() {
 }
 
 /**
+ * The rules edition this world plays by, per **dnd5e's own** world setting — not one of ours.
+ *
+ * The system stores it as `"modern"` / `"legacy"` (`dnd5e.settings.rulesVersion`, registered in the
+ * system's settings.mjs); every edition-aware thing in this module speaks `"2024"` / `"2014"`, which
+ * is what content declares in `system.source.rules`. This is the one place that translation happens.
+ *
+ * Defaults to `"2024"` — the system's own default — including in a world old enough not to have the
+ * setting registered at all, where reading it throws.
+ * @returns {"2014"|"2024"}
+ */
+export function systemRulesEdition() {
+  let raw = globalThis.dnd5e?.settings?.rulesVersion;
+  if ( raw == null ) {
+    try {
+      raw = game.settings.get("dnd5e", "rulesVersion");
+    } catch {
+      raw = null;                         // a world (or a test harness) without the setting
+    }
+  }
+  return String(raw) === "legacy" ? "2014" : "2024";
+}
+
+/**
  * Fallback counts of cantrips / level-1 spells known at level 1, keyed by class
  * identifier. Consulted only when a class carries no matching ScaleValue advancement
  * to read the figure from — see {@link module:data/spell-source}.

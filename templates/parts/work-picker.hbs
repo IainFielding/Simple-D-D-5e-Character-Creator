@@ -29,6 +29,22 @@
              placeholder="{{localize 'sogrom-dnd5e-character-creator.common.search'}}">
     </label>
 
+    {{!-- The class step's edition filter. A world with both books enabled lists every class
+          twice, told apart only by the badge on the card; this shows one book at a time. Rendered
+          only where there are two editions to choose between — see editionFilterContext() — and
+          opens on the edition dnd5e's own rulesVersion setting says the world plays by. --}}
+    {{#if rulesFilter}}
+    <label class="creator-spell-filter creator-rules-filter">
+      <i class="fa-solid fa-book"></i>
+      <select data-class-filter-rules
+              aria-label="{{localize 'sogrom-dnd5e-character-creator.step.class.filterEditionAria'}}">
+        {{#each rulesFilter.options}}
+        <option value="{{value}}" {{#if selected}}selected{{/if}}>{{label}}</option>
+        {{/each}}
+      </select>
+    </label>
+    {{/if}}
+
     {{#if abilityOptions}}
     <label class="creator-spell-filter creator-bg-filter">
       <i class="fa-solid fa-dumbbell"></i>
@@ -82,11 +98,14 @@
 
   <ul class="creator-picklist creator-drawer-grid">
     {{#each cards}}
-    <li>
+    {{!-- `hidden` is the edition filter's opening pass; the shell toggles the same class as the
+          dropdown and the search box change. --}}
+    <li {{#if hidden}}class="is-hidden"{{/if}}>
       <button type="button" class="creator-pickrow {{#if selected}}is-selected{{/if}}"
               data-action="stepAction" data-step-action="{{../pickAction}}"
               data-uuid="{{uuid}}" data-name="{{name}}"
-              {{#if abilities}}data-abilities="{{abilities}}"{{/if}}>
+              {{#if abilities}}data-abilities="{{abilities}}"{{/if}}
+              {{#if filterRules}}data-rules="{{filterRules}}"{{/if}}>
         <img class="creator-pickrow-img" src="{{img}}" alt="">
         <span class="creator-pickrow-name">{{name}}</span>
         {{!-- Both editions of a class share its name, so a world with the 2014 and 2024 books

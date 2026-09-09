@@ -154,6 +154,10 @@ export function installFoundryShims() {
   // dnd5e.documents.Trait: label/icon are identity/stub; wildcard expansion returns empty so
   // the resolver falls back to literal keys (tests that need expansion override this).
   globalThis.dnd5e = {
+    // The system's own world settings, as the system exposes them. Only `rulesVersion` is read —
+    // it is what `systemRulesEdition()` translates into "2024"/"2014" — and "modern" is the
+    // system's own default, so a test that cares flips it to "legacy".
+    settings: { rulesVersion: "modern" },
     // The system's own formatters, which the spell card borrows so a row is worded exactly as the
     // sheet words it. These stand in with the plain English forms.
     utils: {

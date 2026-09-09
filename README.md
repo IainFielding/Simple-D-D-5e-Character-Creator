@@ -274,7 +274,7 @@ This module is designed to sit quietly alongside the rest of your world. Where a
 - **The same content from two places is shown once.** The Player's Handbook module and the system's own SRD packs both ship the 2024 classes, species and backgrounds, so a world with both would otherwise show every one of them twice. The Player's Handbook copy is the one kept — it's the one with the official artwork. Genuinely different content that happens to share a name is always kept separate.
 - **Editions don't mix.** Choosing a class picks your edition, and the Background, Species and subclass screens then show only content from the same one. Change your mind and switch to a class from the other edition, and any origin choice that no longer fits is cleared so you can pick again.
 
-> **The short version:** the only module that changes what this one does is **Ember** (it takes over creation), and the only one you can't run alongside it is **Hero Mancer**. Everything else is free to run together.
+> **The short version:** the only module that changes what this one does is **Ember** — with it enabled, this module stands down from creation on its own. Everything else in the table above is free to run alongside. The one thing to avoid is running a *second* character-creation module that replaces the same screens: nothing stops you, and Foundry won't warn you, but the two will compete over who owns creation and level-up.
 >
 > Modules not listed here haven't been specifically tested, but nothing in this one hooks into the parts of Foundry that most modules touch. If you do hit a clash, please [open an issue](https://github.com/IainFielding/Simple-DnD5e-Character-Creator/issues).
 

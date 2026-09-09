@@ -371,6 +371,9 @@
       "class": {
         "label": "Class & Abilities",
         "hint": "Choose a class to continue.",
+      "filterEditionAria": "Filter by rules edition",
+      "filterAllEditions": "Both editions",
+      "filterEdition": "{year} rules",
         "traits": "Class Traits",
         "features": "Class Features",
         "spells": "Spells",

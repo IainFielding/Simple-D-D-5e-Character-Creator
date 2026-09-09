@@ -245,9 +245,12 @@ if ( api?.settings.creationEnabled() ) await api.launchCreator();
 
 ## Compatibility notes
 
-- The module declares a manifest **conflict with Hero Mancer**, because both replace the same
-  creation and level-up space. If you are writing a module that only wants *some* level-ups, use
-  `preLevelUpTakeover` instead — it lets you take what you need without a blanket conflict.
+- The module declares **no manifest conflicts**, and it makes no runtime check for any other
+  module. Anything else that replaces the same creation or level-up space simply competes with it:
+  nothing coordinates the two and Foundry issues no warning, so which one you end up in depends on
+  hook order. If you are writing a module that wants only *some* level-ups, take them through
+  `preLevelUpTakeover` rather than replacing the flow — it lets you claim what you need without
+  either module standing down wholesale.
 - The module re-emits the system's own advancement hooks
   (`dnd5e.preAdvancementManagerRender`, `dnd5e.preAdvancementManagerComplete`,
   `dnd5e.advancementManagerComplete`) at the equivalent points in its own flow, so a module built
