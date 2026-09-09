@@ -63,10 +63,13 @@
     on a large monitor, for the one control the footer blocks Next on — and, while the drawer was
     open with nothing chosen, below the class list as well.
 
-    Starting Level lives here too: it is a decision, not a description.
+    Starting Level lives here too: it is a decision, not a description. Like the abilities, it
+    renders whether or not a class is chosen — it is the one thing on this screen that changes what
+    the *rest* of the build will ask for, so a player deciding between a level-1 and a level-5
+    character should see that choice while they are still reading the class list, not only after
+    they have committed to a class.
   --}}
   <aside class="creator-work-side">
-    {{#if hasSelection}}
     {{#with targetLevel}}
     {{!--
       Target level: the creator always builds a level-1 character; anything above 1 hands off to
@@ -98,7 +101,6 @@
       </p>
     </section>
     {{/with}}
-    {{/if}}
 
     {{!-- Rendered whether or not a class is chosen: ability scores do not depend on the class,
           and a player who wants to roll first and pick after should not be blocked. --}}
