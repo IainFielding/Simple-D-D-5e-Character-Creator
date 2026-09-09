@@ -1617,6 +1617,10 @@ body:has(.sogrom-creator-fullscreen) .application.compendium-browser {
   border-bottom: 1px solid var(--cc-line);
 }
 .creator-drawer-head .creator-search { width: min(320px, 100%); }
+/* The class drawer's edition filter reuses the spell-filter chip, but sized to its own content:
+   the chip's default `flex: 1 1 9rem` would stretch it across whatever the search box left,
+   which is most of the head. */
+.creator-drawer-head .creator-rules-filter { flex: 0 0 auto; width: min(11rem, 100%); }
 .creator-drawer-close { margin-left: auto; padding: 0.35rem 0.7rem; font-size: 0.85rem; }
 
 /* The grid gets the full width now, so options can sit several to a row instead of

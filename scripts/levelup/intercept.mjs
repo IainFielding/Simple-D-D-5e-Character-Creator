@@ -118,8 +118,9 @@ function shouldTakeOver(manager) {
 
   // The last gate, and the polite one: a listener returning false means we decline this level-up
   // and the *native* dnd5e wizard renders in our place — the player is never left with nothing.
-  // This is the hook another module should use to carve out level-ups it wants to own, instead of
-  // us declaring a blanket manifest conflict. See docs/API.md.
+  // This is the hook another module should use to carve out level-ups it wants to own, rather than
+  // racing us to replace the whole flow — nothing is declared against anyone, so hook order is all
+  // that would decide it otherwise. See docs/API.md.
   return fireCancellableHook(HOOKS.preLevelUpTakeover, { manager, actor: manager.actor });
 }
 

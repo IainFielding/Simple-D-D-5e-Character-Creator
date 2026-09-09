@@ -45,6 +45,16 @@ export class CreatorState {
   targetLevel = 1;
 
   /**
+   * The class drawer's edition filter: `"2014"`, `"2024"`, `""` for "show both", or `null` while
+   * the player has not touched it — which is not the same as `""`, and is why this starts null.
+   * Untouched, the drawer defaults to the edition the world plays by (dnd5e's own `rulesVersion`
+   * setting, see {@link module:config.systemRulesEdition}), or to the chosen class's edition once
+   * there is one; an explicit pick here outranks both. Transient UI, so it is not drafted.
+   * @type {"2014"|"2024"|""|null}
+   */
+  classRulesFilter = null;
+
+  /**
    * Whether the player asked for a character-sheet PDF once the build is finished. Set from the
    * Review step's export control, and honoured after the character reaches the level that was
    * asked for — see {@link module:build/pdf-export}. Nothing is generated while the wizard is open.

@@ -294,14 +294,25 @@ export class CreatorShell extends CreatorShellBase {
     // dropdowns and its search box drive one combined filter, wired (and restored from the state)
     // by the shared base; anything else falls through to the plain name search below.
     const search = root.querySelector("[data-creator-search]");
-    const bgFilter = root.querySelector("[data-bg-filter-ability]");
+    // The two pick drawers that carry a dropdown beside their search box: the background step's
+    // increased-ability filter and the class step's edition filter. Never both at once — one pick
+    // step is on screen — so one combined pass serves either.
+    const drawerFilter = root.querySelector("[data-bg-filter-ability], [data-class-filter-rules]");
     if ( this._wireSpellFilters(root) ) {
       // Wired by the base — nothing further to do here.
-    } else if ( bgFilter ) {
-      // Background step: search box + the increased-ability dropdown drive a combined filter.
-      const apply = () => this.#applyBackgroundFilter();
+    } else if ( drawerFilter ) {
+      const apply = () => this.#applyDrawerFilter();
       if ( search ) search.addEventListener("input", apply);
-      bgFilter.addEventListener("change", apply);
+      drawerFilter.addEventListener("change", ev => {
+        // The edition filter outlives its own DOM: picking a class re-renders the drawer away, and
+        // the state is what puts the player's choice back on the rebuilt control (the same trick
+        // the spell filters use, see SPELL_FILTER_CONTROLS). The background filter needs none —
+        // choosing a background closes its step.
+        if ( ev.currentTarget.matches("[data-class-filter-rules]") ) {
+          this.state.classRulesFilter = ev.currentTarget.value;
+        }
+        apply();
+      });
     } else if ( search ) {
       search.addEventListener("input", ev => this.#filterCards(ev.currentTarget.value));
     }
@@ -355,7 +366,7 @@ export class CreatorShell extends CreatorShellBase {
 
   /**
    * @override Explain an emptied list after any client-side filter pass — the shared spell filter
-   * and the background filter below both land here.
+   * and the drawer filter below both land here.
    */
   _afterFilter(needle, filtered) {
     this.#updateNoResults(needle, filtered);
@@ -363,20 +374,27 @@ export class CreatorShell extends CreatorShellBase {
   }
 
   /**
-   * Hide background pick-rows that don't match the active name search and increased-ability
-   * dropdown (a row must satisfy both). Each row carries the abilities its increase can raise
-   * in `data-abilities` (space-joined); the dropdown filters to backgrounds that raise one.
+   * Hide pick-rows that don't match every active drawer control — the name search plus whichever
+   * dropdown this step renders (a row must satisfy all of them).
+   *
+   * Each row carries what it can be filtered on: `data-abilities` (space-joined) is the abilities a
+   * background's increase can raise, `data-rules` the edition a class belongs to. A class that
+   * declares no edition stays on offer under either filter, which is the same rule the grids
+   * themselves apply — see {@link module:data/source-index.matchesRules}.
    */
-  #applyBackgroundFilter() {
+  #applyDrawerFilter() {
     const root = this.element;
     const needle = (root.querySelector("[data-creator-search]")?.value ?? "").trim().toLowerCase();
     const ability = root.querySelector("[data-bg-filter-ability]")?.value ?? "";
+    const rules = root.querySelector("[data-class-filter-rules]")?.value ?? "";
     for ( const row of root.querySelectorAll(".creator-pickrow") ) {
       const matchesName = !needle || (row.dataset.name ?? "").toLowerCase().includes(needle);
       const matchesAbility = !ability || (row.dataset.abilities ?? "").split(" ").includes(ability);
-      (row.closest("li") ?? row).classList.toggle("is-hidden", !(matchesName && matchesAbility));
+      const matchesEdition = !rules || !row.dataset.rules || (row.dataset.rules === rules);
+      const shown = matchesName && matchesAbility && matchesEdition;
+      (row.closest("li") ?? row).classList.toggle("is-hidden", !shown);
     }
-    this.#updateNoResults(needle, !!ability);
+    this.#updateNoResults(needle, !!(ability || rules));
     this.#updateVisibleCount();
   }
 
