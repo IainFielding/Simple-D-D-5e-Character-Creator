@@ -1503,7 +1503,9 @@ export class LevelUpDriver {
 
         const steps = Array.fromRange(thisLevel - handledLevel + 1, handledLevel)
           .flatMap(l => this.#AdvancementManager.flowsForLevel(item, l, { findExisting: this.steps }))
-          .map(flow => ({ type: "forward", flow, synthetic: true }));
+          .map(flow => flow.retainedData
+            ? { type: "restore", flow, automatic: true, synthetic: true }
+            : { type: "forward", flow, synthetic: true });
 
         this.steps.splice(idx + 1, 0, ...steps);
         idx += steps.length;

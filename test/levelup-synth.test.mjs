@@ -507,3 +507,66 @@ describe("a feat whose grant the player may decline", () => {
     expect(w.driver.optionalGrantSteps).toHaveLength(0);
   });
 });
+
+/* -------------------------------------------- */
+/*  Retained data on a synthesised flow          */
+/* -------------------------------------------- */
+
+/**
+ * A granted feature the walk has *seen before*. When a manager retains an advancement's data —
+ * an item swapped out and back, a level taken down and re-taken — the flow it hands back through
+ * `findExisting` carries `retainedData`, and the choices in it must be restored rather than asked
+ * for a second time. The steps we synthesise are spliced into the manager's own array (we adopt it
+ * wholesale in the constructor), so a retained flow reaches this path exactly as it reaches the
+ * system's. dnd5e 6.0.0 fixed the same omission in `AdvancementManager##synthesizeSteps`; this is
+ * the driver-side mirror of that fix.
+ */
+function makeRetainedWorld({ retainedData } = {}) {
+  const classItem = { id: "clsArtificer0000", type: "class" };
+  const clone = { items: makeItems([classItem]), reset: () => {} };
+  const feature = { id: "featRetained0000", name: "Tools of the Trade", hasAdvancement: true, system: {} };
+
+  const restored = [];
+  const applied = [];
+  const featureAdv = {
+    type: "Trait",
+    item: feature,
+    configuration: { grants: [], choices: [{ count: 1, pool: ["tool:art:alchemist"] }] },
+    value: { chosen: [] },
+    async apply(level, data, options) { applied.push({ level, data, options }); },
+    async restore(level, data) { restored.push({ level, data }); }
+  };
+  const featureFlow = { advancement: featureAdv, level: 3, getAutomaticApplicationValue: async () => false };
+  if ( retainedData ) featureFlow.retainedData = retainedData;
+
+  const flowsByItem = new Map([[feature.id, [featureFlow]]]);
+
+  // The class's own level-3 grant is what puts the feature on the clone mid-walk.
+  const grant = autoFlow("ItemGrant", 3, classItem, () => clone.items.set(feature));
+  const steps = [{ type: "forward", class: { item: classItem, level: 3 }, level: 3, flow: grant }];
+
+  const driver = new LevelUpDriver(makeManager({ steps, clone, flowsByItem }));
+  return { driver, restored, applied, featureFlow };
+}
+
+describe("synthesised steps for a flow that kept its data", () => {
+  it("restores the retained choices instead of asking for them again", async () => {
+    const retainedData = { chosen: ["tool:art:alchemist"] };
+    const w = makeRetainedWorld({ retainedData });
+    await w.driver.prepare();
+
+    expect(w.driver.steps[1]).toMatchObject({ type: "restore", automatic: true, synthetic: true });
+    expect(w.restored).toEqual([{ level: 3, data: retainedData }]);
+    expect(w.applied).toHaveLength(0);
+    expect(w.driver.traitSteps).toHaveLength(0);
+  });
+
+  it("still surfaces a first-time choice as a decision", async () => {
+    const w = makeRetainedWorld();
+    await w.driver.prepare();
+
+    expect(w.driver.steps[1]).toMatchObject({ type: "forward", synthetic: true });
+    expect(w.restored).toHaveLength(0);
+    expect(w.driver.traitSteps).toHaveLength(1);
+  });
+});

@@ -88,6 +88,9 @@ export function installFoundryShims() {
     }
   };
 
+  // Foundry extends the Array constructor; the advancement walk's step synthesis calls it.
+  Array.fromRange ??= (n, min = 0) => Array.from({ length: n }, (_, i) => i + min);
+
   // Roll: validate accepts anything non-empty; evaluate yields a fixed total (rolling is
   // never asserted here, only that the pool has six values in it).
   globalThis.Roll = class Roll {

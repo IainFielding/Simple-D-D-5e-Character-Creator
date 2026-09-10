@@ -30,6 +30,18 @@ Archived as `sweep-results-600-reference.jsonl`. **This is the 6.0.0 reference b
 full `_meta` header; every older baseline on this machine was taken on 5.3.3 and none is comparable to
 it (see *Baseline comparability* below).
 
+> **The sweep measured a 6.0.0 pre-release, and the baseline survives the real one.** dnd5e 6.0.0
+> shipped publicly on **2026-09-10**; what was installed and swept on 09-05 was the earlier
+> `release-6.0.0` build (source dated 09-04). Diffing the two trees: **29 source files changed, one
+> added (`documents/roll-table.mjs`), `system.json` identical, one language key added and none
+> removed, no new deprecations — and `packs/_source` byte-identical across all 4 871 files.** Since
+> the sweep compares *content the packs supply*, no scenario's expected output moved: **this baseline
+> stands for the shipped release.** Only one changed file touches the path we drive —
+> `AdvancementManager##synthesizeSteps` now raises a retained flow as an automatic `restore` step
+> instead of a fresh `forward` one; the driver's port was updated to match (`manager-driver.mjs`,
+> covered by `test/levelup-synth.test.mjs`). The rest are chat cards, effects, tokens, the welcome
+> screen, journal CSS hooks and two `error`/`err` typo fixes in the manager's own catch blocks.
+
 ### The result
 
 | | first run (before fixes) | **re-run, 2026-09-05 12:14** |
